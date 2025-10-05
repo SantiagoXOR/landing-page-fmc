@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://formosamoto.com'),
   title: 'Formosa Moto Crédito - Financiación de Motos en Formosa',
   description: 'Conseguí la moto de tus sueños con Formosa Moto Crédito. Financiación rápida y fácil para Honda, Yamaha, Zanella y más marcas. Cuotas accesibles y proceso 100% digital.',
   keywords: 'motos formosa, credito motos, financiacion motos, honda formosa, yamaha formosa, zanella formosa, moto credito, cuotas motos',
@@ -33,8 +34,6 @@ export const metadata: Metadata = {
     description: 'Conseguí la moto de tus sueños con financiación rápida y fácil. Cuotas accesibles y proceso 100% digital.',
     images: ['/logofmc.svg'],
   },
-  viewport: 'width=device-width, initial-scale=1',
-  themeColor: '#5b00ea',
   manifest: '/manifest.json',
 }
 

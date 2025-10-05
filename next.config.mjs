@@ -24,7 +24,7 @@ const nextConfig = {
   poweredByHeader: false,
   generateEtags: true,
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // Temporarily disabled due to critters dependency issue
   },
 }
 

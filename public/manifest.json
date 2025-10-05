@@ -1,0 +1,28 @@
+{
+  "name": "Formosa Moto Crédito",
+  "short_name": "FMC",
+  "description": "Financiación de motos en Formosa - Conseguí la moto de tus sueños con cuotas accesibles",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e40af",
+  "theme_color": "#1e40af",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logofmcsimple.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logofmcsimple.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "automotive", "business"],
+  "lang": "es-AR",
+  "scope": "/",
+  "id": "formosa-moto-credito"
+}

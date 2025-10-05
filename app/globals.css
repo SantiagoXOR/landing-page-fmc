@@ -1,0 +1,948 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Paleta de colores de FMC para shadcn/tokens */
+:root {
+  --primary: 262 100% 46%; /* fmc-purple */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 137 57% 59%; /* fmc-green */
+  --secondary-foreground: 0 0% 12%;
+  --accent: 202 100% 65%; /* fmc-blue */
+  --accent-foreground: 0 0% 12%;
+  --background: 0 0% 100%;
+  --foreground: 222 14% 15%;
+  --muted: 222 14% 95%;
+  --muted-foreground: 222 10% 45%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 222 14% 85%;
+  --input: 222 14% 85%;
+  --ring: 262 100% 46%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 14% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 14% 15%;
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: 222 20% 10%;
+  --foreground: 0 0% 100%;
+  --card: 222 20% 14%;
+  --card-foreground: 0 0% 100%;
+  --popover: 222 20% 14%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 262 100% 46%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 137 57% 59%;
+  --secondary-foreground: 0 0% 12%;
+  --muted: 222 20% 20%;
+  --muted-foreground: 222 14% 65%;
+  --accent: 202 100% 65%;
+  --accent-foreground: 0 0% 12%;
+  --destructive: 0 60% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 222 20% 22%;
+  --input: 222 20% 22%;
+  --ring: 262 100% 46%;
+  --chart-1: 262 100% 52%;
+  --chart-2: 202 100% 65%;
+  --chart-3: 137 57% 59%;
+}
+
+/* Hero Parallax Styles */
+.hero-parallax {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+.parallax-bg {
+  will-change: transform;
+  transition: transform 0.1s ease-out;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.parallax-fg {
+  will-change: transform;
+  transition: transform 0.1s ease-out;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Mobile-first responsive adjustments */
+@media (max-width: 640px) {
+  .hero-parallax {
+    min-height: 100vh;
+    padding: 2rem 0;
+  }
+  
+  .parallax-fg {
+    opacity: 0.6;
+    object-position: center right;
+  }
+}
+
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .will-change-transform {
+    will-change: auto;
+  }
+  
+  .parallax-bg,
+  .parallax-fg {
+    transform: none !important;
+    transition: none !important;
+  }
+  
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 768px) {
+  .parallax-fg {
+    opacity: 0.7;
+    object-position: center right;
+  }
+}
+
+@media (min-width: 769px) {
+  .parallax-fg {
+    opacity: 0.8;
+    object-position: center right;
+  }
+}
+
+/* Ensure proper z-index stacking */
+.hero-parallax .absolute {
+  position: absolute;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Performance optimizations */
+.parallax-bg,
+.parallax-fg {
+  backface-visibility: hidden;
+  perspective: 1000px;
+  transform: translate3d(0, 0, 0);
+}
+
+/* ACTO Font Family */
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-Hairline.otf') format('opentype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-HairlineItalic.otf') format('opentype');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-Thin.otf') format('opentype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-ThinItalic.otf') format('opentype');
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-UltraLight.otf') format('opentype');
+  font-weight: 250;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-UltraLightItalic.otf') format('opentype');
+  font-weight: 250;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-LightItalic.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-Book.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-BookItalic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-SemiBold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-SemiBoldItalic.otf') format('opentype');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-BoldItalic.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-ExtraBold.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-ExtraBoldItalic.otf') format('opentype');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Fondos FMC para secciones (desktop/mobile) */
+.fmc-bg-2,
+.fmc-bg-3,
+.fmc-bg-4,
+.fmc-bg-5 {
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.fmc-bg-2 { background-image: url('/hero/bg2.png'); }
+.fmc-bg-3 { background-image: url('/hero/bg3.png'); }
+.fmc-bg-4 { background-image: url('/hero/bg4.png'); }
+.fmc-bg-5 { background-image: url('/hero/bg5.png'); }
+
+@media (max-width: 768px) {
+  /* Mantener el mismo fondo en mobile según pedido (bg4) */
+  .fmc-bg-4 { background-image: url('/hero/bg4.png'); }
+}
+
+.fmc-bg-gradient {
+  background: linear-gradient(135deg, rgba(91,0,234,0.65) 0%, rgba(81,194,255,0.35) 100%);
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-BlackItalic.otf') format('opentype');
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-UltraBlack.otf') format('opentype');
+  font-weight: 950;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/Acto-UltraBlackItalic.otf') format('opentype');
+  font-weight: 950;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Formosa Moto Crédito Design System */
+:root {
+  /* Brand Colors */
+  --fmc-green: #5bd26f;
+  --fmc-purple: #5b00ea;
+  --fmc-white: #ffffff;
+  --fmc-blue: #51c2ff;
+  
+  /* Brand Color Variations */
+  --fmc-green-light: #7de094;
+  --fmc-green-dark: #4bb85f;
+  --fmc-purple-light: #7a33ed;
+  --fmc-purple-dark: #4600c7;
+  --fmc-blue-light: #74d1ff;
+  --fmc-blue-dark: #2eb3ff;
+  
+  /* Semantic Colors */
+  --background: var(--fmc-white);
+  --foreground: #1a1a1a;
+  --card: var(--fmc-white);
+  --card-foreground: #1a1a1a;
+  --popover: var(--fmc-white);
+  --popover-foreground: #1a1a1a;
+  --primary: var(--fmc-purple);
+  --primary-foreground: var(--fmc-white);
+  --secondary: var(--fmc-green);
+  --secondary-foreground: var(--fmc-white);
+  --muted: #f8f9fa;
+  --muted-foreground: #6c757d;
+  --accent: var(--fmc-blue);
+  --accent-foreground: var(--fmc-white);
+  --destructive: #dc3545;
+  --destructive-foreground: var(--fmc-white);
+  --border: #e9ecef;
+  --input: #e9ecef;
+  --ring: var(--fmc-purple);
+  --chart-1: var(--fmc-green);
+  --chart-2: var(--fmc-purple);
+  --chart-3: var(--fmc-blue);
+  --chart-4: var(--fmc-green-light);
+  --chart-5: var(--fmc-purple-light);
+  --radius: 0.625rem;
+  --sidebar: var(--fmc-white);
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: var(--fmc-purple);
+  --sidebar-primary-foreground: var(--fmc-white);
+  --sidebar-accent: var(--fmc-green);
+  --sidebar-accent-foreground: var(--fmc-white);
+  --sidebar-border: #e9ecef;
+  --sidebar-ring: var(--fmc-purple);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+/* Typography - Acto Font Family */
+.font-acto {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.font-acto-light {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+}
+
+.font-acto-regular {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+}
+
+.font-acto-medium {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+}
+
+.font-acto-semibold {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+}
+
+.font-acto-bold {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+}
+
+.font-acto-extrabold {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 800;
+}
+
+.font-acto-black {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 900;
+}
+
+/* Brand Color Utilities */
+.text-fmc-green { color: var(--fmc-green); }
+.text-fmc-purple { color: var(--fmc-purple); }
+.text-fmc-blue { color: var(--fmc-blue); }
+.text-fmc-white { color: var(--fmc-white); }
+
+.bg-fmc-green { background-color: var(--fmc-green); }
+.bg-fmc-purple { background-color: var(--fmc-purple); }
+.bg-fmc-blue { background-color: var(--fmc-blue); }
+.bg-fmc-white { background-color: var(--fmc-white); }
+
+.border-fmc-green { border-color: var(--fmc-green); }
+.border-fmc-purple { border-color: var(--fmc-purple); }
+.border-fmc-blue { border-color: var(--fmc-blue); }
+
+/* Gradient Utilities */
+.bg-gradient-fmc-primary {
+  background: linear-gradient(135deg, var(--fmc-purple) 0%, var(--fmc-blue) 100%);
+}
+
+.bg-gradient-fmc-secondary {
+  background: linear-gradient(135deg, var(--fmc-green) 0%, var(--fmc-blue) 100%);
+}
+
+.bg-gradient-fmc-accent {
+  background: linear-gradient(135deg, var(--fmc-purple) 0%, var(--fmc-green) 100%);
+}
+
+@theme inline {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Added scrolling animation for brand header */
+@keyframes scroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+/* Floating animations for decorative elements */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes float-delayed {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 8s ease-in-out infinite 2s;
+}
+
+/* Pulse animation for buttons and interactive elements */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(147, 51, 234, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.8), 0 0 30px rgba(147, 51, 234, 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Gradient text animation */
+@keyframes gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.text__gradient {
+  background: linear-gradient(-45deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
+  background-size: 400% 400%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Header animate styles */
+.header__animate {
+  position: relative;
+  overflow: hidden;
+}
+
+.header__animate__wraper {
+  display: flex;
+  animation: scroll 30s linear infinite;
+  white-space: nowrap;
+}
+
+.header__animate__item {
+  display: flex;
+  align-items: center;
+  margin-right: 3rem;
+  flex-shrink: 0;
+}
+
+/* Service features hover effects */
+.service__features__item {
+  transition: all 0.3s ease;
+}
+
+.service__features__item:hover {
+  transform: translateY(-5px);
+}
+
+/* Single transform hover effect */
+.single__transform {
+  transition: all 0.3s ease;
+}
+
+.single__transform:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* About image tilt effect simulation */
+.about__img__1 {
+  transition: transform 0.3s ease;
+}
+
+.about__img__1:hover {
+  transform: perspective(1000px) rotateX(5deg) rotateY(5deg) scale3d(1.05, 1.05, 1.05);
+}
+
+/* Herobanner front image hover effect */
+.herobanner__front__img {
+  transition: transform 0.3s ease;
+}
+
+.herobanner__front__img:hover {
+  transform: perspective(1000px) rotateX(2deg) rotateY(2deg) scale3d(1.02, 1.02, 1.02);
+}
+
+/* Brand logos hover effects */
+.brand__single {
+  transition: all 0.3s ease;
+  opacity: 0.8;
+}
+
+.brand__single:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Direction button hover effect */
+.direction__btn {
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #8b5cf6;
+}
+
+.direction__btn:hover {
+  background: #8b5cf6;
+  color: white;
+  transform: scale(1.1);
+}
+
+/* Default button styles */
+.default__button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.default__button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.default__button:hover::before {
+  left: 100%;
+}
+
+/* Section stroke line animation */
+.section__strock__line__animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ssla__animation {
+  position: absolute;
+  opacity: 0.6;
+}
+
+.ssl__img__1 {
+  top: 10%;
+  left: 5%;
+  animation: float 4s ease-in-out infinite;
+}
+
+.ssl__img__2 {
+  bottom: 10%;
+  right: 5%;
+  animation: float-delayed 6s ease-in-out infinite;
+}
+
+/* Hero banner vector animations */
+.herobanner__vector {
+  position: absolute;
+  opacity: 0.3;
+}
+
+.hero__icon__1 {
+  top: 10%;
+  left: 5%;
+  animation: float 8s ease-in-out infinite;
+}
+
+.hero__icon__4 {
+  bottom: 10%;
+  right: 5%;
+  animation: float-delayed 10s ease-in-out infinite;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Loading animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* Card hover effects */
+.hover-lift {
+  transition: all 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Team section styles */
+.team__left {
+  position: relative;
+}
+
+.team__right {
+  position: relative;
+}
+
+.team__icon {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  opacity: 0.1;
+}
+
+/* Contact section background */
+.contact {
+  position: relative;
+}
+
+/* Service section background */
+.service {
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+}
+
+/* About section positioning */
+.about__number {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.about__number__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-radius: 20px;
+  color: white;
+  font-weight: bold;
+}
+
+.about__number__icon {
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  width: 30px;
+  height: 30px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Spacing utilities */
+.sp_top_120 {
+  padding-top: 120px;
+}
+
+.sp_bottom_120 {
+  padding-bottom: 120px;
+}
+
+.sp_top_140 {
+  padding-top: 140px;
+}
+
+.sp_bottom_140 {
+  padding-bottom: 140px;
+}
+
+.sp_bottom_100 {
+  padding-bottom: 100px;
+}
+
+.sp_top_100 {
+  padding-top: 100px;
+}
+
+.sp_40 {
+  padding: 40px 0;
+}
+
+.sp_50 {
+  padding: 50px;
+}
+
+.sp_bottom_30 {
+  padding-bottom: 30px;
+}
+
+.sp_bottom_20 {
+  padding-bottom: 20px;
+}
+
+.sp_bottom_70 {
+  padding-bottom: 70px;
+}
+
+.sp_bottom_90 {
+  padding-bottom: 90px;
+}
+
+/* Height utilities */
+.height__800 {
+  min-height: 800px;
+}
+
+/* Special spacing */
+.special__spacing {
+  padding: 120px 0 140px;
+}

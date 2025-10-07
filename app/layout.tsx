@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Analytics } from '@vercel/analytics/next'
+// import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -55,7 +55,7 @@ export default function RootLayout({
       <body className="font-acto antialiased bg-white text-gray-900">
         {children}
         <Toaster position="top-right" />
-        <Analytics />
+        {/* <Analytics /> */}
       </body>
     </html>
   )

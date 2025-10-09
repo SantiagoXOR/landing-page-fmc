@@ -220,20 +220,20 @@ export function CreditForm() {
     }
   }
 
-  // Estilos comunes para inputs
-  const inputClasses = "font-acto-regular border-fmc-purple/30 focus-visible:outline-none focus:border-fmc-green focus:ring-2 focus:ring-fmc-green/40 placeholder:text-gray-400"
+  // Estilos comunes para inputs (añadimos transición suave)
+  const inputClasses = "font-acto-regular border-fmc-purple/30 focus-visible:outline-none focus:border-fmc-green focus:ring-2 focus:ring-fmc-green/40 placeholder:text-gray-400 motion-safe:transition-all motion-safe:duration-200"
 
   // Calcular progreso
   const progress = (step / 3) * 100
 
   return (
-    <section id="solicitar-credito" className="py-8 relative overflow-hidden">
+    <section id="solicitar-credito" className="py-8 relative overflow-hidden" data-aos="fade-up">
       {/* Imagen de fondo */}
       <div className="absolute inset-0 fmc-bg-2 md:fmc-bg-4"></div>
       <div className="absolute inset-0 fmc-bg-gradient"></div>
       
       <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-12">
+        <div className="text-center mb-12" data-aos="fade-down">
           <h2 className="text-3xl md:text-4xl font-acto-bold text-white mb-4">
             SOLICITAR CRÉDITO
           </h2>
@@ -242,13 +242,13 @@ export function CreditForm() {
           </p>
         </div>
         
-        <div className="w-full max-w-2xl mx-auto px-4 pt-0">
-          <Card className="shadow-xl border-fmc-purple/20 py-0">
+        <div className="w-full max-w-2xl mx-auto px-4 pt-0" data-aos="fade-up" data-aos-delay="100">
+          <Card className="shadow-xl border-fmc-purple/20 py-0 will-change-transform motion-safe:transition-transform motion-safe:duration-300 hover:-translate-y-[1px] active:scale-[0.99] hover:shadow-lg">
             <CardHeader className="hidden" />
         
         <CardContent className="p-4 pt-0">
           {/* Indicador de progreso mejorado */}
-          <div className="mb-5">
+          <div className="mb-5" data-aos="fade-up" data-aos-delay="150">
               <div className="flex items-center justify-between mb-3">
                 {[1, 2, 3].map((stepNumber) => (
                   <div key={stepNumber} className="flex items-center">
@@ -289,7 +289,7 @@ export function CreditForm() {
               {/* Paso 1: Datos Personales */}
               {step === 1 && (
                 <div className="space-y-6">
-                  <div className="text-center">
+                  <div className="text-center" data-aos="fade-up">
                     <h3 className="text-xl font-acto-bold text-fmc-purple mb-2">DATOS PERSONALES</h3>
                     <p className="text-sm text-fmc-purple/70 font-acto-regular">
                       Ingresa tu información personal para procesar tu solicitud
@@ -298,7 +298,7 @@ export function CreditForm() {
                   
                   <Separator className="bg-fmc-purple/20" />
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="50">
                     <FormField
                       control={form.control}
                       name="nombre"
@@ -343,7 +343,7 @@ export function CreditForm() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="100">
                     <FormField
                       control={form.control}
                       name="dni"
@@ -388,7 +388,7 @@ export function CreditForm() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="150">
                     <FormField
                       control={form.control}
                       name="email"
@@ -435,7 +435,7 @@ export function CreditForm() {
                   </div>
 
                   {/* Zona de Formosa */}
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 gap-4" data-aos="fade-up" data-aos-delay="200">
                     <FormField
                       control={form.control}
                       name="zona"
@@ -492,7 +492,7 @@ export function CreditForm() {
 
               {/* Paso 2: Selección de Vehículo */}
               {step === 2 && (
-                <div className="space-y-6">
+                <div className="space-y-6" data-aos="fade-up">
                   <div className="text-center">
                     <h3 className="text-xl font-acto-bold text-fmc-purple mb-2">Vehículo de Interés</h3>
                     <p className="text-sm text-fmc-purple/70 font-acto-regular">
@@ -511,40 +511,40 @@ export function CreditForm() {
                         <FormLabel className="font-acto-semibold text-fmc-purple">Tipo de Vehículo *</FormLabel>
                         <FormControl>
                           <div className="grid grid-cols-2 gap-4">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                field.onChange('moto')
-                                form.setValue('marca', '')
-                                form.setValue('modelo', '')
-                              }}
-                              className={cn(
-                                "p-6 rounded-lg border-2 transition-all duration-200 flex flex-col items-center gap-3",
-                                field.value === 'moto'
-                                  ? "border-fmc-green bg-fmc-green/10 text-fmc-green"
-                                  : "border-fmc-purple/30 hover:border-fmc-purple/50 text-fmc-purple/70"
-                              )}
-                            >
-                              <Bike className="w-8 h-8" />
-                              <span className="font-acto-semibold">Moto</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                field.onChange('auto')
-                                form.setValue('marca', '')
-                                form.setValue('modelo', '')
-                              }}
-                              className={cn(
-                                "p-6 rounded-lg border-2 transition-all duration-200 flex flex-col items-center gap-3",
-                                field.value === 'auto'
-                                  ? "border-fmc-green bg-fmc-green/10 text-fmc-green"
-                                  : "border-fmc-purple/30 hover:border-fmc-purple/50 text-fmc-purple/70"
-                              )}
-                            >
-                              <Car className="w-8 h-8" />
-                              <span className="font-acto-semibold">Auto</span>
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              field.onChange('moto')
+                              form.setValue('marca', '')
+                              form.setValue('modelo', '')
+                            }}
+                            className={cn(
+                              "p-6 rounded-lg border-2 transition-all duration-200 flex flex-col items-center gap-3 will-change-transform motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-[2px] active:scale-[0.99] hover:shadow-md",
+                              field.value === 'moto'
+                                ? "border-fmc-green bg-fmc-green/10 text-fmc-green"
+                                : "border-fmc-purple/30 hover:border-fmc-purple/50 text-fmc-purple/70"
+                            )}
+                          >
+                            <Bike className="w-8 h-8" />
+                            <span className="font-acto-semibold">Moto</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              field.onChange('auto')
+                              form.setValue('marca', '')
+                              form.setValue('modelo', '')
+                            }}
+                            className={cn(
+                              "p-6 rounded-lg border-2 transition-all duration-200 flex flex-col items-center gap-3 will-change-transform motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-[2px] active:scale-[0.99] hover:shadow-md",
+                              field.value === 'auto'
+                                ? "border-fmc-green bg-fmc-green/10 text-fmc-green"
+                                : "border-fmc-purple/30 hover:border-fmc-purple/50 text-fmc-purple/70"
+                            )}
+                          >
+                            <Car className="w-8 h-8" />
+                            <span className="font-acto-semibold">Auto</span>
+                          </button>
                           </div>
                         </FormControl>
                         <FormMessage />

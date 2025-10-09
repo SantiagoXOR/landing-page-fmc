@@ -133,9 +133,9 @@ export function Testimonials() {
   }, [carouselApi])
 
   return (
-    <section className="py-16 bg-gradient-fmc-primary/10">
+    <section className="py-16 bg-gradient-fmc-primary/10" data-aos="fade-up">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
+        <div className="text-center mb-12" data-aos="fade-down">
           <h2 className="text-4xl md:text-5xl font-acto-extrabold tracking-tight mb-2 text-fmc-purple">
             Lo que dicen nuestros clientes
           </h2>
@@ -149,8 +149,8 @@ export function Testimonials() {
           <div className="mb-10 rounded-2xl overflow-hidden">
             <Carousel className="w-full" opts={{ loop: true }} setApi={setCarouselApi}>
               <CarouselContent>
-                <CarouselItem>
-                  <AspectRatio ratio={1} className="w-full rounded-2xl overflow-hidden bg-white shadow-md">
+                <CarouselItem data-aos="zoom-in">
+                  <AspectRatio ratio={1} className="w-full rounded-2xl overflow-hidden bg-white shadow-md will-change-transform motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-out hover:scale-[1.02]">
                     <Image
                       src="/hero/testimonial1.png"
                       alt="Cliente retirando su moto gracias al crédito"
@@ -160,8 +160,8 @@ export function Testimonials() {
                     />
                   </AspectRatio>
                 </CarouselItem>
-                <CarouselItem>
-                  <AspectRatio ratio={1} className="w-full rounded-2xl overflow-hidden bg-white shadow-md">
+                <CarouselItem data-aos="zoom-in">
+                  <AspectRatio ratio={1} className="w-full rounded-2xl overflow-hidden bg-white shadow-md will-change-transform motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-out hover:scale-[1.02]">
                     <Image
                       src="/hero/testimonial2.png"
                       alt="Entrega de moto en concesionaria con financiamiento"
@@ -170,8 +170,8 @@ export function Testimonials() {
                     />
                   </AspectRatio>
                 </CarouselItem>
-                <CarouselItem>
-                  <AspectRatio ratio={1} className="w-full rounded-2xl overflow-hidden bg-white shadow-md">
+                <CarouselItem data-aos="zoom-in">
+                  <AspectRatio ratio={1} className="w-full rounded-2xl overflow-hidden bg-white shadow-md will-change-transform motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-out hover:scale-[1.02]">
                     <Image
                       src="/hero/testimonial3.png"
                       alt="Nuevo propietario feliz tras aprobar crédito de moto"
@@ -186,7 +186,7 @@ export function Testimonials() {
 
           {/* Testimonial Principal */}
           <div className="relative">
-            <Card className={`bg-white shadow-xl border-0 transition-all duration-300 ${
+            <Card className={`bg-white shadow-xl border-0 transition-all duration-300 will-change-transform motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-[1px] active:scale-[0.99] hover:shadow-lg ${
               isAnimating ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
             }`}>
               <CardContent className="p-8 md:p-12">
@@ -233,7 +233,7 @@ export function Testimonials() {
                 size="icon"
                 onClick={prevTestimonial}
                 disabled={isAnimating}
-                className="h-12 w-12 rounded-full border-2 border-fmc-purple/40 hover:border-fmc-purple hover:bg-fmc-purple/10"
+                className="h-12 w-12 rounded-full border-2 border-fmc-purple/40 hover:border-fmc-purple hover:bg-fmc-purple/10 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-[1px] active:scale-[0.98]"
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
@@ -259,7 +259,7 @@ export function Testimonials() {
                 size="icon"
                 onClick={nextTestimonial}
                 disabled={isAnimating}
-                className="h-12 w-12 rounded-full border-2 border-fmc-purple/40 hover:border-fmc-purple hover:bg-fmc-purple/10"
+                className="h-12 w-12 rounded-full border-2 border-fmc-purple/40 hover:border-fmc-purple hover:bg-fmc-purple/10 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-[1px] active:scale-[0.98]"
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
@@ -271,7 +271,7 @@ export function Testimonials() {
           {/* Bento Grid: Clientes satisfechos */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
             {/* Card 1 */}
-            <Card className="bg-white border-fmc-purple/20 shadow-sm hover:shadow-md transition-shadow">
+            <Card data-aos="fade-up" data-aos-delay="0" className="bg-white border-fmc-purple/20 shadow-sm hover:shadow-md transition-shadow will-change-transform motion-safe:transition-transform motion-safe:duration-300 hover:-translate-y-[2px] active:scale-[0.99]">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 rounded-full bg-fmc-purple/10 text-fmc-purple flex items-center justify-center mx-auto mb-3">
                   <Smile className="w-6 h-6" />
@@ -282,7 +282,7 @@ export function Testimonials() {
             </Card>
 
             {/* Card 2 */}
-            <Card className="bg-white border-fmc-purple/20 shadow-sm hover:shadow-md transition-shadow">
+            <Card data-aos="fade-up" data-aos-delay="100" className="bg-white border-fmc-purple/20 shadow-sm hover:shadow-md transition-shadow will-change-transform motion-safe:transition-transform motion-safe:duration-300 hover:-translate-y-[2px] active:scale-[0.99]">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 rounded-full bg-fmc-purple/10 text-fmc-purple flex items-center justify-center mx-auto mb-3">
                   <Star className="w-6 h-6" />
@@ -293,7 +293,7 @@ export function Testimonials() {
             </Card>
 
             {/* Card 3 */}
-            <Card className="bg-white border-fmc-purple/20 shadow-sm hover:shadow-md transition-shadow">
+            <Card data-aos="fade-up" data-aos-delay="200" className="bg-white border-fmc-purple/20 shadow-sm hover:shadow-md transition-shadow will-change-transform motion-safe:transition-transform motion-safe:duration-300 hover:-translate-y-[2px] active:scale-[0.99]">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 rounded-full bg-fmc-purple/10 text-fmc-purple flex items-center justify-center mx-auto mb-3">
                   <ThumbsUp className="w-6 h-6" />

@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive will-change-[transform,box-shadow] motion-safe:transition-[transform,box-shadow,background-color,color,border] motion-safe:duration-200 motion-safe:ease-out hover:-translate-y-[1px] active:scale-[0.98] hover:shadow-lg",
   {
     variants: {
       variant: {
@@ -20,12 +20,19 @@ const buttonVariants = cva(
         ghost:
           'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         link: 'text-primary underline-offset-4 hover:underline',
+        // CTA variants for FMC branding
+        fmcCtaPrimary:
+          'bg-fmc-blue text-white shadow-md hover:bg-fmc-blue/90 focus-visible:ring-sky-400/30',
+        fmcCtaWhatsapp:
+          'bg-fmc-green text-white shadow-md hover:bg-fmc-green/90 focus-visible:ring-emerald-400/30',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
         sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
         icon: 'size-9',
+        // Larger pill for hero CTAs
+        xl: 'h-12 rounded-full px-6 md:px-8 text-base md:text-[0.95rem] has-[>svg]:px-6',
       },
     },
     defaultVariants: {

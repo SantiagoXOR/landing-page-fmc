@@ -15,6 +15,7 @@ import Footer from "@/components/footer"
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [headerHeight, setHeaderHeight] = useState(0)
 
   useEffect(() => {
     setIsClient(true)
@@ -22,13 +23,27 @@ export default function Home() {
       const AOS = (await import("aos")).default
       await import("aos/dist/aos.css")
       AOS.init({
-        duration: 1500,
-        easing: "ease",
+        // Ajustes más sensibles y rápidos
+        duration: 900,
+        easing: "ease-out-quart",
         once: true,
-        offset: 100,
+        offset: 80,
       })
     }
     initAOS()
+
+    // Calcular y mantener la altura del header fijo para evitar solapados en móvil
+    const updateHeaderHeight = () => {
+      const headerEl = document.querySelector('header') as HTMLElement | null
+      if (headerEl) {
+        setHeaderHeight(headerEl.getBoundingClientRect().height)
+      }
+    }
+    updateHeaderHeight()
+    window.addEventListener('resize', updateHeaderHeight)
+    return () => {
+      window.removeEventListener('resize', updateHeaderHeight)
+    }
   }, [])
 
   return (
@@ -80,36 +95,39 @@ export default function Home() {
         {/* Navegación Principal - Mobile First Optimizada */}
         <nav className="container mx-auto px-3 xs:px-4 py-2.5 xs:py-3 md:py-4">
           <div className="flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center">
+            {/* Logo: símbolo + texto para tipografía consistente */}
+            <div className="flex items-center gap-2">
               <Image
-                src="/logofmc.svg"
-                alt="Formosa Moto Crédito"
-                width={120}
+                src="/logofmcsimple.svg"
+                alt="FMC"
+                width={36}
                 height={36}
-                className="h-6 xs:h-8 md:h-10 w-auto"
+                className="h-6 w-6 xs:h-8 xs:w-8 md:h-10 md:w-10"
                 priority
               />
+              <span className="text-white font-acto-bold tracking-wide text-xs xs:text-sm md:text-base leading-tight">
+                FORMOSA MOTO CRÉDITO
+              </span>
             </div>
 
             {/* Desktop Navigation - solo accesos rápidos */}
-            <div className="hidden lg:flex items-center space-x-2 text-sm font-acto">
+            <div className="hidden lg:flex items-center space-x-2 text-sm font-acto" data-aos="fade-down" data-aos-delay="150">
               <div className="flex items-center gap-2">
                 <a
                   href="#tasas"
-                  className="inline-flex items-center rounded-full bg-white/10 border border-white/20 text-white px-4 py-2 shadow-sm hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/40"
+                  className="inline-flex items-center rounded-full bg-white/10 border border-white/20 text-white px-4 py-2 shadow-sm hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/40 transition-transform duration-200 ease-out hover:-translate-y-[1px] active:scale-[0.98]"
                 >
                   Tasas
                 </a>
                 <a
                   href="#solicitud"
-                  className="inline-flex items-center rounded-full bg-fmc-green text-white px-4 py-2 shadow-lg hover:bg-fmc-green/90 focus-visible:ring-2 focus-visible:ring-fmc-green/40"
+                  className="inline-flex items-center rounded-full bg-fmc-green text-white px-4 py-2 shadow-lg hover:bg-fmc-green/90 focus-visible:ring-2 focus-visible:ring-fmc-green/40 transition-transform duration-200 ease-out hover:-translate-y-[1px] active:scale-[0.98]"
                 >
                   Crédito
                 </a>
                 <a
                   href="#testimonios"
-                  className="inline-flex items-center rounded-full bg-white/10 border border-white/20 text-white px-4 py-2 shadow-sm hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/40"
+                  className="inline-flex items-center rounded-full bg-white/10 border border-white/20 text-white px-4 py-2 shadow-sm hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/40 transition-transform duration-200 ease-out hover:-translate-y-[1px] active:scale-[0.98]"
                 >
                   Testimonios
                 </a>
@@ -166,6 +184,9 @@ export default function Home() {
           )}
         </nav>
       </header>
+
+      {/* Separador para compensar el header fijo y evitar solapado en el Hero */}
+      <div aria-hidden="true" style={{ height: headerHeight || 72 }} />
 
       {/* Hero Section Optimizado */}
       <Hero />
@@ -617,13 +638,15 @@ export default function Home() {
 <section
   className="relative overflow-hidden fmc-bg-3 py-20"
   style={{ backgroundPosition: 'center 22%' }}
+  data-aos="fade-up"
+  data-aos-delay="100"
 >
   {/* Overlay para legibilidad */}
   <div className="absolute inset-0 fmc-bg-gradient" aria-hidden="true" />
   <div className="relative container mx-auto px-4">
     <div className="grid grid-cols-1 gap-12 place-items-center">
       {/* Contenido: cierre de CTA */}
-      <div className="space-y-5 text-center">
+      <div className="space-y-5 text-center" data-aos="zoom-in" data-aos-delay="150">
         <div className="flex items-center justify-center mx-auto">
           <img src="/logofmcsimple.svg" alt="FMC" className="h-10 w-auto" />
         </div>
@@ -632,20 +655,12 @@ export default function Home() {
           Tasas competitivas y aprobación rápida. Empezá hoy y llevate tu 0km.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-          <a
-            href="#solicitud"
-            className="inline-block bg-fmc-green hover:bg-fmc-green/90 text-white font-acto-semibold px-6 py-3 rounded-lg shadow-lg"
-          >
-            Solicitar crédito
-          </a>
-          <a
-            href="https://wa.me/543704069592"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block bg-fmc-blue hover:bg-fmc-blue/90 text-white font-acto-semibold px-6 py-3 rounded-lg shadow-lg"
-          >
-            Hablar por WhatsApp
-          </a>
+          <Button asChild variant="fmcCtaPrimary" size="xl" className="font-acto-bold">
+            <a href="#solicitud">Solicitar crédito</a>
+          </Button>
+          <Button asChild variant="fmcCtaWhatsapp" size="xl" className="font-acto-bold">
+            <a href="https://wa.me/543704069592" target="_blank" rel="noopener noreferrer">Hablar por WhatsApp</a>
+          </Button>
         </div>
       </div>
     </div>

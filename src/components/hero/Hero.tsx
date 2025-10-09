@@ -36,7 +36,7 @@ export default function Hero({ className = "" }: HeroProps) {
   }, []);
 
   return (
-    <section className={`relative min-h-screen overflow-hidden ${className}`}>
+    <section className={`relative min-h-screen overflow-hidden pb-16 sm:pb-20 md:pb-0 ${className}`}>
       {/* Background Layer */}
       <div 
         ref={bgRef}
@@ -60,7 +60,7 @@ export default function Hero({ className = "" }: HeroProps) {
 
       {/* Overlay para legibilidad en móviles */}
       <div
-        className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-tr from-black/60 via-black/35 to-transparent sm:from-black/40 sm:via-black/25"
+        className="absolute inset-0 z-5 pointer-events-none bg-gradient-to-tr from-black/60 via-black/35 to-transparent sm:from-black/40 sm:via-black/25"
         aria-hidden="true"
       />
 
@@ -77,7 +77,7 @@ export default function Hero({ className = "" }: HeroProps) {
           width={800}
           height={1200}
           className="w-full h-auto select-none object-contain 
-                     max-h-[50vh] sm:max-h-[56vh] md:max-h-[85vh] lg:max-h-none
+                     max-h-[64vh] sm:max-h-[56vh] md:max-h-[85vh] lg:max-h-none
                      transition-all duration-700 ease-out
                      hover:scale-105 hover:brightness-110 hover:drop-shadow-2xl
                      group-hover:rotate-1"
@@ -87,7 +87,7 @@ export default function Hero({ className = "" }: HeroProps) {
       </div>
 
       {/* Botones Mobile bajo la moto */}
-  <div className="order-3 md:hidden" data-aos="fade-up" data-aos-delay="120">
+  <div className="order-3 md:hidden relative z-30 mb-10 sm:mb-12" data-aos="fade-up" data-aos-delay="120">
     <div className="max-w-[86vw] sm:max-w-[80vw] px-4 sm:px-6 mx-auto mt-2 sm:mt-3">
       <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4">
         <Button asChild variant="fmcCtaPrimary" size="xl" className="font-acto-bold w-full sm:w-auto">
@@ -107,17 +107,16 @@ export default function Hero({ className = "" }: HeroProps) {
 
       {/* Content Layer - Título en 4 líneas, bajada y botones */}
       <div
-        className="order-1 md:order-none relative z-30 h-full flex items-start md:items-center justify-start 
-                      pt-14 sm:pt-16 md:pl-16 lg:pl-24 xl:pl-32"
-        style={{ paddingTop: 'calc(max(env(safe-area-inset-top), var(--header-offset, 72px)) + 32px)' }}
+        className="order-1 md:order-none relative z-30 h-full flex items-start md:items-center justify-start md:pl-16 lg:pl-24 xl:pl-32"
+        style={{ paddingTop: '0px' }}
       >
         <div className="max-w-[86vw] sm:max-w-[80vw] md:max-w-lg lg:max-w-xl xl:max-w-2xl 
                         px-4 sm:px-6 md:px-12 md:ml-8 lg:ml-12 xl:ml-16 text-left">
           
-          {/* Título en 4 líneas con espaciado correcto */}
+          {/* Título en 4 líneas con espaciado correcto y más prominente en mobile */}
           <h1 className="text-white font-acto-black tracking-tight
-                         text-2xl sm:text-3xl md:text-4xl lg:text-5xl
-                         leading-[1.2] md:leading-tight mb-4 sm:mb-6" data-aos="fade-right" data-aos-delay="100">
+                         text-3xl sm:text-4xl md:text-4xl lg:text-5xl
+                         leading-[1.15] md:leading-tight mb-4 sm:mb-6" data-aos="fade-right" data-aos-delay="100">
             Si cobrás tu sueldo en
             <br />
             <span className="text-emerald-400">Banco Formosa</span>, accedé
@@ -127,8 +126,8 @@ export default function Hero({ className = "" }: HeroProps) {
             para tu <span className="text-sky-300">0km</span>
           </h1>
           
-          {/* Párrafo optimizado */}
-          <p className="text-white/90 text-sm sm:text-base md:text-lg font-acto-regular
+          {/* Párrafo más prominente en mobile */}
+          <p className="text-white/90 text-base sm:text-lg md:text-lg font-acto-regular
                         mb-6 sm:mb-8 max-w-[80vw] sm:max-w-none" data-aos="fade-right" data-aos-delay="160">
             Pedí tu crédito en minutos y financiá el valor de tu vehículo sin complicaciones.
           </p>

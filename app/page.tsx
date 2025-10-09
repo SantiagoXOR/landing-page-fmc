@@ -36,7 +36,10 @@ export default function Home() {
     const updateHeaderHeight = () => {
       const headerEl = document.querySelector('header') as HTMLElement | null
       if (headerEl) {
-        setHeaderHeight(headerEl.getBoundingClientRect().height)
+        const height = headerEl.getBoundingClientRect().height
+        setHeaderHeight(height)
+        // Exponer la altura del header como variable CSS para compensar scroll/anchors
+        document.documentElement.style.setProperty('--header-offset', `${Math.round(height)}px`)
       }
     }
     updateHeaderHeight()

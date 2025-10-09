@@ -227,7 +227,7 @@ export function CreditForm() {
   const progress = (step / 3) * 100
 
   return (
-    <section id="solicitar-credito" className="py-8 relative overflow-hidden" data-aos="fade-up">
+    <section id="solicitar-credito" className="py-8 relative overflow-hidden" data-aos="fade-up" style={{ scrollMarginTop: 'var(--header-offset, 72px)' }}>
       {/* Imagen de fondo */}
       <div className="absolute inset-0 fmc-bg-2 md:fmc-bg-4"></div>
       <div className="absolute inset-0 fmc-bg-gradient"></div>

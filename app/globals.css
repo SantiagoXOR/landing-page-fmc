@@ -27,6 +27,11 @@
   --radius: 0.625rem;
 }
 
+/* Compensar scroll para headers fijos */
+html {
+  scroll-padding-top: var(--header-offset, 72px);
+}
+
 .dark {
   --background: 222 20% 10%;
   --foreground: 0 0% 100%;

@@ -7,8 +7,10 @@ import { MapPin, Phone, ExternalLink, CalendarClock, CheckCircle2, CreditCard, P
 import { useEffect, useState } from "react"
 import { CreditForm } from "@/components/credit-form"
 import { Testimonials } from "@/components/testimonials"
+import { DealersSection } from "@/components/dealers"
 import Hero from "@/src/components/hero/Hero"
 import Image from "next/image"
+import Footer from "@/components/footer"
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
@@ -90,20 +92,28 @@ export default function Home() {
               />
             </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center space-x-8 text-sm font-acto">
-              <a href="#" className="hover:text-fmc-green transition-all duration-300 tracking-[0.12em] uppercase font-acto-semibold py-2 px-2 relative group">
-                <span>Inicio</span>
-                <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-fmc-green transition-all duration-300 group-hover:w-full"></div>
-              </a>
-              <a href="#" className="hover:text-fmc-green transition-all duration-300 tracking-[0.12em] uppercase font-acto-semibold py-2 px-2 relative group">
-                <span>Nosotros</span>
-                <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-fmc-green transition-all duration-300 group-hover:w-full"></div>
-              </a>
-              <a href="#" className="hover:text-fmc-green transition-all duration-300 tracking-[0.12em] uppercase font-acto-semibold py-2 px-2 relative group">
-                <span>Concesionarios</span>
-                <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-fmc-green transition-all duration-300 group-hover:w-full"></div>
-              </a>
+            {/* Desktop Navigation - solo accesos rápidos */}
+            <div className="hidden lg:flex items-center space-x-2 text-sm font-acto">
+              <div className="flex items-center gap-2">
+                <a
+                  href="#tasas"
+                  className="inline-flex items-center rounded-full bg-white/10 border border-white/20 text-white px-4 py-2 shadow-sm hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/40"
+                >
+                  Tasas
+                </a>
+                <a
+                  href="#solicitud"
+                  className="inline-flex items-center rounded-full bg-fmc-green text-white px-4 py-2 shadow-lg hover:bg-fmc-green/90 focus-visible:ring-2 focus-visible:ring-fmc-green/40"
+                >
+                  Crédito
+                </a>
+                <a
+                  href="#testimonios"
+                  className="inline-flex items-center rounded-full bg-white/10 border border-white/20 text-white px-4 py-2 shadow-sm hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/40"
+                >
+                  Testimonios
+                </a>
+              </div>
             </div>
 
             {/* Desktop Social Icons */}
@@ -134,15 +144,11 @@ export default function Home() {
           {mobileMenuOpen && (
             <div className="lg:hidden mt-3 xs:mt-4 pb-3 xs:pb-4 border-t border-white/20">
               <div className="flex flex-col space-y-3 xs:space-y-4 pt-3 xs:pt-4">
-                <a href="#" className="text-white hover:text-fmc-green transition-colors duration-300 font-acto-semibold uppercase tracking-wide text-sm xs:text-base">
-                  Inicio
-                </a>
-                <a href="#" className="text-white hover:text-fmc-green transition-colors duration-300 font-acto-semibold uppercase tracking-wide text-sm xs:text-base">
-                  Nosotros
-                </a>
-                <a href="#" className="text-white hover:text-fmc-green transition-colors duration-300 font-acto-semibold uppercase tracking-wide text-sm xs:text-base">
-                  Concesionarios
-                </a>
+                <div className="grid grid-cols-3 gap-2">
+                  <a href="#tasas" className="text-white bg-white/10 border border-white/20 rounded-md py-2 text-center hover:bg-white/20">Tasas</a>
+                  <a href="#solicitud" className="text-white bg-fmc-green rounded-md py-2 text-center hover:bg-fmc-green/90">Crédito</a>
+                  <a href="#testimonios" className="text-white bg-white/10 border border-white/20 rounded-md py-2 text-center hover:bg-white/20">Testimonios</a>
+                </div>
                 <div className="flex items-center space-x-4 pt-2 md:hidden">
                   <a href="https://wa.me/543704069592" target="_blank" rel="noopener noreferrer" className="text-white hover:text-fmc-green transition-all duration-300">
                     <svg className="w-5 h-5 xs:w-6 xs:h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -173,7 +179,8 @@ export default function Home() {
       
 
       {/* Beneficios - Optimizado para móvil */}
-      <section className="py-12 xs:py-16 md:py-20 bg-gray-900 text-white relative">
+      <section id="nosotros" className="py-12 xs:py-16 md:py-20 bg-gray-900 text-white relative scroll-mt-24">
+        <div id="tasas" className="absolute -top-24 h-0" aria-hidden="true" />
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-8 xs:gap-12 items-center">
             {/* Imagen lado izquierdo - Optimizada para móvil */}
@@ -284,56 +291,26 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Brand Logos Section */}
-      <section className="pt-8 pb-0 bg-fmc-purple/90 relative overflow-hidden">
-        {/* Eliminado fondo de imagen entre sección 2 y formulario */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-fmc-purple/70 via-fmc-purple/40 to-transparent"></div>
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 items-center mb-0">
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-honda.png" alt="Honda" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-yamaha.png" alt="Yamaha" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-corven.png" alt="Corven" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-keller.png" alt="Keller" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-mondial.png" alt="Mondial" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 items-center">
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-zanella.png" alt="Zanella" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-suzuki.png" alt="Suzuki" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-gilera.png" alt="Gilera" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-bajaj.png" alt="Bajaj" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-            <div className="text-center">
-              <Image src="https://phronencial.com/fmc/img/logo-motomel.png" alt="Motomel" width={96} height={48} className="h-12 w-auto mx-auto" />
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Brand Logos Section (temporariamente ocultada para remover espacio en blanco) */}
+      <section className="hidden" />
 
       {/* Credit Application Form */}
-      <CreditForm />
+      <div id="solicitud" className="scroll-mt-24">
+        <CreditForm />
+      </div>
 
       {/* Customer Testimonials */}
-      <Testimonials />
+      <div id="testimonios" className="scroll-mt-24">
+        <Testimonials />
+      </div>
+
+      {/* Associated Dealers Section (con filtro y carrusel) */}
+      <div id="concesionarios" className="scroll-mt-24">
+        <DealersSection />
+      </div>
 
       {/* Associated Dealers Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="hidden">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-acto-bold text-fmc-purple mb-4">CONCESIONARIOS ASOCIADOS</h2>
@@ -636,134 +613,50 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Bottom Hero Section with Person */}
-      <section className="relative overflow-hidden bg-gradient-fmc-primary py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="flex justify-center">
-              <img
-                src="https://phronencial.com/fmc/img/team/team_left_bg.png"
-                alt="Happy person giving thumbs up"
-                className="max-w-md w-full h-auto"
-              />
-            </div>
-            <div className="space-y-6 text-center lg:text-right">
-              <div className="w-16 h-16 bg-gradient-fmc-secondary rounded-full flex items-center justify-center mx-auto lg:ml-auto lg:mr-0">
-                <img
-                  src="/logofmcsimple.svg"
-                  alt="FMC"
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <div className="text-2xl font-acto-bold text-white mb-2">FORMOSA</div>
-                <div className="text-lg font-acto-regular text-white">MOTO CRÉDITO</div>
-              </div>
-              <h1 className="text-4xl lg:text-5xl font-acto-bold leading-tight text-white">¿La moto de tus sueños?</h1>
-              <p className="text-xl font-acto-regular text-white">
-                ¡Ahora es más accesible que nunca con la tasa de crédito más baja del mercado!
-              </p>
-            </div>
-          </div>
+{/* CTA Final (compacto) */}
+<section
+  className="relative overflow-hidden fmc-bg-3 py-20"
+  style={{ backgroundPosition: 'center 22%' }}
+>
+  {/* Overlay para legibilidad */}
+  <div className="absolute inset-0 fmc-bg-gradient" aria-hidden="true" />
+  <div className="relative container mx-auto px-4">
+    <div className="grid grid-cols-1 gap-12 place-items-center">
+      {/* Contenido: cierre de CTA */}
+      <div className="space-y-5 text-center">
+        <div className="flex items-center justify-center mx-auto">
+          <img src="/logofmcsimple.svg" alt="FMC" className="h-10 w-auto" />
         </div>
-
-        <div className="absolute top-20 right-20 w-32 h-32 border-4 border-fmc-green/30 rounded-full opacity-30"></div>
-        <div className="absolute bottom-20 left-20 w-24 h-24 border-4 border-fmc-blue/30 rounded-full opacity-30"></div>
-      </section>
-
-      {/* Financing CTA */}
-      <section className="py-16 bg-fmc-purple text-white text-center">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-acto-bold mb-4">Financia tu moto en pocos pasos...</h2>
-          <h3 className="text-2xl font-acto-semibold text-fmc-green mb-8">¡Solicitá tu crédito ahora!</h3>
-          <div className="w-16 h-16 bg-gradient-fmc-secondary rounded-full flex items-center justify-center mx-auto">
-            <img
-              src="/logofmcsimple.svg"
-              alt="FMC"
-              className="h-8"
-            />
-          </div>
+        <h2 className="text-4xl lg:text-5xl font-acto-bold leading-tight text-white">¿Listo para tu moto?</h2>
+        <p className="text-lg lg:text-xl font-acto-regular text-white/95">
+          Tasas competitivas y aprobación rápida. Empezá hoy y llevate tu 0km.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+          <a
+            href="#solicitud"
+            className="inline-block bg-fmc-green hover:bg-fmc-green/90 text-white font-acto-semibold px-6 py-3 rounded-lg shadow-lg"
+          >
+            Solicitar crédito
+          </a>
+          <a
+            href="https://wa.me/543704069592"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block bg-fmc-blue hover:bg-fmc-blue/90 text-white font-acto-semibold px-6 py-3 rounded-lg shadow-lg"
+          >
+            Hablar por WhatsApp
+          </a>
         </div>
-      </section>
+      </div>
+    </div>
+  </div>
+</section>
+
+      {/* Financing CTA removida por redundancia */}
+      <section className="hidden" />
 
       {/* Footer */}
-      <footer className="bg-fmc-purple text-white py-16">
-        <div className="container mx-auto px-4">
-          
-
-          <div className="grid lg:grid-cols-2 gap-12 items-center mb-12">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                <img
-                  src="/logofmc.svg"
-                  alt="Formosa Moto Crédito"
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <div className="text-2xl font-acto-bold">FORMOSA</div>
-                <div className="text-lg font-acto-regular">MOTO CRÉDITO</div>
-              </div>
-              <div className="flex space-x-4 ml-8">
-                <a
-                  href="#"
-                  className="w-10 h-10 bg-fmc-purple/70 rounded-full flex items-center justify-center hover:bg-fmc-purple/50"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
-                  </svg>
-                </a>
-                <a
-                  href="#"
-                  className="w-10 h-10 bg-fmc-purple/70 rounded-full flex items-center justify-center hover:bg-fmc-purple/50"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.174-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.347-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.402.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.357-.629-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24.009 12.017 24.009c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641.001.012.001z" />
-                  </svg>
-                </a>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-white/90 font-acto-regular leading-relaxed">
-                Te brindamos la oportunidad de cumplir tu sueño de tener una moto propia a través de créditos rápidos y
-                accesibles. Con un proceso simple y personalizado, te ayudamos a dar el primer paso hacia la libertad y
-                la aventura. ¡No esperes más, tu moto te está esperando!
-              </p>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Phone className="w-4 h-4 text-fmc-blue" />
-                  <span className="text-lg font-acto-semibold">370 428-5453</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-fmc-green" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.367 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
-                  </svg>
-                  <span className="text-lg font-acto-semibold">370 440-8312</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center text-sm text-white/70 max-w-4xl mx-auto leading-relaxed">
-            <p className="mb-4 font-acto-regular">
-              Los préstamos otorgados por Banco de Formosa S.A. a personas humanas con garantía prendaria en primer
-              grado sobre moto vehículos 0 km están sujetos a disponibilidad de stock en las concesionarias y a la
-              aprobación del riesgo crediticio. El monto y el plazo del financiamiento dependerán de la capacidad
-              crediticia del solicitante, y las tasas de interés serán las vigentes al momento de la aprobación. El
-              préstamo estará respaldado por la prenda del vehículo adquirido, que deberá estar asegurado durante el
-              período del préstamo. Las promociones están sujetas a condiciones específicas y la disponibilidad de
-              unidades en las concesionarias. Además, se aplicarán comisiones, cargos administrativos y otros costos
-              adicionales según las políticas del banco, y los pagos deberán realizarse dentro de los plazos
-              establecidos.
-            </p>
-            <div className="border-t border-white/20 pt-8">
-              <p className="font-acto-semibold">Copyright © 2025 FORMOSA MOTO CRÉDITO.</p>
-              <p className="mt-2 font-acto-regular">Todos los derechos reservados.</p>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

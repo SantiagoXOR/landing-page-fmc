@@ -15,7 +15,22 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Loader2, Send, Phone, Car, Bike, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, getWhatsAppUrl } from '@/lib/utils'
+
+// Zonas de Formosa (principales localidades)
+const zonasFormosa = [
+  'Formosa Capital',
+  'Clorinda',
+  'Pirané',
+  'El Colorado',
+  'Las Lomitas',
+  'Ibarreta',
+  'Comandante Fontana',
+  'Ingeniero Juárez',
+  'Laguna Blanca',
+  'Herradura',
+  'Otra'
+] as const
 
 const formSchema = z.object({
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -24,11 +39,20 @@ const formSchema = z.object({
   email: z.string().email('Email inválido'),
   dni: z.string().min(7, 'DNI/CUIT debe tener al menos 7 dígitos').max(11, 'DNI/CUIT debe tener máximo 11 dígitos'),
   ingresos: z.string().min(1, 'Los ingresos son requeridos'),
+  zona: z.enum(zonasFormosa, { required_error: 'Selecciona tu zona' }),
+  zonaOtra: z.string().optional(),
   tipoVehiculo: z.enum(['moto', 'auto'], { required_error: 'Selecciona el tipo de vehículo' }),
   marca: z.string().min(1, 'Selecciona una marca'),
+  marcaOtra: z.string().optional(),
   modelo: z.string().min(1, 'El modelo es requerido'),
   cuotas: z.string().min(1, 'Selecciona la cantidad de cuotas'),
   comentarios: z.string().optional(),
+}).refine((data) => data.zona !== 'Otra' || (data.zonaOtra && data.zonaOtra.trim().length > 0), {
+  message: 'Ingresa tu zona específica',
+  path: ['zonaOtra'],
+}).refine((data) => data.marca !== 'Otra' || (data.marcaOtra && data.marcaOtra.trim().length > 0), {
+  message: 'Ingresa la marca específica',
+  path: ['marcaOtra'],
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -59,8 +83,11 @@ export function CreditForm() {
       email: "",
       dni: "",
       ingresos: "",
-      tipoVehiculo: "",
+      zona: undefined,
+      zonaOtra: "",
+      tipoVehiculo: undefined,
       marca: "",
+      marcaOtra: "",
       modelo: "",
       cuotas: "",
       comentarios: "",
@@ -70,30 +97,50 @@ export function CreditForm() {
 
   // Campos requeridos por paso
   const requiredKeys: Record<number, (keyof FormData)[]> = {
-    1: ['nombre', 'apellido', 'dni', 'telefono', 'email', 'ingresos'],
+    1: ['nombre', 'apellido', 'dni', 'telefono', 'email', 'ingresos', 'zona'],
     2: ['tipoVehiculo', 'marca', 'modelo', 'cuotas'],
     3: [], // Comentarios es opcional
   }
 
   // Campos por paso para validación
   const stepFields: Record<number, (keyof FormData)[]> = {
-    1: ['nombre', 'apellido', 'dni', 'telefono', 'email', 'ingresos'],
+    1: ['nombre', 'apellido', 'dni', 'telefono', 'email', 'ingresos', 'zona'],
     2: ['tipoVehiculo', 'marca', 'modelo', 'cuotas'],
     3: ['comentarios'],
   }
 
   // Obtener marcas disponibles según el tipo de vehículo
   const tipoVehiculo = form.watch('tipoVehiculo')
+  const zonaSeleccionada = form.watch('zona')
+  const marcaSeleccionada = form.watch('marca')
   const marcasDisponibles = tipoVehiculo === 'moto' ? marcasMotos : marcasAutos
 
   // Verificar si se puede proceder al siguiente paso
   const canProceed = () => {
     const requiredCurrentFields = requiredKeys[step] || []
-    
-    return requiredCurrentFields.every(field => {
+    const baseValid = requiredCurrentFields.every(field => {
       const value = form.getValues(field)
+      if (field === 'tipoVehiculo') {
+        return value === 'moto' || value === 'auto'
+      }
       return value !== undefined && value !== '' && value !== null
     })
+
+    if (step === 1) {
+      const zona = form.getValues('zona')
+      if (zona === 'Otra') {
+        const zonaOtra = form.getValues('zonaOtra')
+        return baseValid && !!zonaOtra && zonaOtra.trim() !== ''
+      }
+    }
+    if (step === 2) {
+      const marca = form.getValues('marca')
+      if (marca === 'Otra') {
+        const marcaOtra = form.getValues('marcaOtra')
+        return baseValid && !!marcaOtra && marcaOtra.trim() !== ''
+      }
+    }
+    return baseValid
   }
 
   const handleNext = async () => {
@@ -114,25 +161,50 @@ export function CreditForm() {
     try {
       const tipoVehiculoTexto = data.tipoVehiculo === 'moto' ? 'Moto' : 'Auto'
       
-      const message = `🚗 *Nueva Solicitud de Crédito para ${tipoVehiculoTexto}*
+      // Formatear ingresos con separadores para mejorar legibilidad
+      const formatCurrency = (value: string) => {
+        const num = Number(String(value).replace(/[^\d]/g, ''))
+        if (isNaN(num)) return value
+        return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(num)
+      }
 
-👤 *Datos Personales:*
-• Nombre: ${data.nombre} ${data.apellido}
-• DNI/CUIT: ${data.dni}
-• Teléfono: ${data.telefono}
-• Email: ${data.email}
-• Ingresos: $${data.ingresos}
+      // Emoji dinámico según tipo de vehículo
+      const vehiculoEmoji = data.tipoVehiculo === 'moto' ? '🏍️' : '🚗'
 
-🏍️ *${tipoVehiculoTexto} de Interés:*
-• Marca: ${data.marca}
-• Modelo: ${data.modelo}
-• Cuotas: ${data.cuotas} meses
+      // Sanitizar caracteres que pueden romperse en algunos clientes (VS16, ZWJ)
+      const sanitizeForWhatsApp = (text: string) => text.replace(/[\uFE0F\u200D]/g, '')
 
-${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
+      // Mensaje con emojis y copy más humano
+      const zonaTexto = data.zona === 'Otra' && data.zonaOtra?.trim() ? data.zonaOtra : data.zona
+      const marcaTexto = data.marca === 'Otra' && data.marcaOtra?.trim() ? data.marcaOtra : data.marca
 
-¡Gracias por tu interés! Te contactaremos pronto.`
+      const message = [
+        `✨ *Solicitud de Crédito – ${tipoVehiculoTexto}* ${vehiculoEmoji}`,
+        '',
+        `*👤 Datos Personales:*`,
+        `• Nombre: ${data.nombre} ${data.apellido}`,
+        `• DNI/CUIT: ${data.dni}`,
+        `• Teléfono: 📞 ${data.telefono}`,
+        `• Email: ✉️ ${data.email}`,
+        `• Ingresos: 💸 $${formatCurrency(data.ingresos)}`,
+        `• Zona: 📍 ${zonaTexto}`,
+        '',
+        `*${vehiculoEmoji} ${tipoVehiculoTexto} de Interés:*`,
+        `• Marca: ${marcaTexto}`,
+        `• Modelo: ${data.modelo}`,
+        `• Cuotas: ⏱️ ${data.cuotas} meses`,
+        '',
+        ...(data.comentarios
+          ? [`*📝 Comentarios:*`, `${data.comentarios}`, '']
+          : []),
+        `✅ Gracias por tu interés. 📲 Nuestro equipo te contactará en las próximas horas.`,
+      ].join('\n')
 
-      const whatsappUrl = `https://wa.me/5493704056592?text=${encodeURIComponent(message)}`
+      const safeMessage = sanitizeForWhatsApp(message)
+
+      // Número de WhatsApp corregido: +54 9 3704 06-9592 -> 5493704069592
+      // Usar API clásica mejora compatibilidad de emojis en Web y móviles
+      const whatsappUrl = getWhatsAppUrl(safeMessage)
       window.open(whatsappUrl, '_blank')
       
       toast.success('¡Solicitud enviada correctamente!')
@@ -155,7 +227,7 @@ ${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
   const progress = (step / 3) * 100
 
   return (
-    <section id="solicitar-credito" className="py-20 relative overflow-hidden">
+    <section id="solicitar-credito" className="py-8 relative overflow-hidden">
       {/* Imagen de fondo */}
       <div className="absolute inset-0 fmc-bg-2 md:fmc-bg-4"></div>
       <div className="absolute inset-0 fmc-bg-gradient"></div>
@@ -170,51 +242,44 @@ ${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
           </p>
         </div>
         
-        <div className="w-full max-w-2xl mx-auto p-4">
-          <Card className="shadow-xl border-fmc-purple/20">
-            <CardHeader className="bg-gradient-to-r from-fmc-blue to-fmc-green text-white rounded-t-lg">
-              <CardTitle className="text-2xl font-acto-bold text-center">
-                Solicitar Crédito para Vehículo
-              </CardTitle>
-              <CardDescription className="text-center text-white/90 font-acto-regular">
-                Completa el formulario y te contactaremos por WhatsApp para procesar tu solicitud
-              </CardDescription>
-            </CardHeader>
+        <div className="w-full max-w-2xl mx-auto px-4 pt-0">
+          <Card className="shadow-xl border-fmc-purple/20 py-0">
+            <CardHeader className="hidden" />
         
-        <CardContent className="p-6">
+        <CardContent className="p-4 pt-0">
           {/* Indicador de progreso mejorado */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              {[1, 2, 3].map((stepNumber) => (
-                <div key={stepNumber} className="flex items-center">
-                  <div className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center text-sm font-acto-semibold transition-all duration-300",
-                    step >= stepNumber 
-                      ? "bg-fmc-green text-white" 
-                      : "bg-fmc-purple/20 text-fmc-purple/60"
-                  )}>
-                    {step > stepNumber ? (
-                      <CheckCircle2 className="w-5 h-5" />
-                    ) : (
-                      stepNumber
+          <div className="mb-5">
+              <div className="flex items-center justify-between mb-3">
+                {[1, 2, 3].map((stepNumber) => (
+                  <div key={stepNumber} className="flex items-center">
+                    <div className={cn(
+                      "w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center text-sm font-acto-bold shadow-sm transition-all duration-300",
+                      step >= stepNumber 
+                        ? "bg-fmc-purple text-white ring-2 ring-fmc-purple/40" 
+                        : "bg-white border border-fmc-purple/40 text-fmc-purple/80"
+                    )}>
+                      {step > stepNumber ? (
+                        <CheckCircle2 className="w-5 h-5" />
+                      ) : (
+                        stepNumber
+                      )}
+                    </div>
+                    {stepNumber < 3 && (
+                      <div className={cn(
+                        "w-14 md:w-16 h-1 mx-2 rounded transition-all duration-300",
+                        step > stepNumber ? "bg-fmc-purple" : "bg-fmc-purple/20"
+                      )} />
                     )}
                   </div>
-                  {stepNumber < 3 && (
-                    <div className={cn(
-                      "w-16 h-1 mx-2 rounded transition-all duration-300",
-                      step > stepNumber ? "bg-fmc-green" : "bg-fmc-purple/20"
-                    )} />
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             
-            <Progress value={progress} className="h-3 bg-fmc-purple/10" />
+            <Progress value={progress} className="h-2 bg-fmc-purple/10" />
             
-            <div className="flex justify-between text-xs text-fmc-purple/70 mt-2 font-acto-regular">
-              <span>Datos Personales</span>
-              <span>Vehículo</span>
-              <span>Finalizar</span>
+            <div className="flex justify-between text-[11px] md:text-xs text-fmc-purple/90 mt-2 font-acto-semibold tracking-wide uppercase">
+              <span>DATOS PERSONALES</span>
+              <span>VEHÍCULO</span>
+              <span>FINALIZAR</span>
             </div>
           </div>
 
@@ -225,7 +290,7 @@ ${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
               {step === 1 && (
                 <div className="space-y-6">
                   <div className="text-center">
-                    <h3 className="text-xl font-acto-bold text-fmc-purple mb-2">Datos Personales</h3>
+                    <h3 className="text-xl font-acto-bold text-fmc-purple mb-2">DATOS PERSONALES</h3>
                     <p className="text-sm text-fmc-purple/70 font-acto-regular">
                       Ingresa tu información personal para procesar tu solicitud
                     </p>
@@ -368,6 +433,60 @@ ${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
                       )}
                     />
                   </div>
+
+                  {/* Zona de Formosa */}
+                  <div className="grid grid-cols-1 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="zona"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="font-acto-semibold text-fmc-purple">Zona *</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <SelectTrigger className={cn(inputClasses)}>
+                              <SelectValue placeholder="Seleccioná tu zona" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {zonasFormosa.map((z) => (
+                                <SelectItem key={z} value={z}>{z}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-xs text-fmc-purple/70">
+                            Localidad o zona principal dentro de la provincia de Formosa
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {zonaSeleccionada === 'Otra' && (
+                      <FormField
+                        control={form.control}
+                        name="zonaOtra"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="font-acto-semibold text-fmc-purple">Especificá tu zona *</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Ej: Barrio San Miguel, Misión Laishí, etc."
+                                className={cn(inputClasses)}
+                                aria-invalid={!!form.formState.errors.zonaOtra}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs text-fmc-purple/70">
+                              Completa este campo si seleccionaste "Otra"
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -458,6 +577,7 @@ ${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
                                       {marca}
                                     </SelectItem>
                                   ))}
+                                  <SelectItem value="Otra" className="font-acto-regular">Otra</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormDescription className="text-xs text-fmc-purple/70">
@@ -467,6 +587,30 @@ ${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
                             </FormItem>
                           )}
                         />
+
+                        {marcaSeleccionada === 'Otra' && (
+                          <FormField
+                            control={form.control}
+                            name="marcaOtra"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="font-acto-semibold text-fmc-purple">Especificá la marca *</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="Ej: Otra marca"
+                                    className={cn(inputClasses)}
+                                    aria-invalid={!!form.formState.errors.marcaOtra}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormDescription className="text-xs text-fmc-purple/70">
+                                  Completa este campo si seleccionaste "Otra"
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                         <FormField
                           control={form.control}
                           name="modelo"
@@ -639,15 +783,7 @@ ${data.comentarios ? `💬 *Comentarios:*\n${data.comentarios}` : ''}
             </form>
           </Form>
           
-          {/* Información de contacto */}
-          <div className="text-center pt-4 border-t border-fmc-purple/20">
-            <div className="flex items-center justify-center gap-2 text-sm text-fmc-purple/70">
-              <Phone className="w-4 h-4" />
-              <span className="font-acto-regular">
-                Te contactaremos al <strong className="font-acto-semibold">370 405-6592</strong>
-              </span>
-            </div>
-          </div>
+
         </CardContent>
           </Card>
         </div>

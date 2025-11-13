@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Lead Creation</title>
+</head>
+<body>
+    <h1>Test Lead Creation</h1>
+    <button onclick="testCreateLead()">Crear Lead de Prueba</button>
+    <div id="result"></div>
+
+    <script>
+        async function testCreateLead() {
+            const leadData = {
+                nombre: 'Test Lead API',
+                telefono: '5491155559999',
+                email: 'test@api.com',
+                origen: 'whatsapp',
+                estado: 'NUEVO',
+                notas: 'Lead creado desde test API'
+            };
+
+            try {
+                const response = await fetch('https://phorencial-bot-crm.vercel.app/api/test/create-lead', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(leadData)
+                });
+
+                const result = await response.json();
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<pre>Error: ' + error.message + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# ============================================
+# VARIABLES DE MANYCHAT PARA .env.local
+# ============================================
+#
+# INSTRUCCIONES:
+# 1. Abre tu archivo .env.local
+# 2. Copia y pega las siguientes líneas AL FINAL del archivo
+# 3. Guarda el archivo
+# 4. Continúa con el paso 3 (migración de base de datos)
+#
+# ============================================
+
+# Manychat Configuration
+MANYCHAT_API_KEY=3724482:1bf0d7525e7c87d854d087f44afae137
+MANYCHAT_BASE_URL=https://api.manychat.com
+MANYCHAT_WEBHOOK_SECRET=manychat-webhook-secret-temporal-2024-formosa-moto-credito
+
+# WhatsApp (Información de referencia)
+WHATSAPP_PHONE_NUMBER=5493704069592
+
+# ============================================
+# FIN DE VARIABLES MANYCHAT
+# ============================================
+

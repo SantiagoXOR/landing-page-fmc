@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  nombre      String
+  dni         String?  @unique
+  telefono    String
+  email       String?
+  ingresos    Int?
+  zona        String?
+  producto    String?
+  monto       Int?
+  origen      String?  // whatsapp, instagram, facebook, comentario, web, ads
+  utmSource   String?
+  estado      String   @default("NUEVO") // NUEVO, EN_REVISION, PREAPROBADO, RECHAZADO, DOC_PENDIENTE, DERIVADO
+  agencia     String?
+  notas       String?
+  manychatId  String?  @unique // ID del subscriber en Manychat
+  tags        String?  // JSON array de tags de Manychat
+  customFields String? // JSON object de custom fields de Manychat
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  events        Event[]
+  conversations Conversation[]
+  syncLogs      ManychatSync[]
+
+  @@index([telefono])
+  @@index([estado])
+  @@index([createdAt])
+  @@index([origen])
+  @@index([manychatId])
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  leadId    String?
+  tipo      String   // "whatsapp_in","whatsapp_out","estado_cambiado","lead_upsert"
+  payload   String?  // JSON as string
+  createdAt DateTime @default(now())
+  lead      Lead?    @relation(fields: [leadId], references: [id])
+
+  @@index([leadId])
+  @@index([tipo])
+  @@index([createdAt])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  nombre    String
+  email     String   @unique
+  hash      String
+  rol       String   @default("VENDEDOR") // ADMIN, ANALISTA, VENDEDOR
+  createdAt DateTime @default(now())
+  
+  assignedConversations Conversation[]
+}
+
+model Rule {
+  id        String   @id @default(cuid())
+  key       String   @unique // "edadMin","edadMax","minIngreso","zonasPermitidas","requiereBlanco"
+  value     String   // JSON as string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  leadId        String?
+  platform      String   // whatsapp, instagram, facebook
+  platformId    String   // ID externo de la plataforma
+  status        String   @default("open") // open, assigned, closed
+  assignedTo    String?  // userId
+  lastMessageAt DateTime @default(now())
+  manychatData  String?  // JSON object con metadatos de Manychat (flow_ns, step_ns, etc)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  lead          Lead?    @relation(fields: [leadId], references: [id])
+  messages      Message[]
+  assignedUser  User?    @relation(fields: [assignedTo], references: [id])
+  
+  @@unique([platform, platformId])
+  @@index([status])
+  @@index([assignedTo])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  direction      String   // inbound, outbound
+  content        String
+  mediaUrl       String?
+  messageType    String   @default("text") // text, image, video, audio, document
+  platformMsgId  String?  @unique
+  sentAt         DateTime @default(now())
+  readAt         DateTime?
+  deliveredAt    DateTime?
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  
+  @@index([conversationId])
+  @@index([sentAt])
+}
+
+model ManychatSync {
+  id          String   @id @default(cuid())
+  leadId      String
+  syncType    String   // 'lead_to_manychat', 'manychat_to_lead', 'tags', 'custom_fields'
+  status      String   @default("pending") // pending, success, failed
+  direction   String   // 'to_manychat', 'from_manychat'
+  data        String?  // JSON con datos sincronizados
+  error       String?  // Error message si falla
+  retryCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  @@index([leadId])
+  @@index([status])
+  @@index([syncType])
+  @@index([createdAt])
+}

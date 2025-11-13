@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Capa_2" data-name="Capa 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 487.08 140.17">
+  <defs>
+    <style>
+      .cls-5, .cls-6, .cls-7 {
+        fill: #ffffff;
+      }
+      .cls-8, .cls-7 {
+        font-family: Acto-Black, Acto;
+        font-weight: 800;
+      }
+      .cls-6 {
+        font-size: 44.22px;
+      }
+      .cls-7 {
+        font-size: 50.77px;
+      }
+      .cls-15 {
+        font-family: Acto-Light, Acto;
+        font-weight: 300;
+        fill: #ffffff;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1" data-name="Layer 1">
+    <path class="cls-5" d="M2.93,47.63C21.43.6,79.9-15.42,119.63,16.98c7.42,6.05,14.57,14.46,18.47,23.26-5.48-8.12-11.64-15.24-19.69-20.9-23.56-16.57-54.81-16.02-78.17.57-10.22,7.25-17.04,16.72-22.82,27.71H2.93Z"/>
+    <path class="cls-5" d="M136.68,48.96C121.79,11.1,74.71-1.8,42.72,24.29c-5.98,4.87-11.73,11.64-14.87,18.73,4.41-6.54,9.37-12.27,15.86-16.83,18.97-13.34,44.12-12.9,62.93.46,8.23,5.84,13.72,13.46,18.38,22.31h11.66Z"/>
+    <path class="cls-5" d="M137.53,92.55c-18.5,47.03-76.97,63.05-116.7,30.64-7.42-6.05-14.57-14.46-18.47-23.26,5.48,8.12,11.64,15.24,19.69,20.9,23.56,16.57,54.81,16.02,78.17-.57,10.22-7.25,17.04-16.72,22.82-27.71h14.48Z"/>
+    <path class="cls-5" d="M3.79,91.21c14.89,37.86,61.97,50.76,93.96,24.67,5.98-4.87,11.73-11.64,14.87-18.73-4.41,6.54-9.37,12.27-15.86,16.83-18.97,13.34-44.12,12.9-62.93-.46-8.23-5.84-13.72-13.46-18.38-22.31H3.79Z"/>
+    <text class="cls-7" transform="translate(0 87.23) scale(1.38 1)"><tspan x="0" y="0">FM</tspan><tspan x="68.04" y="0">C</tspan></text>
+    <text class="cls-6" transform="translate(170.5 66.27) scale(1.08 1)"><tspan class="cls-8"><tspan x="0" y="0">F</tspan><tspan x="22.33" y="0">ORM</tspan><tspan x="117.36" y="0">O</tspan><tspan x="148.05" y="0">S</tspan><tspan x="173.08" y="0">A</tspan></tspan><tspan class="cls-15"><tspan x="0" y="40.26">M</tspan><tspan x="35.33" y="40.26">OT</tspan><tspan x="86.32" y="40.26">O </tspan><tspan x="125.76" y="40.26">C</tspan><tspan x="152.69" y="40.26">R</tspan><tspan x="179.31" y="40.26">E</tspan><tspan x="203.37" y="40.26">D</tspan><tspan x="231.93" y="40.26">I</tspan><tspan x="241" y="40.26">T</tspan><tspan x="263.24" y="40.26">O</tspan></tspan></text>
+  </g>
+</svg>

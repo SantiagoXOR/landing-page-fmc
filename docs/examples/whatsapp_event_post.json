@@ -1,0 +1,11 @@
+{
+  "telefono": "5491123456789",
+  "type": "text",
+  "messageId": "wamid.HBgLNTQ5MTE...",
+  "timestamp": 1703001234,
+  "payload": {
+    "text": "Hola, me interesa un préstamo personal",
+    "from": "5491123456789",
+    "contact_name": "Juan Pérez"
+  }
+}

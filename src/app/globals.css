@@ -1,0 +1,647 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262.1 83.3% 57.8%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Gradientes modernos para FMC CRM estilo Prometheo */
+@layer utilities {
+  /* Gradientes principales */
+  .gradient-primary {
+    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  }
+
+  .gradient-success {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  }
+
+  .gradient-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  }
+
+  .gradient-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  }
+
+  .gradient-info {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  }
+
+  /* Gradientes para texto */
+  .gradient-text {
+    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-success {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Fondos sutiles */
+  .bg-gradient-subtle {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+
+  .bg-gradient-dark {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  }
+
+  /* Glassmorphism */
+  .glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Estados de conexión */
+  .status-connected {
+    @apply bg-green-100 text-green-800 border-green-200;
+  }
+
+  .status-disconnected {
+    @apply bg-gray-100 text-gray-800 border-gray-200;
+  }
+
+  .status-pending {
+    @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+  }
+
+  /* Efectos de hover */
+  .hover-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Animaciones suaves */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+}
+
+/* Keyframes para animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Estilos específicos para Formosa CRM */
+.formosa-card {
+  @apply bg-white rounded-lg shadow-sm border border-gray-200 hover-lift;
+}
+
+.formosa-badge-nuevo {
+  @apply bg-blue-100 text-blue-800 border-blue-200;
+}
+
+.formosa-badge-preaprobado {
+  @apply bg-green-100 text-green-800 border-green-200;
+}
+
+.formosa-badge-rechazado {
+  @apply bg-red-100 text-red-800 border-red-200;
+}
+
+.formosa-badge-revision {
+  @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+}
+
+.formosa-badge-pendiente {
+  @apply bg-orange-100 text-orange-800 border-orange-200;
+}
+
+.formosa-badge-derivado {
+  @apply bg-purple-100 text-purple-800 border-purple-200;
+}
+
+/* ===== ESTILOS DE LA LANDING PAGE FMC ===== */
+
+/* Compensar scroll para headers fijos */
+html {
+  scroll-padding-top: var(--header-offset, 72px);
+  scroll-behavior: smooth;
+}
+
+/* ACTO Font Family */
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-Hairline.otf') format('opentype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-HairlineItalic.otf') format('opentype');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-Thin.otf') format('opentype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-ThinItalic.otf') format('opentype');
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-UltraLight.otf') format('opentype');
+  font-weight: 250;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-UltraLightItalic.otf') format('opentype');
+  font-weight: 250;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-LightItalic.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-Book.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-BookItalic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-SemiBold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-SemiBoldItalic.otf') format('opentype');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-BoldItalic.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-ExtraBold.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-ExtraBoldItalic.otf') format('opentype');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-BlackItalic.otf') format('opentype');
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-UltraBlack.otf') format('opentype');
+  font-weight: 950;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ACTO';
+  src: url('/fonts/acto/Acto-UltraBlackItalic.otf') format('opentype');
+  font-weight: 950;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Typography - Acto Font Family */
+.font-acto {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.font-acto-light {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+}
+
+.font-acto-regular {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+}
+
+.font-acto-medium {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+}
+
+.font-acto-semibold {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+}
+
+.font-acto-bold {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+}
+
+.font-acto-extrabold {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 800;
+}
+
+.font-acto-black {
+  font-family: 'ACTO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 900;
+}
+
+/* Brand Color Utilities */
+.text-fmc-green { color: #5bd26f; }
+.text-fmc-purple { color: #5b00ea; }
+.text-fmc-blue { color: #51c2ff; }
+.text-fmc-white { color: #ffffff; }
+
+.bg-fmc-green { background-color: #5bd26f; }
+.bg-fmc-purple { background-color: #5b00ea; }
+.bg-fmc-blue { background-color: #51c2ff; }
+.bg-fmc-white { background-color: #ffffff; }
+
+.border-fmc-green { border-color: #5bd26f; }
+.border-fmc-purple { border-color: #5b00ea; }
+.border-fmc-blue { border-color: #51c2ff; }
+
+/* Gradient Utilities */
+.bg-gradient-fmc-primary {
+  background: linear-gradient(135deg, #5b00ea 0%, #51c2ff 100%);
+}
+
+.bg-gradient-fmc-secondary {
+  background: linear-gradient(135deg, #5bd26f 0%, #51c2ff 100%);
+}
+
+.bg-gradient-fmc-accent {
+  background: linear-gradient(135deg, #5b00ea 0%, #5bd26f 100%);
+}
+
+/* Fondos FMC para secciones */
+.fmc-bg-2,
+.fmc-bg-3,
+.fmc-bg-4,
+.fmc-bg-5 {
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.fmc-bg-2 { background-image: url('/landing/hero/bg2.png'); }
+.fmc-bg-3 { background-image: url('/landing/hero/bg3.png'); }
+.fmc-bg-4 { background-image: url('/landing/hero/bg4.png'); }
+.fmc-bg-5 { background-image: url('/landing/hero/bg5.png'); }
+
+.fmc-bg-gradient {
+  background: linear-gradient(135deg, rgba(91,0,234,0.65) 0%, rgba(81,194,255,0.35) 100%);
+}
+
+/* Hero Parallax Styles */
+.hero-parallax {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+.parallax-bg {
+  will-change: transform;
+  transition: transform 0.1s ease-out;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.parallax-fg {
+  will-change: transform;
+  transition: transform 0.1s ease-out;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Mobile-first responsive adjustments */
+@media (max-width: 640px) {
+  .hero-parallax {
+    min-height: 100vh;
+    padding: 2rem 0;
+  }
+  
+  .parallax-fg {
+    opacity: 0.6;
+    object-position: center right;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 768px) {
+  .parallax-fg {
+    opacity: 0.7;
+    object-position: center right;
+  }
+}
+
+@media (min-width: 769px) {
+  .parallax-fg {
+    opacity: 0.8;
+    object-position: center right;
+  }
+}
+
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .will-change-transform {
+    will-change: auto;
+  }
+  
+  .parallax-bg,
+  .parallax-fg {
+    transform: none !important;
+    transition: none !important;
+  }
+  
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrolling animation for brand header */
+@keyframes scroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+/* Floating animations for decorative elements */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes float-delayed {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 8s ease-in-out infinite 2s;
+}
+
+/* Loading animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* Card hover effects */
+.hover-lift {
+  transition: all 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

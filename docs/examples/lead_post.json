@@ -1,0 +1,12 @@
+{
+  "nombre": "María González",
+  "telefono": "5491198765432",
+  "email": "maria.gonzalez@email.com",
+  "dni": "12345678",
+  "ingresos": 250000,
+  "zona": "CABA",
+  "producto": "Préstamo Personal",
+  "monto": 500000,
+  "origen": "whatsapp",
+  "utmSource": "campaign_2024_q1"
+}

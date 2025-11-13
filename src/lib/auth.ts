@@ -179,7 +179,7 @@ export const authOptions: NextAuthOptions = {
             }
           } else if (existingUser) {
             // Usuario existe, asignar su rol
-            user.role = existingUser.role || existingUser.rol || 'VIEWER'
+            user.role = existingUser.role || 'VIEWER'
             user.status = existingUser.status || 'ACTIVE'
           }
         } catch (error) {

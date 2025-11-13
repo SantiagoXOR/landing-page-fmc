@@ -175,18 +175,18 @@ export const authOptions: NextAuthOptions = {
 
             if (!error && newUser) {
               user.role = 'VIEWER'
-              user.status = 'ACTIVE'
+              user.status = 'ACTIVE' as any
             }
           } else if (existingUser) {
             // Usuario existe, asignar su rol
             user.role = existingUser.role || 'VIEWER'
-            user.status = existingUser.status || 'ACTIVE'
+            user.status = (existingUser.status || 'ACTIVE') as any
           }
         } catch (error) {
           console.error('Error creando/actualizando usuario de Google:', error)
           // Permitir login de todos modos con rol VIEWER por defecto
           user.role = 'VIEWER'
-          user.status = 'ACTIVE'
+          user.status = 'ACTIVE' as any
         }
       }
       return true

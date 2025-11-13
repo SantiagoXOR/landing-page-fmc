@@ -142,7 +142,20 @@ export const authOptions: NextAuthOptions = {
           
           if (!existingUser) {
             // Intentar con tabla antigua
-            existingUser = await supabase.findUserByEmail(profile.email)
+            const oldUser = await supabase.findUserByEmail(profile.email)
+            if (oldUser) {
+              // Mapear de tabla antigua a formato nuevo
+              existingUser = {
+                id: oldUser.id,
+                email: oldUser.email,
+                nombre: oldUser.nombre,
+                apellido: '', // No existe en tabla antigua
+                hash: oldUser.hash,
+                role: oldUser.rol || 'VIEWER', // Mapear 'rol' a 'role'
+                status: 'ACTIVE', // Por defecto
+                createdAt: oldUser.createdAt
+              }
+            }
           }
 
           if (!existingUser && supabase.client) {

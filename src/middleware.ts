@@ -46,13 +46,20 @@ export default withAuth(
     },
     callbacks: {
       authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl
+        
         // Always allow RSC requests
         if (req.nextUrl.searchParams.has('_rsc')) {
           return true
         }
 
+        // Allow landing page (ruta raíz) - pública
+        if (pathname === '/') {
+          return true
+        }
+
         // Allow auth pages without token
-        if (req.nextUrl.pathname.startsWith('/auth')) {
+        if (pathname.startsWith('/auth')) {
           return true
         }
 

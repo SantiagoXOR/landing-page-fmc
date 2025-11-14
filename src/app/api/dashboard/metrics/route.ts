@@ -35,8 +35,8 @@ import { authOptions } from '@/lib/auth'
 
 // Simulación de cliente de base de datos
 // En producción esto debería usar Prisma o el cliente de Supabase
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
 interface Lead {
   id: string

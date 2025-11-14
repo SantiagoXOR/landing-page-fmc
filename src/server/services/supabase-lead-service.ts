@@ -26,8 +26,8 @@ export class SupabaseLeadService {
   private serviceRoleKey: string
 
   constructor() {
-    this.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-    this.serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+    this.supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    this.serviceRoleKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
     logger.info('SupabaseLeadService constructor', {
       hasUrl: !!this.supabaseUrl,

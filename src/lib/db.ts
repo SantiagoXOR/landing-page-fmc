@@ -5,8 +5,8 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
 class SupabaseClient {
   private baseUrl: string
@@ -15,7 +15,7 @@ class SupabaseClient {
   constructor() {
     // Verificar que las variables de entorno estén configuradas
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      throw new Error('Supabase credentials not configured. Please check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.')
+      throw new Error('Supabase credentials not configured. Please check SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY environment variables.')
     }
     
     this.baseUrl = SUPABASE_URL

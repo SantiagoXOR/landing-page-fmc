@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
  */
 async function handleManychatWebhook(event: ManychatWebhookEvent) {
   try {
-    console.log('Processing Manychat webhook:', event.event_type)
+    console.log('Processing Manychat webhook:', event.type)
 
-    switch (event.event_type) {
+    switch (event.type) {
       case 'new_subscriber':
         await handleNewSubscriber(event)
         break
@@ -76,7 +76,7 @@ async function handleManychatWebhook(event: ManychatWebhookEvent) {
         break
       
       default:
-        console.log('Unhandled Manychat event type:', event.event_type)
+        console.log('Unhandled Manychat event type:', event.type)
     }
 
     return NextResponse.json({ status: 'success' })
@@ -155,7 +155,12 @@ async function handleMetaWebhook(body: any) {
             }
 
             // Procesar el mensaje usando el servicio
-            await WhatsAppService.processIncomingMessage(value)
+            // Pasamos un objeto con la estructura {messages: [message]} para que el servicio lo procese correctamente
+            await WhatsAppService.processIncomingMessage({
+              messages: [message],
+              contacts: contacts,
+              metadata: value.metadata
+            })
           }
 
           // Procesar estados de mensajes (entregado, leído, etc.)

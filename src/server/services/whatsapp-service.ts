@@ -72,9 +72,22 @@ export class WhatsAppService {
    */
   static async processIncomingMessage(webhookData: any) {
     try {
-      const message = webhookData.entry?.[0]?.changes?.[0]?.value?.messages?.[0]
+      // Intentar obtener mensaje de la estructura completa del webhook
+      // Estructura 1: webhook completo {entry: [{changes: [{value: {messages: [...]}}]}]}
+      let message = webhookData.entry?.[0]?.changes?.[0]?.value?.messages?.[0]
+      
+      // Estructura 2: si no se encuentra, intentar acceder directamente a messages
+      // Esto ocurre cuando se pasa solo change.value que tiene {messages, contacts, statuses}
+      if (!message && webhookData.messages && Array.isArray(webhookData.messages) && webhookData.messages.length > 0) {
+        message = webhookData.messages[0]
+      }
+      
       if (!message) {
-        console.log('No message found in webhook data')
+        console.log('No message found in webhook data', {
+          hasEntry: !!webhookData.entry,
+          hasMessages: !!webhookData.messages,
+          structure: Object.keys(webhookData)
+        })
         return
       }
 

@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
  */
 async function handleManychatWebhook(event: ManychatWebhookEvent) {
   try {
-    console.log('Processing Manychat webhook:', event.type)
+    console.log('Processing Manychat webhook:', event.event_type)
 
-    switch (event.type) {
+    switch (event.event_type) {
       case 'new_subscriber':
         await handleNewSubscriber(event)
         break
@@ -76,7 +76,7 @@ async function handleManychatWebhook(event: ManychatWebhookEvent) {
         break
       
       default:
-        console.log('Unhandled Manychat event type:', event.type)
+        console.log('Unhandled Manychat event type:', event.event_type)
     }
 
     return NextResponse.json({ status: 'success' })

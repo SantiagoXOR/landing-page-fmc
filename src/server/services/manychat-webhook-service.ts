@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { ManychatWebhookEvent, ManychatSubscriber } from '@/types/manychat'
+import { ManychatWebhookEvent, ManychatSubscriber, ManychatWebhookMessage } from '@/types/manychat'
 import { ConversationService } from './conversation-service'
 import { ManychatSyncService } from './manychat-sync-service'
 import { ManychatService } from './manychat-service'

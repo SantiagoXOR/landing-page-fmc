@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 
+// Forzar renderizado dinámico (usa headers y session)
+export const dynamic = 'force-dynamic'
+
 /**
  * @swagger
  * /api/dashboard/metrics:
@@ -33,8 +36,7 @@ import { authOptions } from '@/lib/auth'
  *               $ref: '#/components/schemas/Error'
  */
 
-// Simulación de cliente de base de datos
-// En producción esto debería usar Prisma o el cliente de Supabase
+// Configuración de Supabase
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -48,25 +50,93 @@ interface Lead {
   createdAt: string
 }
 
-async function fetchFromSupabase(table: string, query: string = '') {
-  const url = `${SUPABASE_URL}/rest/v1/${table}${query}`
-  
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SERVICE_ROLE_KEY || '',
-      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json'
+/**
+ * Valida que las variables de Supabase estén configuradas
+ */
+function validateSupabaseConfig(): { isValid: boolean; error?: string } {
+  if (!SUPABASE_URL) {
+    return {
+      isValid: false,
+      error: 'NEXT_PUBLIC_SUPABASE_URL o SUPABASE_URL no está configurada. Por favor, verifica tus variables de entorno.'
     }
-  })
-
-  if (!response.ok) {
-    throw new Error(`Error fetching ${table}: ${response.statusText}`)
   }
 
-  return response.json()
+  if (!SERVICE_ROLE_KEY) {
+    return {
+      isValid: false,
+      error: 'SUPABASE_SERVICE_ROLE_KEY o SUPABASE_SERVICE_KEY no está configurada. Por favor, verifica tus variables de entorno.'
+    }
+  }
+
+  // Validar formato de URL
+  try {
+    new URL(SUPABASE_URL)
+  } catch {
+    return {
+      isValid: false,
+      error: `SUPABASE_URL tiene un formato inválido: ${SUPABASE_URL}`
+    }
+  }
+
+  return { isValid: true }
 }
 
-export async function GET(request: NextRequest) {
+/**
+ * Retorna métricas vacías como fallback
+ */
+function getEmptyMetrics() {
+  return {
+    totalLeads: 0,
+    newLeadsToday: 0,
+    conversionRate: 0,
+    leadsThisWeek: 0,
+    leadsThisMonth: 0,
+    leadsByStatus: {} as Record<string, number>,
+    recentLeads: [],
+    trendData: Array.from({ length: 7 }, (_, i) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (6 - i))
+      return {
+        date: date.toISOString().split('T')[0],
+        leads: 0,
+        conversions: 0
+      }
+    })
+  }
+}
+
+async function fetchFromSupabase(table: string, query: string = '') {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+    throw new Error('Supabase no está configurado correctamente')
+  }
+
+  const url = `${SUPABASE_URL}/rest/v1/${table}${query}`
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'apikey': SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText)
+      throw new Error(`Error fetching ${table}: ${response.status} ${errorText}`)
+    }
+
+    return response.json()
+  } catch (error: any) {
+    // Capturar errores de conexión específicos
+    if (error.code === 'ENOTFOUND' || error.message?.includes('getaddrinfo')) {
+      throw new Error(`No se pudo conectar a Supabase. Verifica que la URL ${SUPABASE_URL} sea correcta y que el proyecto exista.`)
+    }
+    throw error
+  }
+}
+
+export async function GET(_request: NextRequest) {
   try {
     // Verificar autenticación
     const session = await getServerSession(authOptions)
@@ -78,8 +148,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // Validar configuración de Supabase
+    const configValidation = validateSupabaseConfig()
+    if (!configValidation.isValid) {
+      console.warn('Supabase no configurado correctamente:', configValidation.error)
+      // Retornar métricas vacías en lugar de error 500
+      return NextResponse.json({
+        ...getEmptyMetrics(),
+        warning: 'Supabase no está configurado. Mostrando métricas vacías.'
+      })
+    }
+
     // Obtener todos los leads
-    const leads: Lead[] = await fetchFromSupabase('Lead', '?select=*&order=createdAt.desc')
+    let leads: Lead[] = []
+    try {
+      leads = await fetchFromSupabase('Lead', '?select=*&order=createdAt.desc')
+    } catch (supabaseError: any) {
+      console.error('Error conectando a Supabase:', supabaseError.message)
+      // Retornar métricas vacías en lugar de error 500
+      return NextResponse.json({
+        ...getEmptyMetrics(),
+        warning: `No se pudo conectar a Supabase: ${supabaseError.message}`
+      })
+    }
 
     // Calcular fechas
     const now = new Date()
@@ -159,11 +250,25 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(metrics)
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching dashboard metrics:', error)
     
+    // Si es un error de configuración, retornar métricas vacías
+    if (error.message?.includes('no está configurada') || 
+        error.message?.includes('formato inválido') ||
+        error.message?.includes('No se pudo conectar')) {
+      return NextResponse.json({
+        ...getEmptyMetrics(),
+        warning: error.message || 'Error de configuración de Supabase'
+      })
+    }
+    
+    // Para otros errores, retornar error 500 pero con mensaje claro
     return NextResponse.json(
-      { error: 'Failed to fetch metrics' },
+      { 
+        error: 'Error al obtener métricas',
+        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     )
   }

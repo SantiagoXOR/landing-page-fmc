@@ -4,6 +4,9 @@ import { type NextRequest } from 'next/server'
 import { appRouter } from '@/server/api/root'
 import { createTRPCContext } from '@/server/trpc'
 
+// Forzar renderizado dinámico (tRPC usa headers y request dinámicos)
+export const dynamic = 'force-dynamic'
+
 const handler = (req: NextRequest) =>
   fetchRequestHandler({
     endpoint: '/api/trpc',

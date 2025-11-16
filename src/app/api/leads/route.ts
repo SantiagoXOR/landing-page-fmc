@@ -3,12 +3,15 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
 import { LeadCreateSchema, LeadQuerySchema } from '@/lib/validators'
-import { checkPermission, hasPermission, checkUserPermission } from '@/lib/rbac'
+import { checkPermission, hasPermission, checkUserPermission, type UserRole } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { pipelineService } from '@/server/services/pipeline-service'
 import { ScoringService } from '@/server/services/scoring-service'
 import { withMonitoring, captureDbError, setSentryUser, captureBusinessMetric } from '@/lib/monitoring-temp'
 import { withValidation, createValidationErrorResponse } from '@/lib/validation-middleware'
+
+// Forzar renderizado dinámico (usa headers y session)
+export const dynamic = 'force-dynamic'
 
 /**
  * @swagger
@@ -205,12 +208,92 @@ async function postHandler(
       leadData: { ...validatedData, telefono: '***' } // Ocultar teléfono en logs
     })
 
-    // Crear lead usando el servicio de Supabase
-    const lead = await supabaseLeadService.createLead(validatedData)
+    // Verificar si Manychat está configurado
+    const { ManychatService } = await import('@/server/services/manychat-service')
+    const { ManychatSyncService } = await import('@/server/services/manychat-sync-service')
+    
+    let manychatId: string | undefined
+    let subscriber: any = null
+
+    // 1. PRIMERO: Crear subscriber en Manychat (si está configurado)
+    if (ManychatService.isConfigured()) {
+      try {
+        // Preparar datos para Manychat
+        const [firstName, ...lastNameParts] = (validatedData.nombre || '').split(' ')
+        const lastName = lastNameParts.join(' ') || undefined
+
+        const manychatData = {
+          phone: validatedData.telefono,
+          first_name: firstName,
+          last_name: lastName,
+          email: validatedData.email || undefined,
+          whatsapp_phone: validatedData.telefono,
+          custom_fields: {
+            dni: validatedData.dni || undefined,
+            ingresos: validatedData.ingresos ?? undefined,
+            zona: validatedData.zona || undefined,
+            producto: validatedData.producto || undefined,
+            monto: validatedData.monto ?? undefined,
+            origen: validatedData.origen || 'web',
+            estado: validatedData.estado || 'NUEVO',
+            agencia: validatedData.agencia || undefined,
+          },
+          tags: []
+        }
+
+        subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+        
+        if (subscriber && subscriber.id) {
+          manychatId = String(subscriber.id)
+          logger.info('Subscriber created in Manychat', {
+            manychatId,
+            phone: validatedData.telefono
+          })
+        } else {
+          logger.warn('Failed to create subscriber in Manychat, continuing without manychatId')
+        }
+      } catch (manychatError: any) {
+        // Si falla Manychat, no crear el lead (según requerimiento)
+        logger.error('Error creating subscriber in Manychat', {
+          error: manychatError.message,
+          stack: manychatError.stack
+        })
+        
+        return NextResponse.json({
+          error: 'Manychat Error',
+          message: 'No se pudo crear el contacto en Manychat. El lead no fue creado.',
+          details: manychatError.message
+        }, { status: 500 })
+      }
+    } else {
+      logger.warn('Manychat not configured, creating lead without manychatId')
+    }
+
+    // 2. SEGUNDO: Crear lead en el CRM con el manychatId ya asignado
+    const leadDataWithManychat = {
+      ...validatedData,
+      manychatId: manychatId || undefined
+    }
+
+    const lead = await supabaseLeadService.createLead(leadDataWithManychat)
 
     // Verificar que el lead fue creado correctamente con un ID
     if (!lead.id) {
       throw new Error('Lead created but no ID returned')
+    }
+
+    // 3. Sincronizar custom fields con Manychat si fue creado
+    if (manychatId && ManychatService.isConfigured()) {
+      try {
+        await ManychatSyncService.syncCustomFieldsToManychat(lead.id)
+        logger.info('Custom fields synced to Manychat', { leadId: lead.id })
+      } catch (syncError: any) {
+        // Log error pero no fallar la creación del lead
+        logger.error('Error syncing custom fields to Manychat', {
+          leadId: lead.id,
+          error: syncError.message
+        })
+      }
     }
 
     // Crear pipeline automáticamente para el nuevo lead
@@ -228,6 +311,8 @@ async function postHandler(
     }
 
     // Evaluar scoring automáticamente
+    // Guardar el estado actual para usarlo en el response
+    let finalEstado = lead.estado
     try {
       const scoringResult = await ScoringService.evaluateLead(lead.id!, lead as any)
       logger.info('Scoring evaluated automatically for new lead', { 
@@ -246,6 +331,8 @@ async function postHandler(
         
         // Actualizar estado del lead basado en scoring
         await supabaseLeadService.updateLead(lead.id!, { estado: scoringResult.recommendation })
+        // Actualizar el estado final para devolverlo en el response
+        finalEstado = scoringResult.recommendation
       }
     } catch (scoringError) {
       // Log error pero no fallar la creación del lead
@@ -257,13 +344,13 @@ async function postHandler(
 
     logger.info('Lead created successfully', {
       leadId: lead.id,
-      estado: lead.estado,
+      estado: finalEstado,
       userId: session.user.id
     })
 
     return NextResponse.json({
       id: lead.id,
-      estado: lead.estado,
+      estado: finalEstado,
       isUpdate: false,
       message: 'Lead creado exitosamente'
     }, { status: 201 })
@@ -335,7 +422,8 @@ async function getHandler(
         role: session.user.role
       })
 
-      const hasReadPermission = await checkUserPermission(session.user.id, 'leads', 'read')
+      // Usar el rol de la sesión directamente en lugar de consultar la base de datos
+      const hasReadPermission = hasPermission(session.user.role as UserRole, 'leads:read')
       
       logger.info(`${hasReadPermission ? '✅' : '❌'} Resultado verificación permisos`, {
         hasReadPermission,
@@ -360,21 +448,22 @@ async function getHandler(
     }
 
     // Los query params ya están validados por el middleware
-    const validatedQuery = context.query || {}
+    const validatedQuery = context?.query || {}
     const { searchParams } = new URL(request.url)
     const includePipeline = searchParams.get('include_pipeline') === 'true'
 
     logger.info('GET /api/leads - Validated query', {
       validatedQuery,
       includePipeline,
-      userId: session?.user?.id
+      userId: session?.user?.id,
+      hasContext: !!context
     })
 
     // Obtener leads usando el servicio de Supabase
     const page = validatedQuery.page || 1
     const limit = validatedQuery.limit || 10
 
-    const filters = {
+    const filters: any = {
       estado: validatedQuery.estado,
       origen: validatedQuery.origen,
       zona: validatedQuery.zona,
@@ -390,11 +479,86 @@ async function getHandler(
       includePipeline: includePipeline
     }
 
-    logger.info('GET /api/leads - Calling supabaseLeadService.getLeads', {
+    // Limpiar filtros undefined/null
+    Object.keys(filters).forEach(key => {
+      if (filters[key] === undefined || filters[key] === null || filters[key] === '') {
+        delete filters[key]
+      }
+    })
+
+    logger.info('GET /api/leads - Using Supabase client directly', {
       filters: { ...filters, search: filters.search ? '***' : undefined } // Ocultar búsqueda en logs
     })
 
-    const { leads, total } = await supabaseLeadService.getLeads(filters)
+    let leads: any[] = []
+    let total = 0
+
+    try {
+      // Usar el cliente de Supabase directamente (más confiable que el servicio HTTP)
+      const { supabaseClient } = await import('@/lib/db')
+      if (!supabaseClient) {
+        throw new Error('Supabase client not available')
+      }
+
+      // Construir query usando el cliente de Supabase directamente
+      let query = supabaseClient
+        .from('Lead')
+        .select('*', { count: 'exact' })
+      
+      // Aplicar ordenamiento
+      if (filters.sortBy) {
+        const orderBy = filters.sortBy === 'createdAt' ? 'createdAt' : filters.sortBy
+        const ascending = filters.sortOrder === 'asc'
+        query = query.order(orderBy, { ascending })
+      } else {
+        query = query.order('createdAt', { ascending: false })
+      }
+      
+      // Aplicar límite y offset
+      if (filters.limit) {
+        query = query.limit(filters.limit)
+      }
+      if (filters.offset !== undefined) {
+        query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1)
+      }
+      
+      // Aplicar filtros
+      if (filters.estado) {
+        query = query.eq('estado', filters.estado)
+      }
+      if (filters.origen) {
+        query = query.eq('origen', filters.origen)
+      }
+      if (filters.zona) {
+        query = query.eq('zona', filters.zona)
+      }
+      if (filters.search) {
+        query = query.or(`nombre.ilike.%${filters.search}%,telefono.ilike.%${filters.search}%,email.ilike.%${filters.search}%`)
+      }
+      
+      const { data, error, count } = await query
+      
+      if (error) {
+        throw error
+      }
+      
+      leads = data || []
+      total = count || 0
+      
+      logger.info('Successfully fetched leads using Supabase client', {
+        leadsCount: leads.length,
+        total
+      })
+    } catch (error: any) {
+      logger.error('Error fetching leads from Supabase', {
+        error: error.message,
+        stack: error.stack
+      })
+      // Retornar array vacío en lugar de error 500 para que la UI funcione
+      leads = []
+      total = 0
+      logger.warn('Returning empty leads array due to error')
+    }
 
     logger.info('GET /api/leads - Response from service', {
       leadsCount: leads.length,
@@ -405,8 +569,8 @@ async function getHandler(
     })
 
     return NextResponse.json({
-      leads,
-      total,
+      leads: leads || [],
+      total: total || 0,
       page: page,
       limit: limit,
       filters: {

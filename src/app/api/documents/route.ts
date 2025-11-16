@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { SupabaseStorageService } from '@/lib/supabase-storage'
 import { checkUserPermission } from '@/lib/rbac'
 
+// Forzar renderizado dinámico (usa headers y session)
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/documents
  * Listar documentos con filtros

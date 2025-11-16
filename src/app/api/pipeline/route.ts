@@ -5,6 +5,9 @@ import { pipelineService } from '@/server/services/pipeline-service'
 import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 
+// Forzar renderizado dinámico (usa headers y session)
+export const dynamic = 'force-dynamic'
+
 // GET - Obtener métricas del pipeline
 export async function GET(request: NextRequest) {
   try {

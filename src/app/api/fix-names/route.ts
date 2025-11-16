@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 
+// Forzar renderizado dinámico (usa headers para autenticación)
+export const dynamic = 'force-dynamic'
+
 // Nombres argentinos realistas
 const NOMBRES = [
   'Juan Carlos González', 'María Elena Rodríguez', 'Carlos Alberto Fernández', 'Ana María López',

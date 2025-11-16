@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ManychatWebhookService } from '@/server/services/manychat-webhook-service'
-import { ManychatWebhookEvent } from '@/types/manychat'
+import { ManychatWebhookEvent, ManychatWebhookMessage } from '@/types/manychat'
 import { logger } from '@/lib/logger'
 
 /**

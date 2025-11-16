@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Para cada subscriber encontrado, crear o actualizar lead y conversación
-    for (const [phone, subscriber] of subscribersMap.entries()) {
+    // Usar Array.from para compatibilidad con ES5
+    for (const [phone, subscriber] of Array.from(subscribersMap.entries())) {
       try {
         results.found++
 

@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
     // Si hay stageId, mapear a estados correspondientes
     if (stageId) {
       const estados = Object.entries(estadoToStageId)
-        .filter(([_, sid]) => sid === stageId)
+        .filter(([, sid]) => sid === stageId)
         .map(([estado]) => estado)
       
       if (estados.length > 0) {
@@ -155,7 +155,8 @@ export async function GET(request: NextRequest) {
     // Obtener el evento más reciente por cada lead para calcular lastActivity
     // Usar una query por lead para asegurar que obtenemos el evento más reciente de cada uno
     // en lugar de los 1000 eventos más recientes globalmente
-    const leadIds = leads.map(l => l.id)
+    // Filtrar undefined para cumplir con el tipo string[] requerido por Prisma
+    const leadIds = leads.map(l => l.id).filter((id): id is string => id !== undefined)
     const eventsMap = new Map<string, any>()
     
     if (leadIds.length > 0) {
@@ -243,10 +244,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Mapear leads a PipelineLead usando el evento más reciente de cada lead
-    let pipelineLeads = leads.map(lead => {
-      const lastEvent = eventsMap.get(lead.id) || null
-      return mapLeadToPipelineLead(lead, lastEvent, assignmentMap.get(lead.id))
-    })
+    // Filtrar leads sin id para evitar errores de tipo
+    let pipelineLeads = leads
+      .filter(lead => lead.id !== undefined)
+      .map(lead => {
+        const leadId = lead.id as string // Type assertion seguro después del filter
+        const lastEvent = eventsMap.get(leadId) || null
+        return mapLeadToPipelineLead(lead, lastEvent, assignmentMap.get(leadId))
+      })
 
     // Aplicar filtros adicionales que no están en la base de datos
     if (priority) {

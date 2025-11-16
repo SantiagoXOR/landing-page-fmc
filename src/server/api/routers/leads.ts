@@ -176,7 +176,7 @@ export const leadsRouter = createTRPCRouter({
         const newLead = await supabaseLeadService.createLead(leadData)
 
         // 3. Sincronizar custom fields con Manychat si fue creado
-        if (manychatId && ManychatService.isConfigured()) {
+        if (manychatId && ManychatService.isConfigured() && newLead.id) {
           try {
             await ManychatSyncService.syncCustomFieldsToManychat(newLead.id)
             logger.info('Custom fields synced to Manychat', { leadId: newLead.id })

@@ -32,19 +32,41 @@ function createRedisInstance(): Redis {
     
     redis.on('close', () => {
       console.log('🔌 Redis connection closed')
+      // En entornos serverless, la conexión puede cerrarse entre invocaciones
+      // No resetear redis aquí para permitir reconexión automática
     })
     
     redis.on('reconnecting', () => {
       console.log('🔄 Redis reconnecting...')
+    })
+    
+    redis.on('ready', () => {
+      logger.info('✅ Redis ready')
     })
   }
   
   return redis
 }
 
-// Get Redis instance
+// Get Redis instance with connection check
 export function getRedis(): Redis {
-  return createRedisInstance()
+  const instance = createRedisInstance()
+  
+  // Verificar estado de la conexión y reconectar si es necesario
+  if (instance.status === 'end' || instance.status === 'close') {
+    // La conexión está cerrada, crear una nueva instancia
+    redis = null
+    return createRedisInstance()
+  }
+  
+  // Si la conexión está en estado 'wait', intentar conectar
+  if (instance.status === 'wait') {
+    instance.connect().catch((error) => {
+      logger.error('Error connecting to Redis:', error)
+    })
+  }
+  
+  return instance
 }
 
 // Cache utilities
@@ -57,16 +79,42 @@ export class CacheManager {
   }
   
   /**
+   * Get Redis instance, reconnecting if necessary
+   */
+  private getRedisInstance(): Redis {
+    // Verificar estado y reconectar si es necesario
+    if (this.redis.status === 'end' || this.redis.status === 'close') {
+      this.redis = getRedis()
+    }
+    return this.redis
+  }
+  
+  /**
    * Set a value in cache with optional TTL
    */
   async set(key: string, value: any, ttl?: number): Promise<void> {
     try {
+      const redis = this.getRedisInstance()
       const serializedValue = JSON.stringify(value)
       const expiration = ttl || this.defaultTTL
       
-      await this.redis.setex(key, expiration, serializedValue)
-    } catch (error) {
-      console.error(`Cache set error for key ${key}:`, error)
+      await redis.setex(key, expiration, serializedValue)
+    } catch (error: any) {
+      // Manejar errores de conexión cerrada
+      if (error?.message?.includes('Connection is closed') || error?.message?.includes('closed')) {
+        console.warn(`Redis connection closed, retrying for key ${key}`)
+        try {
+          // Intentar reconectar y reintentar
+          this.redis = getRedis()
+          const serializedValue = JSON.stringify(value)
+          const expiration = ttl || this.defaultTTL
+          await this.redis.setex(key, expiration, serializedValue)
+        } catch (retryError) {
+          console.error(`Cache set error (retry failed) for key ${key}:`, retryError)
+        }
+      } else {
+        console.error(`Cache set error for key ${key}:`, error)
+      }
       // Don't throw error to prevent cache failures from breaking the app
     }
   }
@@ -76,16 +124,34 @@ export class CacheManager {
    */
   async get<T>(key: string): Promise<T | null> {
     try {
-      const value = await this.redis.get(key)
+      const redis = this.getRedisInstance()
+      const value = await redis.get(key)
       
       if (!value) {
         return null
       }
       
       return JSON.parse(value) as T
-    } catch (error) {
-      console.error(`Cache get error for key ${key}:`, error)
-      return null
+    } catch (error: any) {
+      // Manejar errores de conexión cerrada
+      if (error?.message?.includes('Connection is closed') || error?.message?.includes('closed')) {
+        console.warn(`Redis connection closed, retrying for key ${key}`)
+        try {
+          // Intentar reconectar y reintentar
+          this.redis = getRedis()
+          const value = await this.redis.get(key)
+          if (!value) {
+            return null
+          }
+          return JSON.parse(value) as T
+        } catch (retryError) {
+          console.error(`Cache get error (retry failed) for key ${key}:`, retryError)
+          return null
+        }
+      } else {
+        console.error(`Cache get error for key ${key}:`, error)
+        return null
+      }
     }
   }
   
@@ -94,9 +160,20 @@ export class CacheManager {
    */
   async del(key: string): Promise<void> {
     try {
-      await this.redis.del(key)
-    } catch (error) {
-      console.error(`Cache delete error for key ${key}:`, error)
+      const redis = this.getRedisInstance()
+      await redis.del(key)
+    } catch (error: any) {
+      // Manejar errores de conexión cerrada
+      if (error?.message?.includes('Connection is closed') || error?.message?.includes('closed')) {
+        try {
+          this.redis = getRedis()
+          await this.redis.del(key)
+        } catch (retryError) {
+          console.error(`Cache delete error (retry failed) for key ${key}:`, retryError)
+        }
+      } else {
+        console.error(`Cache delete error for key ${key}:`, error)
+      }
     }
   }
   
@@ -157,9 +234,20 @@ export class CacheManager {
    */
   async expire(key: string, ttl: number): Promise<void> {
     try {
-      await this.redis.expire(key, ttl)
-    } catch (error) {
-      console.error(`Cache expire error for key ${key}:`, error)
+      const redis = this.getRedisInstance()
+      await redis.expire(key, ttl)
+    } catch (error: any) {
+      // Manejar errores de conexión cerrada
+      if (error?.message?.includes('Connection is closed') || error?.message?.includes('closed')) {
+        try {
+          this.redis = getRedis()
+          await this.redis.expire(key, ttl)
+        } catch (retryError) {
+          console.error(`Cache expire error (retry failed) for key ${key}:`, retryError)
+        }
+      } else {
+        console.error(`Cache expire error for key ${key}:`, error)
+      }
     }
   }
   
@@ -180,14 +268,30 @@ export class CacheManager {
    */
   async incr(key: string, amount: number = 1): Promise<number> {
     try {
+      const redis = this.getRedisInstance()
       if (amount === 1) {
-        return await this.redis.incr(key)
+        return await redis.incr(key)
       } else {
-        return await this.redis.incrby(key, amount)
+        return await redis.incrby(key, amount)
       }
-    } catch (error) {
-      console.error(`Cache increment error for key ${key}:`, error)
-      return 0
+    } catch (error: any) {
+      // Manejar errores de conexión cerrada
+      if (error?.message?.includes('Connection is closed') || error?.message?.includes('closed')) {
+        try {
+          this.redis = getRedis()
+          if (amount === 1) {
+            return await this.redis.incr(key)
+          } else {
+            return await this.redis.incrby(key, amount)
+          }
+        } catch (retryError) {
+          console.error(`Cache increment error (retry failed) for key ${key}:`, retryError)
+          return 0
+        }
+      } else {
+        console.error(`Cache increment error for key ${key}:`, error)
+        return 0
+      }
     }
   }
   

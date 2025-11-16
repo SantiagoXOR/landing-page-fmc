@@ -438,7 +438,7 @@ export default function ChatsPage() {
 }
 
 // Datos mock para desarrollo (mantenido para referencia futura)
-// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getMockConversations(): Conversation[] {
   return [
     {

@@ -133,6 +133,42 @@ function UsersAdminPage() {
     }
   }
 
+  // Función para aprobar usuario pendiente
+  const approvePendingUser = async (userId: string, email: string, role: 'VIEWER' | 'VENDEDOR' | 'ANALISTA' | 'MANAGER') => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          status: 'ACTIVE',
+          role: role
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al aprobar usuario')
+      }
+
+      await fetchUsers()
+      
+      addToast({
+        type: 'success',
+        title: 'Usuario aprobado',
+        description: `El usuario ${email} ha sido aprobado como ${role}`
+      })
+    } catch (error) {
+      console.error('Error approving user:', error)
+      addToast({
+        type: 'error',
+        title: 'Error al aprobar',
+        description: error instanceof Error ? error.message : 'Error al aprobar el usuario'
+      })
+    }
+  }
+
   // Función para cambiar estado de usuario
   const toggleUserStatus = async (userId: string, currentStatus: string) => {
     try {

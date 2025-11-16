@@ -147,29 +147,76 @@ export interface ManychatSendMessageResponse {
 // Webhook Events
 // ============================================================================
 
+export type ManychatWebhookEventType =
+  | 'new_subscriber'
+  | 'message_received'
+  | 'message_sent'
+  | 'tag_added'
+  | 'tag_removed'
+  | 'custom_field_changed'
+  | 'subscriber_updated'
+  | 'flow_triggered'
+  | 'button_clicked'
+
 export interface ManychatWebhookEvent {
+  event_type: ManychatWebhookEventType
+  subscriber_id?: number
+  subscriber?: ManychatSubscriber
+  message?: ManychatWebhookMessage
+  tag?: ManychatTag
+  custom_field?: ManychatWebhookCustomField
+  flow?: {
+    id: number
+    name: string
+    ns: string
+  }
+  button?: {
+    id: string
+    title: string
+    payload?: string
+  }
+  timestamp?: number
+  created_at?: string
+  data?: any // Para eventos personalizados
+}
+
+export interface ManychatWebhookMessage {
   id: string
-  type: 'new_subscriber' | 'message_received' | 'tag_added' | 'tag_removed' | 'custom_field_changed'
-  timestamp: number
-  data: ManychatWebhookData
+  type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'location' | 'sticker' | 'template' | 'interactive'
+  text?: string
+  url?: string
+  caption?: string
+  filename?: string
+  latitude?: number
+  longitude?: number
+  template_name?: string
+  interactive?: any
+  timestamp?: number
+  direction?: 'inbound' | 'outbound'
+  platform_msg_id?: string
+}
+
+export interface ManychatWebhookCustomField {
+  id: number
+  name: string
+  value: any
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'boolean'
 }
 
 export interface ManychatWebhookData {
   subscriber?: ManychatSubscriber
-  message?: {
-    id: string
-    type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'location' | 'sticker'
-    text?: string
-    url?: string
-    caption?: string
-    latitude?: number
-    longitude?: number
-  }
+  message?: ManychatWebhookMessage
   tag?: ManychatTag
-  custom_field?: {
+  custom_field?: ManychatWebhookCustomField
+  flow?: {
     id: number
     name: string
-    value: any
+    ns: string
+  }
+  button?: {
+    id: string
+    title: string
+    payload?: string
   }
 }
 

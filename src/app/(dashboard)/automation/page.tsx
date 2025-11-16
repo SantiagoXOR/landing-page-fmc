@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { AutomationRulesManager } from '@/components/automation/AutomationRulesManager'
 
 export const metadata: Metadata = {
-  title: 'Automatizaciones | Phorencial CRM',
+  title: 'Automatizaciones | PHRONENCIAL CRM',
   description: 'Gestiona reglas de automatización para el pipeline de ventas',
 }
 

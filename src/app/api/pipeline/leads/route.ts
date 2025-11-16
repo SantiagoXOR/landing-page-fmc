@@ -4,202 +4,95 @@ import { authOptions } from '@/lib/auth'
 import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { PipelineLead } from '@/types/pipeline'
+import { supabaseLeadService } from '@/server/services/supabase-lead-service'
+import { PrismaClient } from '@prisma/client'
 
-// Datos de ejemplo para el pipeline
-const mockPipelineLeads: PipelineLead[] = [
-  {
-    id: 'lead-1',
-    nombre: 'Juan Pérez',
-    telefono: '+54 370 4123456',
-    email: 'juan.perez@email.com',
-    origen: 'WhatsApp',
-    estado: 'NUEVO',
-    stageId: 'nuevo',
-    stageEntryDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 días atrás
-    lastActivity: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    score: 75,
-    tags: ['Formosa Capital', 'Primera Vivienda'],
-    priority: 'high',
-    value: 25000000,
-    probability: 60,
-    assignedTo: 'user-1',
-    notes: 'Cliente interesado en casa en zona céntrica',
-    activities: [
-      {
-        id: 'activity-1',
-        type: 'whatsapp',
-        description: 'Primer contacto por WhatsApp',
-        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        userId: 'user-1',
-        userName: 'Agente Ventas'
-      }
-    ],
-    tasks: [
-      {
-        id: 'task-1',
-        title: 'Llamar para agendar visita',
-        description: 'Contactar al cliente para coordinar visita a propiedades',
-        dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-        priority: 'high',
-        status: 'pending',
-        assignedTo: 'user-1',
-        assignedBy: 'user-1',
-        createdAt: new Date(),
-        type: 'call'
-      }
-    ]
-  },
-  {
-    id: 'lead-2',
-    nombre: 'María González',
-    telefono: '+54 370 5987654',
-    email: 'maria.gonzalez@email.com',
-    origen: 'Facebook',
-    estado: 'CONTACTADO',
-    stageId: 'contactado',
-    stageEntryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    lastActivity: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    score: 85,
-    tags: ['Clorinda', 'Inversión'],
-    priority: 'urgent',
-    value: 45000000,
-    probability: 80,
-    assignedTo: 'user-2',
-    notes: 'Inversora con experiencia, busca propiedades para alquiler',
-    activities: [
-      {
-        id: 'activity-2',
-        type: 'call',
-        description: 'Llamada inicial - muy interesada',
-        date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        userId: 'user-2',
-        userName: 'Agente Senior'
-      }
-    ],
-    tasks: []
-  },
-  {
-    id: 'lead-3',
-    nombre: 'Carlos Rodríguez',
-    telefono: '+54 371 1234567',
-    origen: 'Referido',
-    estado: 'CALIFICADO',
-    stageId: 'calificado',
-    stageEntryDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-    lastActivity: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    score: 90,
-    tags: ['Laguna Blanca', 'Familia'],
-    priority: 'medium',
-    value: 35000000,
-    probability: 75,
-    assignedTo: 'user-1',
-    notes: 'Familia joven buscando primera vivienda en zona tranquila',
-    customFields: {
-      presupuesto: '35000000',
-      financiacion: 'Crédito hipotecario',
-      tiempoCompra: '3 meses'
-    },
-    activities: [
-      {
-        id: 'activity-3',
-        type: 'meeting',
-        description: 'Reunión en oficina - definió presupuesto',
-        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        userId: 'user-1',
-        userName: 'Agente Ventas'
-      }
-    ],
-    tasks: [
-      {
-        id: 'task-3',
-        title: 'Preparar propuestas de propiedades',
-        description: 'Seleccionar 3-5 propiedades que coincidan con el perfil',
-        dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-        priority: 'medium',
-        status: 'in_progress',
-        assignedTo: 'user-1',
-        assignedBy: 'user-1',
-        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        type: 'document'
-      }
-    ]
-  },
-  {
-    id: 'lead-4',
-    nombre: 'Ana Martínez',
-    telefono: '+54 370 4567890',
-    email: 'ana.martinez@email.com',
-    origen: 'Web',
-    estado: 'PROPUESTA',
-    stageId: 'propuesta',
-    stageEntryDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    lastActivity: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    score: 95,
-    tags: ['Formosa Capital', 'Ejecutiva'],
-    priority: 'high',
-    value: 55000000,
-    probability: 85,
-    assignedTo: 'user-2',
-    notes: 'Ejecutiva de empresa, decisión rápida',
-    customFields: {
-      presupuesto: '55000000',
-      propuesta_url: 'https://docs.google.com/document/d/abc123',
-      fecha_envio_propuesta: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    activities: [
-      {
-        id: 'activity-4',
-        type: 'email',
-        description: 'Propuesta comercial enviada por email',
-        date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        userId: 'user-2',
-        userName: 'Agente Senior'
-      }
-    ],
-    tasks: [
-      {
-        id: 'task-4',
-        title: 'Seguimiento de propuesta',
-        description: 'Contactar para conocer feedback sobre la propuesta',
-        dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-        priority: 'high',
-        status: 'pending',
-        assignedTo: 'user-2',
-        assignedBy: 'user-2',
-        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-        type: 'follow_up'
-      }
-    ]
-  },
-  {
-    id: 'lead-5',
-    nombre: 'Roberto Silva',
-    telefono: '+54 371 8765432',
-    origen: 'WhatsApp',
-    estado: 'NEGOCIACION',
-    stageId: 'negociacion',
-    stageEntryDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    lastActivity: new Date(),
-    score: 88,
-    tags: ['Pirané', 'Comercial'],
-    priority: 'urgent',
-    value: 75000000,
-    probability: 90,
-    assignedTo: 'user-1',
-    notes: 'Negociando términos de pago y fecha de entrega',
-    activities: [
-      {
-        id: 'activity-5',
-        type: 'call',
-        description: 'Negociación de términos - muy cerca del cierre',
-        date: new Date(),
-        userId: 'user-1',
-        userName: 'Agente Ventas'
-      }
-    ],
+// Singleton pattern para PrismaClient en Next.js serverless
+// Evita crear múltiples conexiones y fugas de recursos
+// IMPORTANTE: Guardar en globalThis en TODOS los entornos (incluyendo producción)
+// para evitar crear múltiples conexiones en serverless
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+const prisma = globalForPrisma.prisma ?? new PrismaClient()
+
+// Guardar en globalThis en todos los entornos para evitar múltiples conexiones en serverless
+globalForPrisma.prisma = prisma
+
+// Mapeo de estados de leads a etapas del pipeline
+const estadoToStageId: Record<string, string> = {
+  'NUEVO': 'nuevo',
+  'CONTACTADO': 'contactado',
+  'EN_REVISION': 'calificado',
+  'CALIFICADO': 'calificado',
+  'PREAPROBADO': 'propuesta',
+  'PROPUESTA': 'propuesta',
+  'NEGOCIACION': 'negociacion',
+  'DOC_PENDIENTE': 'propuesta',
+  'RECHAZADO': 'perdido',
+  'DERIVADO': 'seguimiento'
+}
+
+// Función para obtener probabilidad por etapa
+function getProbabilityForStage(stageId: string): number {
+  const probabilities: Record<string, number> = {
+    'nuevo': 10,
+    'contactado': 20,
+    'calificado': 30,
+    'propuesta': 70,
+    'negociacion': 80,
+    'ganado': 100,
+    'perdido': 0,
+    'seguimiento': 100
+  }
+  return probabilities[stageId] || 10
+}
+
+// Función para mapear lead a PipelineLead
+function mapLeadToPipelineLead(lead: any, lastEvent: any = null, assignedTo?: string): PipelineLead {
+  const stageId = estadoToStageId[lead.estado] || 'nuevo'
+  const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
+  
+  // Usar el evento más reciente pasado como parámetro, o la fecha de creación del lead
+  const lastActivity = lastEvent ? new Date(lastEvent.createdAt) : new Date(lead.createdAt)
+  
+  // Parsear custom fields si existen
+  let customFields: Record<string, any> = {}
+  if (lead.customFields) {
+    try {
+      customFields = typeof lead.customFields === 'string' 
+        ? JSON.parse(lead.customFields) 
+        : lead.customFields
+    } catch (e) {
+      // Ignorar errores de parsing
+    }
+  }
+
+  return {
+    id: lead.id,
+    nombre: lead.nombre,
+    telefono: lead.telefono,
+    email: lead.email || undefined,
+    origen: lead.origen || 'web',
+    estado: lead.estado,
+    stageId,
+    stageEntryDate: new Date(lead.createdAt),
+    lastActivity,
+    score: undefined, // Se puede calcular después
+    tags: Array.isArray(tags) ? tags : [],
+    customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
+    notes: lead.notas || undefined,
+    assignedTo: assignedTo || undefined,
+    priority: 'medium' as const, // Se puede calcular basado en score o valor
+    value: lead.monto || undefined,
+    probability: getProbabilityForStage(stageId),
+    activities: [],
     tasks: []
   }
-]
+}
+
+// Datos de ejemplo eliminados - Ahora se usan datos reales de la base de datos
 
 /**
  * GET /api/pipeline/leads
@@ -234,39 +127,145 @@ export async function GET(request: NextRequest) {
     const assignedTo = searchParams.get('assignedTo')
     const search = searchParams.get('search')
 
-    let filteredLeads = [...mockPipelineLeads]
+    // Construir filtros para la consulta de leads
+    const filters: any = {
+      limit: 100, // Límite razonable para el pipeline
+      offset: 0
+    }
 
-    // Aplicar filtros
+    // Si hay stageId, mapear a estados correspondientes
     if (stageId) {
-      filteredLeads = filteredLeads.filter(lead => lead.stageId === stageId)
-    }
-
-    if (priority) {
-      filteredLeads = filteredLeads.filter(lead => lead.priority === priority)
-    }
-
-    if (assignedTo) {
-      filteredLeads = filteredLeads.filter(lead => lead.assignedTo === assignedTo)
+      const estados = Object.entries(estadoToStageId)
+        .filter(([_, sid]) => sid === stageId)
+        .map(([estado]) => estado)
+      
+      if (estados.length > 0) {
+        // Usar el primer estado encontrado (se puede mejorar para múltiples)
+        filters.estado = estados[0]
+      }
     }
 
     if (search) {
-      const searchLower = search.toLowerCase()
-      filteredLeads = filteredLeads.filter(lead => 
-        lead.nombre.toLowerCase().includes(searchLower) ||
-        lead.telefono.includes(search) ||
-        lead.email?.toLowerCase().includes(searchLower) ||
-        lead.origen.toLowerCase().includes(searchLower)
-      )
+      filters.search = search
+    }
+
+    // Obtener leads reales de la base de datos
+    const { leads, total } = await supabaseLeadService.getLeads(filters)
+
+    // Obtener el evento más reciente por cada lead para calcular lastActivity
+    // Usar una query por lead para asegurar que obtenemos el evento más reciente de cada uno
+    // en lugar de los 1000 eventos más recientes globalmente
+    const leadIds = leads.map(l => l.id)
+    const eventsMap = new Map<string, any>()
+    
+    if (leadIds.length > 0) {
+      // Obtener el evento más reciente para cada lead usando DISTINCT ON (PostgreSQL)
+      // Esto asegura que cada lead tenga su evento más reciente, incluso si tiene muchos eventos antiguos
+      // Nota: DISTINCT ON requiere que la columna en DISTINCT ON sea la primera en ORDER BY
+      try {
+        const latestEvents = await prisma.$queryRaw<Array<{
+          leadId: string
+          id: string
+          tipo: string
+          payload: string | null
+          createdAt: Date
+        }>>`
+          SELECT DISTINCT ON (e."leadId") 
+            e."leadId",
+            e.id,
+            e.tipo,
+            e.payload,
+            e."createdAt"
+          FROM "Event" e
+          WHERE e."leadId" = ANY(${leadIds}::text[])
+          ORDER BY e."leadId", e."createdAt" DESC
+        `
+        
+        latestEvents.forEach(event => {
+          eventsMap.set(event.leadId, event)
+        })
+      } catch (error: any) {
+        // Fallback: si la query con DISTINCT ON falla (por ejemplo, nombres de columnas diferentes),
+        // obtener todos los eventos y filtrar en memoria
+        logger.warn('Error using DISTINCT ON query, falling back to in-memory filtering', {
+          error: error.message,
+          leadCount: leadIds.length
+        })
+        
+        const allEvents = await prisma.event.findMany({
+          where: {
+            leadId: { in: leadIds }
+          },
+          orderBy: { createdAt: 'desc' }
+        })
+        
+        // Agrupar por leadId y tomar el más reciente de cada grupo
+        const eventsByLead = new Map<string, any>()
+        allEvents.forEach(event => {
+          if (event.leadId && !eventsByLead.has(event.leadId)) {
+            eventsByLead.set(event.leadId, event)
+          }
+        })
+        
+        eventsByLead.forEach((event, leadId) => {
+          eventsMap.set(leadId, event)
+        })
+      }
+    }
+
+    // Obtener asignaciones de leads (assignedTo) desde lead_pipeline
+    // Nota: lead_pipeline puede no existir para todos los leads, así que usamos LEFT JOIN
+    let assignmentMap = new Map<string, string>()
+    
+    if (leadIds.length > 0) {
+      try {
+        // Intentar obtener asignaciones desde lead_pipeline si existe
+        // Los IDs son CUID strings, no UUIDs, así que usamos TEXT/VARCHAR
+        const leadAssignments = await prisma.$queryRaw<Array<{ lead_id: string, assigned_to: string | null }>>`
+          SELECT lead_id, assigned_to 
+          FROM lead_pipeline 
+          WHERE lead_id = ANY(${leadIds}::text[])
+          AND assigned_to IS NOT NULL
+        `
+        
+        leadAssignments.forEach(assignment => {
+          if (assignment.assigned_to) {
+            assignmentMap.set(assignment.lead_id, assignment.assigned_to)
+          }
+        })
+      } catch (error: any) {
+        // Si la tabla lead_pipeline no existe o hay un error, simplemente continuar sin asignaciones
+        logger.warn('Could not fetch lead assignments from lead_pipeline', {
+          error: error.message,
+          leadCount: leadIds.length
+        })
+      }
+    }
+
+    // Mapear leads a PipelineLead usando el evento más reciente de cada lead
+    let pipelineLeads = leads.map(lead => {
+      const lastEvent = eventsMap.get(lead.id) || null
+      return mapLeadToPipelineLead(lead, lastEvent, assignmentMap.get(lead.id))
+    })
+
+    // Aplicar filtros adicionales que no están en la base de datos
+    if (priority) {
+      pipelineLeads = pipelineLeads.filter(lead => lead.priority === priority)
+    }
+
+    if (assignedTo) {
+      pipelineLeads = pipelineLeads.filter(lead => lead.assignedTo === assignedTo)
     }
 
     logger.info('Pipeline leads requested', {
       userId: session.user.id,
       userName: session.user.name,
       filters: { stageId, priority, assignedTo, search },
-      resultCount: filteredLeads.length
+      resultCount: pipelineLeads.length,
+      totalLeads: total
     })
 
-    return NextResponse.json(filteredLeads)
+    return NextResponse.json(pipelineLeads)
 
   } catch (error: any) {
     logger.error('Error getting pipeline leads', {

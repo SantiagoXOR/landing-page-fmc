@@ -1,67 +1,121 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Header } from '@/components/layout/Header'
 import { ChatList } from '@/components/chat/ChatList'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { ChatSidebar } from '@/components/chat/ChatSidebar'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { Conversation } from '@/types/chat'
 
 export default function ChatsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | undefined>()
   const [loading, setLoading] = useState(true)
-  
-  // Estados de filtros
-  const [filters, setFilters] = useState({
-    status: 'active' as string,
-    platform: '' as string,
-    search: '' as string,
-  })
+  const [syncing, setSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<string | null>(null)
+  const [mobileView, setMobileView] = useState<'list' | 'chat' | 'sidebar'>('list')
+
+  const fetchConversations = useCallback(async (sync: boolean = false) => {
+    try {
+      setLoading(true)
+      
+      const url = sync ? '/api/conversations?sync=true' : '/api/conversations'
+      const response = await fetch(url)
+      
+      if (response.ok) {
+        const data = await response.json()
+        const apiConversations = data.conversations || []
+        
+        // Siempre usar las conversaciones del API, incluso si están vacías
+        setConversations(apiConversations)
+        
+        if (sync) {
+          if (apiConversations.length > 0) {
+            setSyncStatus(`Sincronizado: ${apiConversations.length} conversaciones`)
+          } else {
+            setSyncStatus('No hay conversaciones para mostrar. Sincroniza con Manychat primero.')
+          }
+          setTimeout(() => setSyncStatus(null), 5000)
+        }
+      } else {
+        // Si el API falla, mostrar array vacío y mensaje de error
+        setConversations([])
+        if (sync) {
+          setSyncStatus('Error al obtener conversaciones')
+          setTimeout(() => setSyncStatus(null), 5000)
+        }
+      }
+    } catch (error) {
+      // Si hay un error, mostrar array vacío
+      setConversations([])
+      if (sync) {
+        setSyncStatus('Error de conexión al obtener conversaciones')
+        setTimeout(() => setSyncStatus(null), 5000)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleSyncManychat = async () => {
+    try {
+      setSyncing(true)
+      setSyncStatus('Sincronizando con Manychat...')
+      
+      const response = await fetch('/api/conversations/sync-manychat', {
+        method: 'POST',
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const syncedConversations = data.conversations || []
+        const syncedCount = data.synced || 0
+        const foundSubscribers = data.foundSubscribers || 0
+        
+        // Actualizar inmediatamente con las conversaciones retornadas
+        if (syncedConversations.length > 0) {
+          setConversations(syncedConversations)
+          setSyncStatus(
+            `Sincronizado: ${syncedCount} conversaciones${foundSubscribers > 0 ? `, ${foundSubscribers} nuevos subscribers encontrados` : ''}`
+          )
+        } else {
+          // Si no hay conversaciones pero se encontraron subscribers, recargar
+          if (foundSubscribers > 0) {
+            await fetchConversations(false)
+            setSyncStatus(`Encontrados ${foundSubscribers} subscribers. Recargando conversaciones...`)
+          } else {
+            setSyncStatus(
+              data.message || 'No hay conversaciones para sincronizar. Asegúrate de tener leads con manychatId o teléfonos válidos.'
+            )
+          }
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setSyncStatus(errorData.error || 'Error al sincronizar con Manychat')
+      }
+    } catch (error: any) {
+      setSyncStatus(`Error de conexión: ${error.message || 'No se pudo conectar con el servidor'}`)
+    } finally {
+      setSyncing(false)
+      setTimeout(() => setSyncStatus(null), 5000)
+    }
+  }
 
   // Cargar conversaciones al montar el componente y cuando cambien filtros
   useEffect(() => {
     fetchConversations()
-  }, [filters])
-
-  const fetchConversations = async () => {
-    try {
-      setLoading(true)
-      
-      // Construir query params
-      const params = new URLSearchParams()
-      if (filters.status) params.append('status', filters.status)
-      if (filters.platform) params.append('platform', filters.platform)
-      if (filters.search) params.append('search', filters.search)
-      
-      const response = await fetch(`/api/conversations?${params.toString()}`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        setConversations(data.conversations || [])
-      } else {
-        console.error('Error fetching conversations')
-        setConversations([])
-      }
-    } catch (error) {
-      console.error('Error fetching conversations:', error)
-      setConversations([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
-  }
-
-  const handleSearchChange = (value: string) => {
-    // Debounce la búsqueda
-    setFilters(prev => ({ ...prev, search: value }))
-  }
+  }, [fetchConversations])
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation)
+    
+    // En mobile, cambiar a vista de chat
+    if (window.innerWidth < 768) {
+      setMobileView('chat')
+    }
     
     // Cargar mensajes completos de la conversación en segundo plano
     fetch(`/api/conversations/${conversation.id}`)
@@ -74,8 +128,8 @@ export default function ChatsPage() {
       .then(data => {
         setSelectedConversation(data.conversation)
       })
-      .catch(error => {
-        console.error('Error fetching conversation details:', error)
+      .catch(() => {
+        // Error silencioso, la conversación ya está seleccionada
       })
   }
 
@@ -122,8 +176,8 @@ export default function ChatsPage() {
           )
         )
       }
-    } catch (error) {
-      console.error('Error sending message:', error)
+    } catch {
+      // Error silencioso
     }
   }
 
@@ -148,8 +202,8 @@ export default function ChatsPage() {
         }
         setSelectedConversation(updatedConversation)
       }
-    } catch (error) {
-      console.error('Error assigning user:', error)
+    } catch {
+      // Error silencioso
     }
   }
 
@@ -170,15 +224,64 @@ export default function ChatsPage() {
         setConversations(prev => prev.filter(conv => conv.id !== selectedConversation.id))
         setSelectedConversation(undefined)
       }
-    } catch (error) {
-      console.error('Error closing conversation:', error)
+    } catch {
+      // Error silencioso
     }
   }
 
-  const handleAddNote = (note: string) => {
-    console.log('Adding note:', note)
+  const handleAddNote = () => {
     // Implementar lógica para agregar notas
   }
+
+  // Botón de sincronizar para el Header
+  const syncButton = (
+    <div className="flex items-center gap-2">
+      {syncStatus && (
+        <div className={cn(
+          "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs sm:text-sm",
+          syncStatus.includes('Error') || syncStatus.includes('error')
+            ? "bg-red-50 text-red-700 border border-red-200"
+            : syncStatus.includes('Sincronizado') || syncStatus.includes('Encontrados')
+            ? "bg-green-50 text-green-700 border border-green-200"
+            : "bg-blue-50 text-blue-700 border border-blue-200"
+        )}>
+          {syncStatus.includes('Error') || syncStatus.includes('error') ? (
+            <span className="text-red-500">✕</span>
+          ) : syncStatus.includes('Sincronizado') || syncStatus.includes('Encontrados') ? (
+            <span className="text-green-500">✓</span>
+          ) : (
+            <RefreshCw className="h-3 w-3 animate-spin text-blue-500" />
+          )}
+          <span>{syncStatus}</span>
+        </div>
+      )}
+      <Button
+        onClick={handleSyncManychat}
+        disabled={syncing || loading}
+        size="sm"
+        className={cn(
+          "text-xs sm:text-sm h-9 sm:h-10 px-2.5 sm:px-3 lg:px-4 transition-all",
+          syncing
+            ? "bg-purple-400 cursor-not-allowed"
+            : "bg-purple-600 hover:bg-purple-700 text-white"
+        )}
+      >
+        {syncing ? (
+          <>
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin sm:mr-1.5 lg:mr-2" />
+            <span className="hidden sm:inline">Sincronizando...</span>
+            <span className="sm:hidden">Sync...</span>
+          </>
+        ) : (
+          <>
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1.5 lg:mr-2" />
+            <span className="hidden sm:inline">Sincronizar Manychat</span>
+            <span className="sm:hidden">Sync</span>
+          </>
+        )}
+      </Button>
+    </div>
+  )
 
   if (loading) {
     return (
@@ -189,9 +292,10 @@ export default function ChatsPage() {
           showDateFilter={false}
           showExportButton={false}
           showNewButton={false}
+          actions={syncButton}
         />
         <div className="flex h-[calc(100vh-80px)]">
-          <div className="w-1/3 bg-white border-r border-gray-200 animate-pulse">
+          <div className="hidden md:block w-1/3 bg-white border-r border-gray-200 animate-pulse">
             <div className="p-4 space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="h-16 bg-gray-200 rounded"></div>
@@ -217,95 +321,124 @@ export default function ChatsPage() {
         showDateFilter={false}
         showExportButton={false}
         showNewButton={false}
+        actions={syncButton}
       />
 
-      {/* Layout de 3 columnas */}
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Columna 1: Lista de conversaciones con filtros */}
-        <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">
-          {/* Filtros y búsqueda */}
-          <div className="p-4 border-b border-gray-200 space-y-3">
-            {/* Búsqueda */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar en conversaciones..."
-                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                value={filters.search}
-                onChange={(e) => handleSearchChange(e.target.value)}
-              />
-              <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-
-            {/* Filtros */}
-            <div className="flex gap-2">
-              <select
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-              >
-                <option value="">Todos los estados</option>
-                <option value="active">Activas</option>
-                <option value="open">Abiertas</option>
-                <option value="assigned">Asignadas</option>
-                <option value="closed">Cerradas</option>
-                <option value="resolved">Resueltas</option>
-              </select>
-
-              <select
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                value={filters.platform}
-                onChange={(e) => handleFilterChange('platform', e.target.value)}
-              >
-                <option value="">Todas las plataformas</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="instagram">Instagram</option>
-                <option value="facebook">Facebook</option>
-                <option value="web">Web</option>
-              </select>
-            </div>
-
-            {/* Contador de resultados */}
-            <div className="text-sm text-gray-500">
-              {conversations.length} conversación{conversations.length !== 1 ? 'es' : ''}
-            </div>
-          </div>
-
-          {/* Lista de conversaciones */}
-          <div className="flex-1 overflow-y-auto">
-            <ChatList
-              conversations={conversations}
-              selectedConversationId={selectedConversation?.id}
-              onSelectConversation={handleSelectConversation}
-            />
-          </div>
+      {/* Layout Responsive */}
+      <div className="flex h-[calc(100vh-80px)] relative">
+        {/* Mobile: Vista de lista */}
+        <div className={cn(
+          'bg-white border-r border-gray-200 flex flex-col transition-transform duration-300',
+          'md:w-1/3 lg:w-80',
+          mobileView === 'list' ? 'w-full' : 'hidden md:flex',
+          mobileView === 'chat' && 'hidden'
+        )}>
+          <ChatList
+            conversations={conversations}
+            selectedConversationId={selectedConversation?.id}
+            onSelectConversation={handleSelectConversation}
+          />
         </div>
 
-        {/* Columna 2: Ventana de chat */}
-        <div className="flex-1">
+        {/* Mobile: Vista de chat */}
+        <div className={cn(
+          'flex-1 flex flex-col bg-white transition-transform duration-300',
+          mobileView === 'chat' ? 'w-full' : 'hidden md:flex',
+          mobileView === 'list' && 'hidden'
+        )}>
+          {/* Botón volver en mobile */}
+          {selectedConversation && (
+            <div className="md:hidden flex items-center gap-2 p-3 border-b border-gray-200">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileView('list')}
+                className="h-8 w-8 p-0"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-gray-900 truncate">
+                  {selectedConversation.lead?.nombre || 'Usuario'}
+                </h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setMobileView('sidebar')
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </Button>
+            </div>
+          )}
           <ChatWindow
             conversation={selectedConversation}
             onSendMessage={handleSendMessage}
           />
         </div>
 
-        {/* Columna 3: Panel lateral */}
-        <div className="w-80">
+        {/* Desktop: Sidebar siempre visible, Mobile: Drawer */}
+        <div className={cn(
+          'bg-white border-l border-gray-200 transition-transform duration-300',
+          'lg:w-80',
+          // Desktop: siempre visible en lg+
+          'hidden lg:block',
+          // Tablet: oculto por defecto, se puede mostrar
+          'md:hidden',
+          // Mobile: drawer
+          mobileView === 'sidebar' && 'fixed inset-y-0 right-0 w-full max-w-sm z-50 shadow-xl block'
+        )}>
+          {mobileView === 'sidebar' && (
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold">Detalles</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setMobileView('chat')
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </Button>
+            </div>
+          )}
           <ChatSidebar
             conversation={selectedConversation}
             onAssignUser={handleAssignUser}
-            onCloseConversation={handleCloseConversation}
+            onCloseConversation={() => {
+              handleCloseConversation()
+              if (window.innerWidth < 768) {
+                setMobileView('list')
+              }
+            }}
             onAddNote={handleAddNote}
           />
         </div>
+
+        {/* Overlay para mobile sidebar */}
+        {mobileView === 'sidebar' && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => {
+              setMobileView('chat')
+            }}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-// Datos mock para desarrollo
+// Datos mock para desarrollo (mantenido para referencia futura)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getMockConversations(): Conversation[] {
   return [
     {
@@ -314,32 +447,35 @@ function getMockConversations(): Conversation[] {
       status: 'open',
       lastMessageAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      unreadCount: 2,
       lead: {
         id: 'lead1',
-        nombre: 'Diana',
+        nombre: 'Ariel',
         telefono: '+54123456789',
-        email: 'diana@email.com'
+        email: 'ariel@email.com'
       },
       messages: [
         {
           id: 'msg1',
-          direction: 'inbound',
-          content: 'Hola, me interesa saber sobre los créditos para motos',
+          direction: 'outbound',
+          content: '¡Hola Ariel! Soy Clara, la asistente del Team...',
           messageType: 'text',
-          sentAt: new Date(Date.now() - 1000 * 60 * 30).toISOString()
+          sentAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+          isFromBot: true
         }
       ]
     },
     {
       id: '2',
-      platform: 'whatsapp',
+      platform: 'instagram',
       status: 'assigned',
       assignedTo: 'user1',
-      lastMessageAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+      lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+      unreadCount: 18,
       lead: {
         id: 'lead2',
-        nombre: 'Margarita Fernández',
+        nombre: 'Eugenio Alonso',
         telefono: '+54123456790'
       },
       assignedUser: {
@@ -350,31 +486,56 @@ function getMockConversations(): Conversation[] {
       messages: [
         {
           id: 'msg2',
-          direction: 'inbound',
-          content: 'Muchas gracias! He recibido la información',
+          direction: 'outbound',
+          content: 'Muchas gracias por todos los datos...',
           messageType: 'text',
-          sentAt: new Date(Date.now() - 1000 * 60 * 60).toISOString()
+          sentAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+          isFromBot: true
         }
       ]
     },
     {
       id: '3',
-      platform: 'instagram',
+      platform: 'whatsapp',
       status: 'open',
-      lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
       createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+      botAlert: true,
       lead: {
         id: 'lead3',
-        nombre: 'Roberto',
+        nombre: 'Lucas de Martos',
         telefono: '+54123456791'
       },
       messages: [
         {
           id: 'msg3',
-          direction: 'inbound',
-          content: 'He elevado tu consulta al departamento correspondiente',
+          direction: 'outbound',
+          content: 'Sii yo creo que si!...',
           messageType: 'text',
-          sentAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
+          sentAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+          isFromBot: true
+        }
+      ]
+    },
+    {
+      id: '4',
+      platform: 'whatsapp',
+      status: 'open',
+      lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+      lead: {
+        id: 'lead4',
+        nombre: 'Marcelo Avila',
+        telefono: '+54123456792'
+      },
+      messages: [
+        {
+          id: 'msg4',
+          direction: 'outbound',
+          content: '¡Gracias, Marcelo! He elevado tu...',
+          messageType: 'text',
+          sentAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+          isFromBot: true
         }
       ]
     }

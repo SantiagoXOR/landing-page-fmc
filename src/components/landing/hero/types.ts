@@ -5,7 +5,7 @@ export interface ParallaxOptions {
 
 export interface ParallaxRefs {
   bgRef: React.RefObject<HTMLDivElement>;
-  fgRef: React.RefObject<HTMLImageElement>;
+  fgRef: React.RefObject<HTMLDivElement>;
 }
 
 export interface HeroProps {

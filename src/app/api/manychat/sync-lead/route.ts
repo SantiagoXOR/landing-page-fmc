@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ManychatSyncService } from '@/server/services/manychat-sync-service'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       )
     }
   } catch (error: any) {
-    console.error('Error en sync-lead:', error)
+    logger.error('Error en sync-lead', { error: error.message })
     return NextResponse.json(
       { error: error.message || 'Error al sincronizar lead' },
       { status: 500 }

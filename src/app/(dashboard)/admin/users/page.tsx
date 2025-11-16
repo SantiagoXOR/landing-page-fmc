@@ -322,7 +322,18 @@ function UsersAdminPage() {
               <UserX className="h-8 w-8 text-red-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Inactivos</p>
-                <p className="text-2xl font-bold">{users.filter(u => u.status !== 'ACTIVE').length}</p>
+                <p className="text-2xl font-bold">{users.filter(u => u.status !== 'ACTIVE' && u.status !== 'PENDING').length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <UserCheck className="h-8 w-8 text-yellow-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Pendientes</p>
+                <p className="text-2xl font-bold">{users.filter(u => u.status === 'PENDING').length}</p>
               </div>
             </div>
           </CardContent>
@@ -376,39 +387,60 @@ function UsersAdminPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center space-x-2">
-                        <Button asChild variant="ghost" size="sm" className="hover:bg-blue-50" title="Editar usuario">
-                          <Link href={`/admin/users/${user.id}/edit`}>
-                            <Edit className="h-4 w-4 text-blue-600" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={user.status === 'ACTIVE' ? 'hover:bg-red-50' : 'hover:bg-green-50'}
-                          title={user.status === 'ACTIVE' ? 'Desactivar usuario' : 'Activar usuario'}
-                          onClick={() => toggleUserStatus(user.id, user.status)}
-                        >
-                          {user.status === 'ACTIVE' ? (
-                            <UserX className="h-4 w-4 text-red-600" />
-                          ) : (
-                            <UserCheck className="h-4 w-4 text-green-600" />
-                          )}
-                        </Button>
-                        {user.role !== 'ADMIN' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-red-50"
-                            title="Eliminar usuario"
-                            onClick={() => openDeleteModal(user.id, `${user.nombre} ${user.apellido || ''}`)}
-                            disabled={deletingId === user.id}
-                          >
-                            {deletingId === user.id ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                            ) : (
-                              <Trash2 className="h-4 w-4 text-red-600" />
+                        {user.status === 'PENDING' ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:bg-green-50"
+                              title="Aprobar usuario como VIEWER"
+                              onClick={() => approvePendingUser(user.id, user.email, 'VIEWER')}
+                            >
+                              <UserCheck className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button asChild variant="ghost" size="sm" className="hover:bg-blue-50" title="Editar usuario">
+                              <Link href={`/admin/users/${user.id}/edit`}>
+                                <Edit className="h-4 w-4 text-blue-600" />
+                              </Link>
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button asChild variant="ghost" size="sm" className="hover:bg-blue-50" title="Editar usuario">
+                              <Link href={`/admin/users/${user.id}/edit`}>
+                                <Edit className="h-4 w-4 text-blue-600" />
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={user.status === 'ACTIVE' ? 'hover:bg-red-50' : 'hover:bg-green-50'}
+                              title={user.status === 'ACTIVE' ? 'Desactivar usuario' : 'Activar usuario'}
+                              onClick={() => toggleUserStatus(user.id, user.status)}
+                            >
+                              {user.status === 'ACTIVE' ? (
+                                <UserX className="h-4 w-4 text-red-600" />
+                              ) : (
+                                <UserCheck className="h-4 w-4 text-green-600" />
+                              )}
+                            </Button>
+                            {user.role !== 'ADMIN' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="hover:bg-red-50"
+                                title="Eliminar usuario"
+                                onClick={() => openDeleteModal(user.id, `${user.nombre} ${user.apellido || ''}`)}
+                                disabled={deletingId === user.id}
+                              >
+                                {deletingId === user.id ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                )}
+                              </Button>
                             )}
-                          </Button>
+                          </>
                         )}
                       </div>
                     </td>

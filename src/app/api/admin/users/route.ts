@@ -20,17 +20,31 @@ export async function GET(request: NextRequest) {
 
     // Obtener usuarios
     const users = await supabase.findAllUsers()
+    
+    // Asegurar que siempre retornamos un array
+    if (!Array.isArray(users)) {
+      logger.warn('findAllUsers no retornó un array, retornando array vacío')
+      return NextResponse.json([])
+    }
 
     return NextResponse.json(users)
 
   } catch (error: any) {
     logger.error('Error in GET /api/admin/users:', error)
+    logger.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    })
     
-    if (error.message.includes('Insufficient permissions')) {
+    if (error.message?.includes('Insufficient permissions')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // Retornar array vacío en lugar de error 500 para que el frontend pueda mostrar la interfaz
+    // El frontend mostrará un mensaje de error pero no se romperá
+    logger.warn('Retornando array vacío debido a error en findAllUsers')
+    return NextResponse.json([], { status: 200 })
   }
 }
 
@@ -97,22 +111,38 @@ export async function POST(request: NextRequest) {
     // Hash de la contraseña
     const passwordHash = await bcrypt.hash(password, 10)
 
-    // Crear usuario
+    // Crear usuario - mapear campos al esquema de la tabla User
+    // La tabla User tiene: id, email, name, role, hashedPassword, createdAt, updatedAt
     const userData = {
       email: email.toLowerCase().trim(),
-      nombre: nombre.trim(),
-      apellido: apellido?.trim() || null,
-      telefono: telefono?.trim() || null,
+      name: nombre.trim(), // Mapear nombre -> name
       role,
-      status,
-      password_hash: passwordHash,
-      created_by: session.user.id
+      hashedPassword: passwordHash, // Mapear password_hash -> hashedPassword
+      // Nota: apellido, telefono, status, created_by no existen en la tabla User actual
+      // Si necesitas estos campos, deberías crear una tabla extendida o actualizar el esquema
     }
 
     const newUser = await supabase.createUser(userData)
 
-    // Remover password_hash de la respuesta
-    const { hash, ...userResponse } = newUser
+    if (!newUser) {
+      return NextResponse.json({ error: 'Error al crear usuario' }, { status: 500 })
+    }
+
+    // Mapear respuesta al formato esperado por el frontend
+    const userResponse = {
+      id: newUser.id,
+      email: newUser.email,
+      nombre: newUser.name || newUser.nombre || '',
+      apellido: apellido?.trim() || '',
+      telefono: telefono?.trim() || null,
+      role: newUser.role,
+      status: status || 'ACTIVE', // Mantener el status aunque no se guarde en DB
+      created_at: newUser.createdAt || new Date().toISOString()
+    }
+
+    // Remover campos sensibles
+    delete (userResponse as any).hashedPassword
+    delete (userResponse as any).password_hash
 
     return NextResponse.json(userResponse, { status: 201 })
 

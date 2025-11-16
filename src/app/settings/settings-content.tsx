@@ -293,7 +293,7 @@ export default function SettingsContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <Label className="text-gray-500">Versión del CRM</Label>
-              <p>Phorencial CRM v1.0.0</p>
+              <p>PHRONENCIAL CRM v1.0.0</p>
             </div>
             <div>
               <Label className="text-gray-500">Base de Datos</Label>

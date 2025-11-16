@@ -137,17 +137,8 @@ export default function Home() {
                 </a>
               </div>
             </div>
-
-            {/* Mobile User Icon - Visible only on mobile/tablet */}
-            <div className="flex lg:hidden items-center gap-2">
-              <Link 
-                href="/auth/signin"
-                className="text-white hover:text-fmc-green transition-colors duration-300 p-2"
-                aria-label="Iniciar sesión"
-              >
-                <UserCircle className="w-6 h-6" />
-              </Link>
-            </div>
+ 
+            {/* Mobile User Icon eliminado para evitar duplicado; acceso queda en menú hamburguesa */}
 
             {/* Desktop Social Icons */}
             <div className="hidden md:flex items-center space-x-3">

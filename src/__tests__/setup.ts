@@ -30,16 +30,7 @@ vi.mock('next-auth', () => ({
   getServerSession: vi.fn(),
 }))
 
-// Mock NextAuth providers
-vi.mock('next-auth/providers/credentials', () => ({
-  default: vi.fn(() => ({
-    id: 'credentials',
-    name: 'credentials',
-    type: 'credentials',
-    credentials: {},
-    authorize: vi.fn(),
-  })),
-}))
+// Ya no se usa CredentialsProvider (login solo con Google), no es necesario mockearlo
 
 // Mock Supabase client
 vi.mock('@/lib/db', () => ({

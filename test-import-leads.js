@@ -12,84 +12,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Datos de prueba (primeros 10 leads del Excel)
-const testLeads = [
-  {
-    nombre: 'echeverria maribel silvia',
-    dni: '17968421',
-    telefono: '+543704861647',
-    email: 'echeverria.maribel@email.com',
-    ingresos: 340000,
-    zona: 'Formosa',
-    producto: '110',
-    monto: 500000,
-    origen: 'excel',
-    utmSource: 'importacion_excel',
-    estado: 'RECHAZADO',
-    agencia: 'A',
-    notas: 'Trabajo: pensionada. hist, crediticio malo. BDF: Sí'
-  },
-  {
-    nombre: 'López mauro',
-    dni: '36204697',
-    telefono: '+543704698662',
-    email: 'lopez.mauro@email.com',
-    ingresos: 1038302,
-    zona: 'Ingeniero Juárez',
-    producto: 'Wave 110',
-    monto: 500000,
-    origen: 'excel',
-    utmSource: 'importacion_excel',
-    estado: 'PREAPROBADO',
-    agencia: 'Rio Bermejo',
-    notas: 'Trabajo: Empleado Provincial. Notas BDF: Sí'
-  },
-  {
-    nombre: 'Juan Ramón muzzio',
-    dni: '38542477',
-    telefono: '+543705182438',
-    email: 'juan.ramon@email.com',
-    ingresos: 877000,
-    zona: 'Villa del Rosario',
-    producto: 'Moto 110cc',
-    monto: 500000,
-    origen: 'excel',
-    utmSource: 'importacion_excel',
-    estado: 'RECHAZADO',
-    agencia: 'C',
-    notas: 'Trabajo: Personal Policial. hist. crediticio malo. BDF: Sí'
-  },
-  {
-    nombre: 'Sandra beatriz busto',
-    dni: '29797131',
-    telefono: '+543705084469',
-    email: 'sandra.beatriz@email.com',
-    ingresos: 350000,
-    zona: 'La Nueva Formosa',
-    producto: '110',
-    monto: 500000,
-    origen: 'excel',
-    utmSource: 'importacion_excel',
-    estado: 'DOC_PENDIENTE',
-    agencia: 'D',
-    notas: 'Trabajo: Empleada Domestica. debe enviar recibos BDF: Sí'
-  },
-  {
-    nombre: 'Luque María de Jesús',
-    dni: '14172033',
-    telefono: '+543704947119',
-    email: 'luque.maria@email.com',
-    ingresos: 330000,
-    zona: 'Solidaridad',
-    producto: 'Moto 110cc',
-    monto: 500000,
-    origen: 'excel',
-    utmSource: 'importacion_excel',
-    estado: 'DOC_PENDIENTE',
-    agencia: null,
-    notas: 'Trabajo: Jubilada. debe enviar recibos BDF: Sí'
-  }
-];
+// Datos de prueba eliminados - Los leads ahora se crean desde Manychat
+// Este archivo se mantiene solo para referencia histórica
+const testLeads = [];
 
 async function testImport() {
   try {

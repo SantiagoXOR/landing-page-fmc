@@ -26,16 +26,42 @@ class SupabaseClient {
     const url = `${this.baseUrl}/rest/v1${endpoint}`
 
     try {
+      // Validar que serviceKey esté configurado
+      if (!this.serviceKey) {
+        throw new Error('Supabase service key no está configurada')
+      }
+
       console.log(`🌐 Supabase request: ${url}`)
       
+      // Asegurar que los headers de autenticación no se sobrescriban
+      const headers = new Headers({
+        'Content-Type': 'application/json',
+        'apikey': this.serviceKey,
+        'Authorization': `Bearer ${this.serviceKey}`,
+      })
+
+      // Agregar headers adicionales del request (como 'Prefer')
+      if (options.headers) {
+        if (options.headers instanceof Headers) {
+          options.headers.forEach((value, key) => {
+            headers.set(key, value)
+          })
+        } else if (Array.isArray(options.headers)) {
+          options.headers.forEach(([key, value]) => {
+            headers.set(key, value)
+          })
+        } else {
+          Object.entries(options.headers).forEach(([key, value]) => {
+            if (value) {
+              headers.set(key, String(value))
+            }
+          })
+        }
+      }
+
       const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.serviceKey,
-          'Authorization': `Bearer ${this.serviceKey}`,
-          ...options.headers
-        },
-        ...options
+        ...options,
+        headers
       })
 
       if (!response.ok) {
@@ -44,7 +70,32 @@ class SupabaseClient {
         throw new Error(`Supabase error: ${response.status} - ${error}`)
       }
 
-      return response.json()
+      // Para DELETE con 204 No Content, no hay body
+      if (response.status === 204) {
+        return null
+      }
+
+      // Leer el contenido de la respuesta
+      const contentType = response.headers.get('content-type')
+      const text = await response.text()
+      
+      // Si no hay contenido, retornar null
+      if (!text || text.trim() === '') {
+        return null
+      }
+
+      // Si es JSON, parsearlo
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          return JSON.parse(text)
+        } catch (parseError) {
+          console.error(`❌ Error parseando JSON: ${parseError}`)
+          throw new Error(`Error parseando respuesta JSON: ${parseError}`)
+        }
+      }
+
+      // Si no es JSON, retornar el texto tal cual
+      return text
     } catch (error: any) {
       // Capturar errores de red específicos
       if (error.message === 'fetch failed' || error.name === 'TypeError') {
@@ -75,12 +126,22 @@ class SupabaseClient {
   }
 
   private mapUserData(userData: any) {
+    // Determinar status basado en el email (soft delete usando prefijo deleted_)
+    let status = 'ACTIVE'
+    if (userData.email && userData.email.startsWith('deleted_')) {
+      status = 'INACTIVE'
+    } else if (userData.role === 'PENDING') {
+      status = 'PENDING'
+    }
+    
     return {
       id: userData.id,
       email: userData.email,
       nombre: userData.name,
       hash: userData.hashedPassword,
       rol: userData.role,
+      role: userData.role, // Agregar también 'role' para compatibilidad
+      status: status,
       createdAt: userData.createdAt
     }
   }
@@ -312,14 +373,23 @@ class SupabaseClient {
     const users = await this.request(`/User?email=eq.${email}&limit=1`)
     if (!users[0]) return null
 
+    // Determinar status basado en el email (soft delete usando prefijo deleted_)
+    let status = 'ACTIVE'
+    if (users[0].email && users[0].email.startsWith('deleted_')) {
+      status = 'INACTIVE'
+    } else if (users[0].role === 'PENDING') {
+      status = 'PENDING'
+    }
+
+    // Mapear según schema de Prisma: nombre, email, hash, rol
     return {
       id: users[0].id,
       email: users[0].email,
-      nombre: users[0].name,
-      apellido: '', // Campo requerido por auth.ts
-      hash: users[0].hashedPassword,
-      role: users[0].role, // Cambiar de 'rol' a 'role'
-      status: 'ACTIVE', // Campo requerido por auth.ts
+      nombre: users[0].nombre || users[0].name, // Soporta ambos formatos
+      apellido: '', // Campo requerido por auth.ts pero no existe en schema
+      hash: users[0].hash || users[0].hashedPassword, // Soporta ambos formatos
+      role: users[0].rol || users[0].role, // Mapear 'rol' del schema a 'role' para auth.ts
+      status: status, // Calculado basado en email y role
       createdAt: users[0].createdAt
     }
   }
@@ -375,16 +445,94 @@ class SupabaseClient {
   }
 
   async updateUser(userId: string, userData: any) {
+    // Mapear campos del frontend a la estructura de la tabla User
+    const updateData: any = {}
+    
+    if (userData.email !== undefined) updateData.email = userData.email
+    if (userData.nombre !== undefined) updateData.name = userData.nombre // Mapear nombre -> name
+    if (userData.name !== undefined) updateData.name = userData.name
+    if (userData.role !== undefined) updateData.role = userData.role
+    if (userData.hash !== undefined) updateData.hashedPassword = userData.hash
+    if (userData.password_hash !== undefined) updateData.hashedPassword = userData.password_hash
+    
+    // Nota: La tabla User no tiene campo 'status', así que lo ignoramos
+    // Si necesitas status, deberías agregarlo al esquema de la tabla
+    
     const users = await this.request(`/User?id=eq.${userId}`, {
       method: 'PATCH',
       headers: { 'Prefer': 'return=representation' },
-      body: JSON.stringify(userData)
+      body: JSON.stringify(updateData)
     })
     return users[0]
   }
 
+  async deleteUser(userId: string) {
+    try {
+      // Eliminar usuario realmente de la base de datos
+      // Supabase/PostgREST retorna 204 No Content si es exitoso, o 200 con array vacío
+      const result = await this.request(`/User?id=eq.${userId}`, {
+        method: 'DELETE'
+      })
+      
+      // Si el request no lanzó error, la eliminación fue exitosa
+      // result puede ser null (204), [] (200 con array vacío), o undefined
+      console.log(`[Supabase] Usuario ${userId} eliminado exitosamente`)
+      return true
+    } catch (error: any) {
+      console.error(`[Supabase] Error eliminando usuario ${userId}:`, error)
+      
+      // Verificar si es un error de restricción de integridad referencial
+      if (error.message?.includes('foreign key') || error.message?.includes('23503')) {
+        throw new Error('No se puede eliminar el usuario porque tiene datos asociados (leads, eventos, etc.)')
+      }
+      
+      // Re-lanzar el error para que el endpoint lo maneje
+      throw error
+    }
+  }
+
   async findAllUsers() {
-    return this.request('/User?select=*&order=created_at.desc')
+    try {
+      // Usar el formato correcto de PostgREST para ordenar
+      const users = await this.request('/User?select=*&order=createdAt.desc')
+      
+      // Si no hay usuarios, retornar array vacío
+      if (!users || !Array.isArray(users)) {
+        console.warn('[Supabase] findAllUsers: respuesta no es un array', users)
+        return []
+      }
+      
+      // Mapear usuarios para el frontend
+      return users.map((user: any) => {
+        // Determinar status basado en el email (soft delete usando prefijo deleted_)
+        let status = 'ACTIVE'
+        if (user.email && user.email.startsWith('deleted_')) {
+          status = 'INACTIVE'
+        } else if (user.role === 'PENDING') {
+          status = 'PENDING'
+        }
+        
+        return {
+          id: user.id,
+          email: user.email,
+          nombre: user.name || user.nombre || '',
+          apellido: user.apellido || '',
+          role: user.role === 'PENDING' ? 'VIEWER' : (user.role || 'VIEWER'), // Mostrar como VIEWER temporalmente si es PENDING
+          status: status,
+          last_login: user.last_login || null,
+          created_at: user.createdAt || user.created_at
+        }
+      })
+    } catch (error: any) {
+      console.error('[Supabase] Error en findAllUsers:', error)
+      console.error('[Supabase] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
+      // Retornar array vacío en caso de error para que el frontend no se rompa
+      return []
+    }
   }
 
   async findUserById(userId: string) {

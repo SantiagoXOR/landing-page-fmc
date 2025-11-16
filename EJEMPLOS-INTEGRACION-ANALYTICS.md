@@ -286,8 +286,9 @@ export default function RegisterForm() {
           userId: user.id,
         })
         
-        // Iniciar sesión automáticamente
-        await signIn('credentials', { email, password })
+        // Iniciar sesión automáticamente (Google-only en la app principal)
+        // Aquí podrías redirigir a /auth/signin para continuar con Google OAuth
+        // await signIn('google')
       }
     } catch (error) {
       console.error('Error en registro:', error)

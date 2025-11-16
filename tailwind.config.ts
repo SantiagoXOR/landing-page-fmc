@@ -17,7 +17,11 @@ const config: Config = {
       },
     },
     extend: {
+      screens: {
+        'xs': '375px',
+      },
       fontFamily: {
+        'sans': ['ACTO', 'system-ui', 'sans-serif'],
         'acto': ['ACTO', 'system-ui', 'sans-serif'],
       },
       fontWeight: {

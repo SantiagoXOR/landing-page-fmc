@@ -26,8 +26,28 @@ export async function GET(
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
+    // Determinar status basado en el email (soft delete usando prefijo deleted_)
+    let userStatus = 'ACTIVE'
+    if (user.email && user.email.startsWith('deleted_')) {
+      userStatus = 'INACTIVE'
+    } else if (user.role === 'PENDING') {
+      userStatus = 'PENDING'
+    }
+
+    // Mapear respuesta al formato esperado por el frontend
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      nombre: user.nombre || '',
+      apellido: '',
+      telefono: null,
+      role: user.role || user.rol,
+      status: userStatus,
+      created_at: user.createdAt
+    }
+
     // Remover hash de la respuesta
-    const { hash, ...userResponse } = user
+    delete (userResponse as any).hash
 
     return NextResponse.json(userResponse)
 
@@ -95,7 +115,7 @@ export async function PATCH(
           error: 'El nombre es obligatorio' 
         }, { status: 400 })
       }
-      updateData.nombre = nombre.trim()
+      updateData.name = nombre.trim() // La tabla User usa 'name', no 'nombre'
     }
 
     if (apellido !== undefined) {
@@ -121,7 +141,13 @@ export async function PATCH(
         }, { status: 400 })
       }
 
+      // Permitir cambiar de PENDING a cualquier rol válido (aprobación de usuario)
       updateData.role = role
+      // Si el usuario tenía role PENDING y se le asigna un rol válido, también actualizar name si es necesario
+      if (existingUser.rol === 'PENDING' && validRoles.includes(role)) {
+        // El usuario está siendo aprobado
+        console.log(`[Admin] Aprobando usuario ${existingUser.email} con rol ${role}`)
+      }
     }
 
     if (status !== undefined) {
@@ -139,7 +165,21 @@ export async function PATCH(
         }, { status: 400 })
       }
 
-      updateData.status = status
+      // Nota: La tabla User no tiene campo 'status', así que implementamos soft delete
+      // Si el estado es INACTIVE o SUSPENDED, marcamos con prefijo en el email
+      if (status === 'INACTIVE' || status === 'SUSPENDED') {
+        // Si el email no empieza con deleted_, agregamos el prefijo
+        if (!existingUser.email.startsWith('deleted_')) {
+          updateData.email = `deleted_${Date.now()}_${existingUser.email}`
+        }
+      } else if (status === 'ACTIVE') {
+        // Si se reactiva, intentar restaurar el email original
+        const emailMatch = existingUser.email.match(/^deleted_\d+_(.+)$/)
+        if (emailMatch) {
+          updateData.email = emailMatch[1]
+        }
+      }
+      // El campo status se mantiene en la respuesta para el frontend, pero no se guarda en DB
     }
 
     if (password !== undefined) {
@@ -155,8 +195,33 @@ export async function PATCH(
     // Actualizar usuario
     const updatedUser = await supabase.updateUser(params.id, updateData)
 
-    // Remover password_hash de la respuesta
-    const { hash, ...userResponse } = updatedUser
+    if (!updatedUser) {
+      return NextResponse.json({ error: 'Error al actualizar usuario' }, { status: 500 })
+    }
+
+    // Determinar status basado en el email (soft delete usando prefijo deleted_)
+    let userStatus = 'ACTIVE'
+    if (updatedUser.email && updatedUser.email.startsWith('deleted_')) {
+      userStatus = 'INACTIVE'
+    } else if (updatedUser.role === 'PENDING') {
+      userStatus = 'PENDING'
+    }
+
+    // Mapear respuesta al formato esperado por el frontend
+    const userResponse = {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      nombre: updatedUser.name || updatedUser.nombre || '',
+      apellido: apellido?.trim() || '',
+      telefono: telefono?.trim() || null,
+      role: updatedUser.role,
+      status: status !== undefined ? status : userStatus, // Usar el status solicitado o el calculado
+      created_at: updatedUser.createdAt || new Date().toISOString()
+    }
+
+    // Remover campos sensibles
+    delete (userResponse as any).hashedPassword
+    delete (userResponse as any).password_hash
 
     return NextResponse.json(userResponse)
 
@@ -212,12 +277,22 @@ export async function DELETE(
       }, { status: 400 })
     }
 
-    // Eliminar usuario (esto debería implementarse en supabase)
-    // Por ahora, solo desactivamos el usuario
-    await supabase.updateUser(params.id, { 
-      status: 'INACTIVE',
-      email: `deleted_${Date.now()}_${existingUser.email}` // Para evitar conflictos de email
-    })
+    // Eliminar usuario de la base de datos
+    try {
+      await supabase.deleteUser(params.id)
+    } catch (deleteError: any) {
+      console.error('Error eliminando usuario en Supabase:', deleteError)
+      
+      // Si hay datos asociados, devolver mensaje específico
+      if (deleteError.message?.includes('datos asociados')) {
+        return NextResponse.json({ 
+          error: deleteError.message 
+        }, { status: 400 })
+      }
+      
+      // Otros errores de Supabase
+      throw deleteError
+    }
 
     return NextResponse.json({ 
       success: true, 
@@ -226,11 +301,23 @@ export async function DELETE(
 
   } catch (error: any) {
     console.error('Error in DELETE /api/admin/users/[id]:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    })
     
-    if (error.message.includes('Insufficient permissions')) {
+    if (error.message?.includes('Insufficient permissions')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // Retornar el mensaje de error específico si existe
+    if (error.message && error.message !== 'Internal server error') {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ 
+      error: 'Error al eliminar usuario. Verifica los logs del servidor para más detalles.' 
+    }, { status: 500 })
   }
 }

@@ -42,7 +42,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
         <div className="flex items-center justify-center h-16 px-4 bg-primary">
-          <h1 className="text-xl font-bold text-white">Phorencial CRM</h1>
+          <h1 className="text-xl font-bold text-white">PHRONENCIAL CRM</h1>
         </div>
         <nav className="mt-8">
           <div className="px-4 space-y-2">

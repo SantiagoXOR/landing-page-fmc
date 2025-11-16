@@ -37,22 +37,7 @@ jest.mock('next-auth', () => ({
   getServerSession: jest.fn(),
 }))
 
-// Mock NextAuth providers
-jest.mock('next-auth/providers/credentials', () => ({
-  default: jest.fn(() => ({
-    id: 'credentials',
-    name: 'credentials',
-    type: 'credentials',
-    credentials: {},
-    authorize: jest.fn(),
-  })),
-}))
-
-// Mock bcryptjs
-jest.mock('bcryptjs', () => ({
-  compare: jest.fn().mockResolvedValue(true),
-  hash: jest.fn().mockResolvedValue('hashed-password'),
-}))
+// Ya no se usa CredentialsProvider ni bcryptjs (login solo con Google)
 
 // Export mocks for use in tests
 module.exports = {

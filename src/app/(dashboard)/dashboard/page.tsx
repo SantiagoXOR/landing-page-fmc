@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/Header'
+import { useSidebar } from '@/contexts/SidebarContext'
 import {
   MessageSquare,
   Plus,
@@ -55,6 +56,7 @@ interface DashboardMetrics {
 export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const sidebar = useSidebar()
 
   if (loading) {
     return (
@@ -82,22 +84,23 @@ export default function DashboardPage() {
         showNewButton={true}
         newButtonText="Nuevo Lead"
         newButtonHref="/leads/new"
+        onSidebarToggle={sidebar.toggle}
       />
 
-      <div className="p-6 space-y-8">
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Sección de Indicadores */}
         <div>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Indicadores</h2>
-            <p className="text-sm text-gray-500">Agrega o modifícalos según tus preferencias</p>
+          <div className="mb-3 sm:mb-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Indicadores</h2>
+            <p className="text-xs sm:text-sm text-gray-500">Agrega o modifícalos según tus preferencias</p>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {/* Card de Conversaciones */}
             <IndicatorCard
               title="Conversaciones"
               value="18"
-              icon={<MessageSquare className="h-6 w-6 text-purple-600" />}
+              icon={<MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />}
             />
             
             {/* Cards de Añadir Indicador */}
@@ -111,17 +114,17 @@ export default function DashboardPage() {
         <WeeklyTrendChart />
 
         {/* Grid inferior */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Conversaciones por Moderador (vacío por ahora) */}
           <Card className="bg-white border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+            <CardHeader className="px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4">
+              <CardTitle className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">
                 CONVERSACIONES POR MODERADOR
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center text-gray-400">
-                <p>No hay datos disponibles</p>
+            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+              <div className="h-48 sm:h-64 flex items-center justify-center text-gray-400">
+                <p className="text-xs sm:text-sm">No hay datos disponibles</p>
               </div>
             </CardContent>
           </Card>

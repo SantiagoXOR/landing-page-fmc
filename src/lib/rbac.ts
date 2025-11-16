@@ -1,5 +1,5 @@
 // Tipos para roles actualizados
-type UserRole = 'ADMIN' | 'MANAGER' | 'ANALISTA' | 'VENDEDOR' | 'VIEWER'
+export type UserRole = 'ADMIN' | 'MANAGER' | 'ANALISTA' | 'VENDEDOR' | 'VIEWER'
 
 export type Permission =
   | 'leads:read'

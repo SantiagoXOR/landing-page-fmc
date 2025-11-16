@@ -407,8 +407,7 @@ npm run dev
 
 **Síntoma:**
 ```
-CredentialsSignin: Sign in failed
-Invalid credentials
+Access blocked by Google / redirect_uri_mismatch / invalid_client
 ```
 
 **Diagnóstico:**

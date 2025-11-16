@@ -90,69 +90,7 @@ async function insertRules() {
   }
 }
 
-async function insertSampleLeads() {
-  console.log('🎯 Insertando leads de ejemplo...')
-  
-  const leads = [
-    {
-      id: 'lead_001',
-      nombre: 'Juan Pérez',
-      telefono: '+541123456789',
-      email: 'juan.perez@email.com',
-      dni: '12345678',
-      ingresos: 300000,
-      zona: 'CABA',
-      producto: 'Préstamo Personal',
-      monto: 500000,
-      origen: 'Facebook',
-      utmSource: 'facebook-ads',
-      estado: 'NUEVO',
-      agencia: 'Digital Marketing',
-      notas: 'Cliente interesado en préstamo para refacciones'
-    },
-    {
-      id: 'lead_002',
-      nombre: 'María González',
-      telefono: '+541198765432',
-      email: 'maria.gonzalez@email.com',
-      dni: '87654321',
-      ingresos: 450000,
-      zona: 'GBA',
-      producto: 'Tarjeta de Crédito',
-      monto: 200000,
-      origen: 'Google',
-      utmSource: 'google-ads',
-      estado: 'CONTACTADO',
-      agencia: 'Performance Marketing',
-      notas: 'Solicita información sobre límites de tarjeta'
-    }
-  ]
-
-  for (const lead of leads) {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/Lead`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify(lead)
-      })
-
-      if (response.ok) {
-        console.log(`✅ Lead ${lead.nombre} creado`)
-      } else if (response.status === 409) {
-        console.log(`⚠️  Lead ${lead.nombre} ya existe`)
-      } else {
-        console.log(`❌ Error creando lead ${lead.nombre}:`, response.status, await response.text())
-      }
-    } catch (error) {
-      console.log(`❌ Error creando lead ${lead.nombre}:`, error.message)
-    }
-  }
-}
+// Función insertSampleLeads eliminada - Los leads ahora se crean desde Manychat
 
 async function verifyData() {
   console.log('🔍 Verificando datos insertados...')
@@ -185,7 +123,7 @@ async function main() {
   
   await insertUsers()
   await insertRules()
-  await insertSampleLeads()
+  // insertSampleLeads() eliminado - Los leads ahora se crean desde Manychat
   await verifyData()
   
   console.log('🎉 ¡Configuración de datos completada!')

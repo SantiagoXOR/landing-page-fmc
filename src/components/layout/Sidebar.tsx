@@ -180,14 +180,44 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
 
 interface SidebarProps {
   className?: string
+  isOpen?: boolean
+  onToggle?: () => void
+  onClose?: () => void
+  showMobileButton?: boolean
 }
 
-export function Sidebar({ className }: SidebarProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function Sidebar({ 
+  className, 
+  isOpen: controlledIsOpen, 
+  onToggle,
+  onClose,
+  showMobileButton = true 
+}: SidebarProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [leadsCount, setLeadsCount] = useState(0)
   const pathname = usePathname()
   const { data: session } = useSession()
+  
+  // Usar estado controlado si se proporciona, sino usar interno
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen
+  const handleToggle = () => {
+    if (onToggle) {
+      onToggle()
+    } else {
+      setInternalIsOpen(prev => !prev)
+    }
+  }
+  const handleClose = () => {
+    if (onClose) {
+      onClose()
+    } else if (onToggle && controlledIsOpen !== undefined && isOpen) {
+      // Si está controlado y abierto, usar toggle para cerrarlo
+      onToggle()
+    } else {
+      setInternalIsOpen(false)
+    }
+  }
 
   // Obtener contador de leads dinámicamente
   useEffect(() => {
@@ -221,23 +251,11 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsOpen(!isOpen)}
-          className="bg-white/90 backdrop-blur-sm border-gray-200"
-        >
-          {isOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </Button>
-      </div>
-
       {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-          onClick={() => setIsOpen(false)}
+          onClick={handleClose}
         />
       )}
 
@@ -286,7 +304,7 @@ export function Sidebar({ className }: SidebarProps) {
                         ? "bg-purple-100 text-purple-700 border border-purple-200"
                         : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                     )}
-                    onClick={() => setIsOpen(false)}
+                    onClick={handleClose}
                   >
                     <div className="flex items-center space-x-3">
                       {item.icon && (
@@ -335,7 +353,7 @@ export function Sidebar({ className }: SidebarProps) {
                                 ? "text-purple-600 bg-purple-50"
                                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                             )}
-                          onClick={() => setIsOpen(false)}
+                          onClick={handleClose}
                         >
                           {child.name}
                         </Link>

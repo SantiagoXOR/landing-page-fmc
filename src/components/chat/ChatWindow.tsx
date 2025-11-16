@@ -70,37 +70,37 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
 
   return (
     <div className={cn('flex flex-col h-full bg-white', className)}>
-      {/* Header de la conversación */}
-      <div className="p-4 border-b border-gray-200 space-y-3">
+      {/* Header de la conversación - Responsive (oculto en mobile porque ya está en la página) */}
+      <div className="hidden md:block p-3 md:p-4 border-b border-gray-200 space-y-2 md:space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-xs md:text-sm">
               {conversation.lead?.nombre?.charAt(0) || 'U'}
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">
+              <h3 className="text-sm md:text-base font-semibold text-gray-900">
                 {conversation.lead?.nombre || 'Usuario'}
               </h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs md:text-sm text-gray-500">
                 {conversation.lead?.telefono}
               </p>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 md:space-x-2">
             <div className={cn(
               'w-2 h-2 rounded-full',
               conversation.status === 'open' ? 'bg-red-500' : 'bg-green-500'
             )}></div>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <MoreVertical className="h-4 w-4" />
+            <Button variant="ghost" size="sm" className="h-7 w-7 md:h-8 md:w-8 p-0">
+              <MoreVertical className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Indicador de flujo de Manychat */}
+        {/* Indicador de flujo de Manychat - Oculto en mobile muy pequeño */}
         {conversation.manychatData?.flowName && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
             <ManychatFlowIndicator
               flowName={conversation.manychatData.flowName}
               flowNs={conversation.manychatData.flowNs}
@@ -111,23 +111,24 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
                 variant="outline"
                 size="sm"
                 onClick={onTakeControl}
-                className="text-xs"
+                className="text-[10px] md:text-xs h-6 md:h-7 px-2"
               >
-                Tomar control
+                <span className="hidden sm:inline">Tomar control</span>
+                <span className="sm:hidden">Control</span>
               </Button>
             )}
           </div>
         )}
 
-        {/* Tags del lead */}
+        {/* Tags del lead - Oculto en mobile muy pequeño */}
         {conversation.lead?.tags && conversation.lead.tags.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Tag className="w-3 h-3 text-gray-400" />
+          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+            <Tag className="w-3 h-3 text-gray-400 hidden sm:block" />
             {conversation.lead.tags.slice(0, 3).map((tag) => (
               <TagPill key={tag} tag={tag} readonly />
             ))}
             {conversation.lead.tags.length > 3 && (
-              <span className="text-xs text-gray-500">
+              <span className="text-[10px] md:text-xs text-gray-500">
                 +{conversation.lead.tags.length - 3} más
               </span>
             )}
@@ -135,20 +136,20 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
         )}
       </div>
 
-      {/* Área de mensajes */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+      {/* Área de mensajes - Responsive */}
+      <ScrollArea className="flex-1 p-2 sm:p-3 md:p-4">
+        <div className="space-y-2 sm:space-y-3 md:space-y-4">
           {conversation.messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}
           
           {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-md">
+              <div className="bg-gray-100 text-gray-900 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl rounded-bl-md">
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
               </div>
             </div>
@@ -158,11 +159,11 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
         </div>
       </ScrollArea>
 
-      {/* Input de mensaje */}
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
-            <Paperclip className="h-4 w-4" />
+      {/* Input de mensaje - Responsive */}
+      <div className="p-2 sm:p-3 md:p-4 border-t border-gray-200">
+        <div className="flex items-center space-x-1.5 sm:space-x-2">
+          <Button variant="ghost" size="sm" className="h-8 w-8 sm:h-9 sm:w-9 p-0 flex-shrink-0">
+            <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </Button>
           
           <div className="flex-1 relative">
@@ -172,23 +173,24 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
               onChange={handleInputChange}
               onKeyPress={handleKeyPress}
               placeholder="Escribe un mensaje..."
-              className="pr-10"
+              className="pr-8 sm:pr-10 h-8 sm:h-9 md:h-10 text-sm"
             />
             <Button
               variant="ghost"
               size="sm"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+              className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 sm:h-7 sm:w-7 p-0"
             >
-              <Smile className="h-4 w-4" />
+              <Smile className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
           
           <Button
             onClick={handleSendMessage}
             disabled={!message.trim()}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-auto md:px-3 p-0 md:p-2 flex-shrink-0"
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden md:inline ml-1.5">Enviar</span>
           </Button>
         </div>
       </div>

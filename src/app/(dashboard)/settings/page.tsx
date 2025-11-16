@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -86,7 +87,7 @@ export default function SettingsPage() {
 
   // Estados para configuración general
   const [generalSettings, setGeneralSettings] = useState({
-    companyName: "Phorencial",
+    companyName: "PHRONENCIAL",
     companyEmail: "admin@phorencial.com",
     companyPhone: "+543704123456",
     address: "Formosa Capital, Formosa, Argentina",
@@ -121,7 +122,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Información de la Empresa</CardTitle>
           <CardDescription>
-            Configuración básica de Phorencial
+            Configuración básica de PHRONENCIAL
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -289,13 +290,19 @@ export default function SettingsPage() {
       </CardHeader>
       <CardContent>
         <div className="text-center py-8">
-          <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-600 mb-2">
-            Próximamente
+          <Users className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Panel de Administración de Usuarios
           </h3>
-          <p className="text-gray-500">
-            La gestión de usuarios estará disponible en una próxima actualización
+          <p className="text-gray-600 mb-6">
+            Gestiona usuarios, roles, permisos y aprueba solicitudes de acceso pendientes
           </p>
+          <Link href="/admin/users">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Users className="h-4 w-4 mr-2" />
+              Ir a Gestión de Usuarios
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>
@@ -328,7 +335,7 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-4xl font-bold gradient-text" data-testid="settings-title">Configuración</h1>
             <p className="text-muted-foreground mt-2">
-              Configuración del sistema CRM Phorencial
+              Configuración del sistema CRM PHRONENCIAL
             </p>
           </div>
           <Button

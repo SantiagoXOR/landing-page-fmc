@@ -82,7 +82,7 @@ export abstract class BaseIntegration {
       // Configurar headers por defecto
       const defaultHeaders = {
         'Content-Type': 'application/json',
-        'User-Agent': 'Phorencial-CRM/1.0',
+        'User-Agent': 'PHRONENCIAL-CRM/1.0',
         ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
       }
 

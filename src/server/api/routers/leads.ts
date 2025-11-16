@@ -106,12 +106,88 @@ export const leadsRouter = createTRPCRouter({
       try {
         checkPermission(ctx.session.user.role, 'leads:write')
 
+        // Verificar si Manychat está configurado
+        const { ManychatService } = await import('@/server/services/manychat-service')
+        const { ManychatSyncService } = await import('@/server/services/manychat-sync-service')
+        
+        let manychatId: string | undefined
+        let subscriber: any = null
+
+        // 1. PRIMERO: Crear subscriber en Manychat (si está configurado)
+        if (ManychatService.isConfigured()) {
+          try {
+            // Preparar datos para Manychat
+            const [firstName, ...lastNameParts] = (input.nombre || '').split(' ')
+            const lastName = lastNameParts.join(' ') || undefined
+
+            const manychatData = {
+              phone: input.telefono,
+              first_name: firstName,
+              last_name: lastName,
+              email: input.email || undefined,
+              whatsapp_phone: input.telefono,
+              custom_fields: {
+                dni: input.dni || undefined,
+                ingresos: input.ingresos ?? undefined,
+                zona: input.zona || undefined,
+                producto: input.producto || undefined,
+                monto: input.monto ?? undefined,
+                origen: input.origen || 'web',
+                estado: input.estado || 'NUEVO',
+                agencia: input.agencia || undefined,
+              },
+              tags: []
+            }
+
+            subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+            
+            if (subscriber && subscriber.id) {
+              manychatId = String(subscriber.id)
+              logger.info('Subscriber created in Manychat', {
+                manychatId,
+                phone: input.telefono
+              })
+            } else {
+              logger.warn('Failed to create subscriber in Manychat, continuing without manychatId')
+            }
+          } catch (manychatError: any) {
+            // Si falla Manychat, no crear el lead (según requerimiento)
+            logger.error('Error creating subscriber in Manychat', {
+              error: manychatError.message,
+              stack: manychatError.stack
+            })
+            
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'No se pudo crear el contacto en Manychat. El lead no fue creado.',
+              cause: manychatError
+            })
+          }
+        } else {
+          logger.warn('Manychat not configured, creating lead without manychatId')
+        }
+
+        // 2. SEGUNDO: Crear lead en el CRM con el manychatId ya asignado
         const leadData = {
           ...input,
-          created_by: ctx.session.user.id,
+          manychatId: manychatId || undefined
         }
 
         const newLead = await supabaseLeadService.createLead(leadData)
+
+        // 3. Sincronizar custom fields con Manychat si fue creado
+        if (manychatId && ManychatService.isConfigured()) {
+          try {
+            await ManychatSyncService.syncCustomFieldsToManychat(newLead.id)
+            logger.info('Custom fields synced to Manychat', { leadId: newLead.id })
+          } catch (syncError: any) {
+            // Log error pero no fallar la creación del lead
+            logger.error('Error syncing custom fields to Manychat', {
+              leadId: newLead.id,
+              error: syncError.message
+            })
+          }
+        }
 
         // Capture business metric
         await captureBusinessMetric('lead_created', 1, {

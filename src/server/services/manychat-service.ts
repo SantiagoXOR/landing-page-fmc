@@ -168,6 +168,79 @@ export class ManychatService {
   }
 
   /**
+   * Obtener subscribers activos por tag
+   * Nota: Manychat no tiene endpoint directo para listar todos los subscribers,
+   * pero podemos obtenerlos por tag o usar los leads sincronizados
+   */
+  static async getSubscribersByTag(tagName: string, limit: number = 100): Promise<ManychatSubscriber[]> {
+    // Manychat no tiene endpoint directo para obtener lista de subscribers
+    // Esta función está preparada para futuras implementaciones
+    // Por ahora, usaremos los leads sincronizados con manychatId
+    return []
+  }
+
+  /**
+   * Obtener información actualizada de múltiples subscribers
+   * Útil para actualizar información de leads ya sincronizados
+   */
+  static async getSubscribersByIds(subscriberIds: number[]): Promise<ManychatSubscriber[]> {
+    const subscribers: ManychatSubscriber[] = []
+    
+    // Obtener información de cada subscriber con rate limiting
+    for (const id of subscriberIds) {
+      try {
+        const subscriber = await this.getSubscriberById(id)
+        if (subscriber) {
+          subscribers.push(subscriber)
+        }
+        // Pequeño delay para respetar rate limits
+        await new Promise(resolve => setTimeout(resolve, 10))
+      } catch (error: any) {
+        // Error silencioso, continuar con el siguiente
+      }
+    }
+    
+    return subscribers
+  }
+
+  /**
+   * Buscar múltiples subscribers por teléfono de forma eficiente
+   * Útil para sincronizar leads que no tienen manychatId
+   */
+  static async getSubscribersByPhones(phones: string[]): Promise<Map<string, ManychatSubscriber>> {
+    const subscribersMap = new Map<string, ManychatSubscriber>()
+    
+    // Procesar en lotes para evitar sobrecarga
+    const batchSize = 10
+    for (let i = 0; i < phones.length; i += batchSize) {
+      const batch = phones.slice(i, i + batchSize)
+      
+      // Procesar en paralelo con rate limiting
+      const promises = batch.map(async (phone) => {
+        try {
+          const subscriber = await this.getSubscriberByPhone(phone)
+          if (subscriber) {
+            subscribersMap.set(phone, subscriber)
+          }
+          // Delay entre requests para respetar rate limits
+          await new Promise(resolve => setTimeout(resolve, 50))
+        } catch (error: any) {
+          // Error silencioso, continuar con el siguiente
+        }
+      })
+      
+      await Promise.all(promises)
+      
+      // Delay entre lotes
+      if (i + batchSize < phones.length) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+    
+    return subscribersMap
+  }
+
+  /**
    * Crear o actualizar subscriber
    */
   static async createOrUpdateSubscriber(data: ManychatLeadData): Promise<ManychatSubscriber | null> {

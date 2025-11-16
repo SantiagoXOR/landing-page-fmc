@@ -97,82 +97,8 @@ async function main() {
     console.log(`✅ Regla creada: ${rule.key} = ${JSON.stringify(rule.value)}`)
   }
 
-  // Crear algunos leads de ejemplo
-  console.log('📋 Creando leads de ejemplo...')
-  
-  const sampleLeads = [
-    {
-      nombre: 'Juan Pérez',
-      telefono: '+5491123456789',
-      email: 'juan.perez@email.com',
-      dni: '12345678',
-      ingresos: 250000,
-      zona: 'CABA',
-      producto: 'Préstamo Personal',
-      monto: 500000,
-      origen: 'whatsapp',
-      estado: 'NUEVO',
-    },
-    {
-      nombre: 'María González',
-      telefono: '+5491198765432',
-      email: 'maria.gonzalez@email.com',
-      dni: '87654321',
-      ingresos: 180000,
-      zona: 'GBA',
-      producto: 'Tarjeta de Crédito',
-      monto: 100000,
-      origen: 'instagram',
-      estado: 'EN_REVISION',
-    },
-    {
-      nombre: 'Carlos Rodriguez',
-      telefono: '+5491155555555',
-      email: 'carlos.rodriguez@email.com',
-      dni: '11111111',
-      ingresos: 350000,
-      zona: 'Córdoba',
-      producto: 'Préstamo Hipotecario',
-      monto: 2000000,
-      origen: 'web',
-      estado: 'PREAPROBADO',
-    },
-    {
-      nombre: 'Ana López',
-      telefono: '+5491144444444',
-      email: 'ana.lopez@email.com',
-      dni: '22222222',
-      ingresos: 150000,
-      zona: 'Mendoza',
-      producto: 'Préstamo Personal',
-      monto: 300000,
-      origen: 'facebook',
-      estado: 'RECHAZADO',
-    },
-    {
-      nombre: 'Lead WhatsApp +5491133333333',
-      telefono: '+5491133333333',
-      origen: 'whatsapp',
-      estado: 'NUEVO',
-    },
-  ]
-
-  for (const leadData of sampleLeads) {
-    const lead = await prisma.lead.create({
-      data: leadData as any,
-    })
-    
-    // Crear evento inicial
-    await prisma.event.create({
-      data: {
-        leadId: lead.id,
-        tipo: 'lead_created',
-        payload: JSON.stringify({ source: 'seed', leadData }),
-      },
-    })
-    
-    console.log(`✅ Lead creado: ${leadData.nombre}`)
-  }
+  // Creación de leads de ejemplo eliminada - Los leads ahora se crean desde Manychat
+  // Los leads se sincronizan automáticamente desde Manychat al CRM
 
   console.log('🎉 Seed completado exitosamente!')
   console.log('')
@@ -188,7 +114,7 @@ async function main() {
   console.log('  - Zonas: CABA, GBA, Córdoba')
   console.log('  - Requiere ingresos en blanco: Sí')
   console.log('')
-  console.log('📋 Leads de ejemplo: 5 leads creados con diferentes estados')
+  console.log('📋 Leads: Se crearán automáticamente desde Manychat')
 }
 
 main()

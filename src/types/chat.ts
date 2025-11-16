@@ -22,6 +22,7 @@ export interface Lead {
   email?: string
   manychatId?: string
   tags?: string[]
+  profileImage?: string
 }
 
 export interface AssignedUser {
@@ -48,6 +49,8 @@ export interface Conversation {
   assignedUser?: AssignedUser
   messages: Message[]
   manychatData?: ManychatData
+  unreadCount?: number
+  botAlert?: boolean
 }
 
 

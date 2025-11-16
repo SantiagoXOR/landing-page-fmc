@@ -185,8 +185,8 @@ export default function EditLeadPage() {
       const finalData = {
         ...validatedData,
         telefono: validatedData.telefono?.replace(/[^\d]/g, ''), // Solo números
-        ingresos: validatedData.ingresos || null,
-        monto: validatedData.monto || null,
+        ingresos: validatedData.ingresos ?? null,
+        monto: validatedData.monto ?? null,
         email: validatedData.email || null,
         dni: validatedData.dni || null,
         zona: validatedData.zona || null,

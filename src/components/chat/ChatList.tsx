@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Search, MessageSquare, MoreHorizontal, Phone, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Conversation } from '@/types/chat'
+import Image from 'next/image'
 
 interface ChatListProps {
   conversations: Conversation[]
@@ -29,7 +29,8 @@ export function ChatList({
     const matchesSearch = conversation.lead?.nombre
       .toLowerCase()
       .includes(searchTerm.toLowerCase()) ||
-      conversation.lead?.telefono.includes(searchTerm)
+      conversation.lead?.telefono.includes(searchTerm) ||
+      conversation.messages[0]?.content.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesFilter = filter === 'all' || conversation.platform === filter
 
@@ -40,34 +41,49 @@ export function ChatList({
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+    const diffInDays = Math.floor(diffInHours / 24)
 
-    if (diffInHours < 24) {
+    // Si es hoy, mostrar hora
+    if (diffInHours < 24 && date.getDate() === now.getDate()) {
       return date.toLocaleTimeString('es-ES', { 
         hour: '2-digit', 
-        minute: '2-digit' 
-      })
-    } else if (diffInHours < 48) {
-      return 'Ayer'
-    } else {
-      return date.toLocaleDateString('es-ES', { 
-        day: '2-digit', 
-        month: 'short' 
+        minute: '2-digit',
+        hour12: false
       })
     }
+    
+    // Si fue ayer
+    if (diffInDays === 1 || (diffInHours < 48 && date.getDate() === now.getDate() - 1)) {
+      return 'Ayer'
+    }
+    
+    // Si fue esta semana, mostrar día abreviado
+    if (diffInDays < 7) {
+      return date.toLocaleDateString('es-ES', { 
+        weekday: 'short'
+      }).toLowerCase()
+    }
+    
+    // Si fue hace más tiempo, mostrar fecha
+    return date.toLocaleDateString('es-ES', { 
+      day: '2-digit', 
+      month: 'short' 
+    })
   }
 
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
       case 'whatsapp':
-        return <Phone className="h-4 w-4 text-green-600" />
+        return <Phone className="h-3.5 w-3.5 text-purple-600" />
       case 'instagram':
-        return <Camera className="h-4 w-4 text-pink-600" />
+        return <Camera className="h-3.5 w-3.5 text-purple-600" />
       default:
-        return <MessageSquare className="h-4 w-4 text-gray-600" />
+        return <MessageSquare className="h-3.5 w-3.5 text-purple-600" />
     }
   }
 
   const getInitials = (name: string) => {
+    if (!name) return 'U'
     return name
       .split(' ')
       .map(word => word.charAt(0))
@@ -76,121 +92,182 @@ export function ChatList({
       .slice(0, 2)
   }
 
+  const getLastMessagePreview = (conversation: Conversation) => {
+    const lastMessage = conversation.messages[0]
+    if (!lastMessage) return 'Sin mensajes'
+    
+    const content = lastMessage.content
+    const isFromBot = lastMessage.isFromBot || lastMessage.direction === 'outbound'
+    
+    // Agregar prefijo "P:" si es del bot
+    if (isFromBot) {
+      return `P: ${content}`
+    }
+    
+    return content
+  }
+
   return (
-    <div className={cn('flex flex-col h-full bg-white border-r border-gray-200', className)}>
+    <div className={cn('flex flex-col h-full bg-white', className)}>
       {/* Header con búsqueda */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-2 mb-4">
+      <div className="p-2 sm:p-3 md:p-4 border-b border-gray-200">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 mb-2 sm:mb-3 md:mb-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
             <Input
               placeholder="Buscar"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-8 sm:pl-10 h-8 sm:h-9 text-sm"
             />
           </div>
-          <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
-            <MoreHorizontal className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-8 sm:h-9 w-8 sm:w-9 p-0 flex-shrink-0">
+            <MoreHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </Button>
         </div>
 
-        {/* Filtros */}
-        <div className="flex space-x-2">
+        {/* Filtros estilo Prometheo - Responsive */}
+        <div className="flex space-x-1 sm:space-x-2 overflow-x-auto -mx-2 sm:-mx-0 px-2 sm:px-0">
           <Button
-            variant={filter === 'all' ? 'default' : 'ghost'}
+            variant="ghost"
             size="sm"
             onClick={() => setFilter('all')}
             className={cn(
-              'text-xs',
+              'text-xs h-7 sm:h-8 px-2 sm:px-3 flex-shrink-0',
               filter === 'all' 
-                ? 'bg-purple-600 text-white' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             )}
           >
             Todos
           </Button>
           <Button
-            variant={filter === 'whatsapp' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setFilter('whatsapp')}
-            className={cn(
-              'text-xs',
-              filter === 'whatsapp' 
-                ? 'bg-purple-600 text-white' 
-                : 'text-gray-600 hover:text-gray-900'
-            )}
-          >
-            <Phone className="h-3 w-3 mr-1" />
-            WhatsApp
-          </Button>
-          <Button
-            variant={filter === 'instagram' ? 'default' : 'ghost'}
+            variant="ghost"
             size="sm"
             onClick={() => setFilter('instagram')}
             className={cn(
-              'text-xs',
+              'text-xs h-7 sm:h-8 px-2 sm:px-3 flex-shrink-0',
               filter === 'instagram' 
-                ? 'bg-purple-600 text-white' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             )}
           >
-            <Camera className="h-3 w-3 mr-1" />
-            Instagram
+            <Camera className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1 sm:mr-1.5" />
+            <span className="hidden xs:inline">Instagram</span>
+            <span className="xs:hidden">IG</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFilter('whatsapp')}
+            className={cn(
+              'text-xs h-7 sm:h-8 px-2 sm:px-3 flex-shrink-0',
+              filter === 'whatsapp' 
+                ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            )}
+          >
+            <Phone className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1 sm:mr-1.5" />
+            <span className="hidden xs:inline">WhatsApp</span>
+            <span className="xs:hidden">WA</span>
           </Button>
         </div>
       </div>
 
       {/* Lista de conversaciones */}
       <ScrollArea className="flex-1">
-        <div className="p-2">
+        <div className="divide-y divide-gray-100">
           {filteredConversations.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No hay conversaciones</p>
+            <div className="flex flex-col items-center justify-center py-12 sm:py-16 px-4 text-center">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-purple-100 flex items-center justify-center mb-4">
+                <MessageSquare className="h-8 w-8 sm:h-10 sm:w-10 text-purple-400" />
+              </div>
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2">
+                {searchTerm || filter !== 'all' 
+                  ? 'No se encontraron conversaciones' 
+                  : 'No hay conversaciones'}
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-500 max-w-sm">
+                {searchTerm || filter !== 'all'
+                  ? 'Intenta ajustar los filtros o la búsqueda'
+                  : 'Sincroniza con Manychat para ver las conversaciones de tus leads'}
+              </p>
             </div>
           ) : (
             filteredConversations.map((conversation) => {
-              const lastMessage = conversation.messages[0]
               const isSelected = selectedConversationId === conversation.id
+              const unreadCount = conversation.unreadCount || 0
+              const hasBotAlert = conversation.botAlert || false
+              const lastMessagePreview = getLastMessagePreview(conversation)
 
               return (
                 <div
                   key={conversation.id}
                   onClick={() => onSelectConversation(conversation)}
                   className={cn(
-                    'flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors',
+                    'flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 md:p-4 cursor-pointer transition-all duration-150',
                     isSelected
-                      ? 'bg-purple-100 border border-purple-200'
-                      : 'hover:bg-gray-50'
+                      ? 'bg-purple-50 border-l-4 border-purple-600'
+                      : 'hover:bg-gray-50 border-l-4 border-transparent'
                   )}
                 >
-                  {/* Avatar */}
-                  <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                      {getInitials(conversation.lead?.nombre || 'U')}
-                    </div>
+                  {/* Avatar con foto o iniciales - Responsive */}
+                  <div className="flex-shrink-0 relative">
+                    {conversation.lead?.profileImage ? (
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-gray-200 ring-2 ring-gray-100">
+                        <Image
+                          src={conversation.lead.profileImage}
+                          alt={conversation.lead.nombre}
+                          width={48}
+                          height={48}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-600 flex items-center justify-center text-white font-semibold text-xs sm:text-sm ring-2 ring-purple-100">
+                        {getInitials(conversation.lead?.nombre || 'U')}
+                      </div>
+                    )}
                   </div>
 
                   {/* Contenido */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="text-sm font-medium text-gray-900 truncate">
-                        {conversation.lead?.nombre || 'Usuario'}
-                      </h4>
-                      <span className="text-xs text-gray-500">
+                    <div className="flex items-center justify-between mb-0.5 sm:mb-1 gap-1 sm:gap-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2 flex-1 min-w-0">
+                        <h4 className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                          {conversation.lead?.nombre || 'Usuario'}
+                        </h4>
+                        {/* Icono de plataforma pequeño junto al nombre */}
+                        <div className="flex-shrink-0">
+                          {getPlatformIcon(conversation.platform)}
+                        </div>
+                      </div>
+                      <span className="text-[10px] sm:text-xs text-gray-500 flex-shrink-0">
                         {formatTime(conversation.lastMessageAt)}
                       </span>
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-500 truncate">
-                        {lastMessage?.content || 'Sin mensajes'}
+                    <div className="flex items-center justify-between gap-1 sm:gap-2">
+                      <p className="text-xs sm:text-sm text-gray-600 truncate flex-1 min-w-0">
+                        {lastMessagePreview}
                       </p>
-                      <div className="flex items-center space-x-1">
-                        {getPlatformIcon(conversation.platform)}
-                        {conversation.status === 'open' && (
-                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                      
+                      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        {/* Botón Bot Alert - Responsive */}
+                        {hasBotAlert && (
+                          <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-pink-500 text-white shadow-sm whitespace-nowrap">
+                            <span className="hidden sm:inline">Bot Alert</span>
+                            <span className="sm:hidden">Alert</span>
+                          </span>
+                        )}
+                        
+                        {/* Badge de mensajes no leídos - Responsive */}
+                        {unreadCount > 0 && (
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-purple-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                            <span className="text-[10px] sm:text-xs font-semibold text-white">
+                              {unreadCount > 99 ? '99+' : unreadCount}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>

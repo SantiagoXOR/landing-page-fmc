@@ -6,7 +6,7 @@ export function useParallax({
   fgSpeed = 0.35 
 }: ParallaxOptions = {}): ParallaxRefs {
   const bgRef = useRef<HTMLDivElement | null>(null);
-  const fgRef = useRef<HTMLImageElement | null>(null);
+  const fgRef = useRef<HTMLDivElement | null>(null);
   const ticking = useRef(false);
 
   useEffect(() => {
@@ -17,6 +17,17 @@ export function useParallax({
     // If user prefers reduced motion, disable parallax
     if (prefersReducedMotion) {
       return;
+    }
+
+    // Asegurar que el contenedor foreground esté completamente estático desde el inicio
+    if (fgRef.current) {
+      fgRef.current.style.setProperty('transform', 'none', 'important');
+      fgRef.current.style.setProperty('position', 'absolute', 'important');
+      fgRef.current.style.setProperty('will-change', 'auto', 'important');
+      fgRef.current.style.setProperty('top', '0', 'important');
+      fgRef.current.style.setProperty('left', '0', 'important');
+      fgRef.current.style.setProperty('right', '0', 'important');
+      fgRef.current.style.setProperty('bottom', '0', 'important');
     }
 
     const onScroll = () => {
@@ -30,15 +41,16 @@ export function useParallax({
           bgRef.current.style.transform = `translateY(${y * bgSpeed}px)`;
         }
         
+        // Foreground: Completamente estático - sin parallax ni transformaciones
+        // Forzar que permanezca fijo sin importar el scroll
         if (fgRef.current) {
-          // Para el foreground, aplicamos efectos sutiles sin desplazamiento vertical
-          const scrollProgress = Math.min(y / window.innerHeight, 1);
-          const scaleEffect = 1 + (scrollProgress * 0.05); // Escala sutil del 0% al 5%
-          const rotateEffect = scrollProgress * 2; // Rotación sutil de 0 a 2 grados
-          const brightnessEffect = 1 + (scrollProgress * 0.1); // Brillo sutil del 100% al 110%
-          
-          fgRef.current.style.transform = `scale(${scaleEffect}) rotate(${rotateEffect}deg)`;
-          fgRef.current.style.filter = `brightness(${brightnessEffect})`;
+          fgRef.current.style.setProperty('transform', 'none', 'important');
+          fgRef.current.style.setProperty('position', 'absolute', 'important');
+          fgRef.current.style.setProperty('will-change', 'auto', 'important');
+          fgRef.current.style.setProperty('top', '0', 'important');
+          fgRef.current.style.setProperty('left', '0', 'important');
+          fgRef.current.style.setProperty('right', '0', 'important');
+          fgRef.current.style.setProperty('bottom', '0', 'important');
         }
         
         ticking.current = false;

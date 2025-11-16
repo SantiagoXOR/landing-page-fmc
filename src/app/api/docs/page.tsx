@@ -63,7 +63,7 @@ export default function ApiDocsPage() {
     <div className="min-h-screen bg-white">
       <div className="bg-blue-600 text-white py-6">
         <div className="container mx-auto px-4">
-          <h1 className="text-3xl font-bold">Phorencial CRM API</h1>
+          <h1 className="text-3xl font-bold">PHRONENCIAL CRM API</h1>
           <p className="text-blue-100 mt-2">
             Documentación interactiva de la API del sistema CRM
           </p>

@@ -1,12 +1,51 @@
 import { NextAuthOptions } from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { supabase } from './db'
-import bcrypt from 'bcryptjs'
 
 // Tipos para roles actualizados
 type UserRole = 'ADMIN' | 'MANAGER' | 'ANALISTA' | 'VENDEDOR' | 'VIEWER'
 type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING'
+
+/**
+ * Determina el rol de un usuario basado en su email
+ * Prioridad:
+ * 1. Lista de emails de administradores (ADMIN_EMAILS)
+ * 2. Dominios específicos (@phorencial.com, @formosafmc.com.ar = ADMIN)
+ * 3. Por defecto: VIEWER
+ */
+function determineUserRole(email: string): UserRole {
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+  const emailLower = email.toLowerCase().trim()
+
+  // Verificar si está en la lista de administradores
+  if (adminEmails.includes(emailLower)) {
+    return 'ADMIN'
+  }
+
+  // Verificar dominios específicos
+  const adminDomains = ['@phorencial.com', '@formosafmc.com.ar', '@phronencial.com']
+  if (adminDomains.some(domain => emailLower.endsWith(domain))) {
+    return 'ADMIN'
+  }
+
+  // Por defecto: VIEWER
+  return 'VIEWER'
+}
+
+/**
+ * Verifica si un email está en la lista de emails permitidos para registro automático
+ */
+function isEmailAllowed(email: string): boolean {
+  const allowedEmails = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+  const emailLower = email.toLowerCase().trim()
+  
+  // Si no hay lista configurada, no permitir registro automático
+  if (allowedEmails.length === 0) {
+    return false
+  }
+  
+  return allowedEmails.includes(emailLower)
+}
 
 export const authOptions: NextAuthOptions = {
   // Removemos el adapter de Prisma ya que usamos Supabase directamente
@@ -23,100 +62,6 @@ export const authOptions: NextAuthOptions = {
     }
   },
   providers: [
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
-      },
-      async authorize(credentials) {
-        console.log('🔍 Iniciando authorize con:', { email: credentials?.email })
-        
-        if (!credentials?.email || !credentials?.password) {
-          console.log('❌ Credenciales faltantes')
-          return null
-        }
-
-        try {
-          // Intentar primero con la tabla nueva
-          let user = await supabase.findUserByEmailNew(credentials.email)
-          console.log('👤 Usuario encontrado:', !!user)
-
-          // Si no se encuentra, intentar con la tabla antigua
-          if (!user) {
-            console.log('🔄 Intentando con tabla antigua...')
-            const oldUser = await supabase.findUserByEmail(credentials.email)
-            if (oldUser) {
-              user = {
-                id: oldUser.id,
-                email: oldUser.email,
-                nombre: oldUser.nombre,
-                apellido: '',
-                role: oldUser.rol,
-                status: 'ACTIVE', // Asumir activo para usuarios existentes
-                hash: oldUser.hash,
-                createdAt: oldUser.createdAt
-              }
-            }
-          }
-
-          if (!user) {
-            console.log('❌ Usuario no encontrado')
-            return null
-          }
-
-          console.log('🔑 Verificando contraseña...', { hasHash: !!user.hash })
-
-          // Verificar contraseña
-          let isPasswordValid = false
-
-          if (user.hash) {
-            isPasswordValid = await bcrypt.compare(credentials.password, user.hash)
-            console.log('🔐 Resultado bcrypt:', isPasswordValid)
-          } else {
-            // Para usuarios sin hash, verificar contraseñas de prueba
-            const testPasswords = ['admin123', 'analista123', 'vendedor123', 'password']
-            isPasswordValid = testPasswords.includes(credentials.password)
-            console.log('🔐 Resultado contraseña de prueba:', isPasswordValid)
-          }
-
-          if (!isPasswordValid) {
-            console.log('❌ Contraseña inválida')
-            return null
-          }
-
-          // Actualizar último login si la función existe
-          try {
-            await supabase.updateUserLastLogin(user.id)
-          } catch (error) {
-            console.log('⚠️ No se pudo actualizar último login:', error)
-          }
-
-          const result = {
-            id: user.id,
-            email: user.email,
-            name: `${user.nombre} ${user.apellido || ''}`.trim(),
-            role: user.role as UserRole,
-            status: (user.status || 'ACTIVE') as UserStatus,
-          }
-          
-          console.log('✅ Authorize exitoso:', { id: result.id, email: result.email, role: result.role })
-          return result
-
-        } catch (error: any) {
-          console.error('❌ Error en authorize:', error.message)
-          console.error('   Tipo de error:', error.constructor.name)
-          console.error('   Stack:', error.stack)
-          
-          // Si es un error de conexión a Supabase, proporcionar mensaje específico
-          if (error.message.includes('Error de conexión a Supabase')) {
-            console.error('🔌 Error de conectividad con Supabase. Verifique la configuración de red.')
-          }
-          
-          return null
-        }
-      }
-    }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
@@ -134,15 +79,17 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Si es login con Google, crear/actualizar usuario en la base de datos
+      // Si es login con Google, verificar/autorizar usuario
       if (account?.provider === 'google' && profile?.email) {
         try {
+          const email = profile.email.toLowerCase().trim()
+          
           // Verificar si el usuario ya existe
-          let existingUser = await supabase.findUserByEmailNew(profile.email)
+          let existingUser = await supabase.findUserByEmailNew(email)
           
           if (!existingUser) {
             // Intentar con tabla antigua
-            const oldUser = await supabase.findUserByEmail(profile.email)
+            const oldUser = await supabase.findUserByEmail(email)
             if (oldUser) {
               // Mapear de tabla antigua a formato nuevo
               existingUser = {
@@ -158,37 +105,118 @@ export const authOptions: NextAuthOptions = {
             }
           }
 
-          if (!existingUser && supabase.client) {
-            // Crear nuevo usuario con rol VIEWER por defecto
-            const { data: newUser, error } = await supabase.client
-              .from('auth.users')
-              .insert({
-                email: profile.email,
-                nombre: profile.name?.split(' ')[0] || 'Usuario',
-                apellido: profile.name?.split(' ').slice(1).join(' ') || '',
-                role: 'VIEWER',
-                status: 'ACTIVE',
-                hash: '', // No tiene contraseña porque usa Google
-              })
-              .select()
-              .single()
+          if (!existingUser) {
+            // Usuario no existe - verificar si está permitido para registro automático
+            const isAllowed = isEmailAllowed(email)
+            
+            if (!isAllowed) {
+              // Usuario no autorizado - crear usuario con estado PENDING para aprobación
+              const nameParts = (profile.name || 'Usuario').split(' ')
+              const nombre = nameParts[0] || 'Usuario'
 
-            if (!error && newUser) {
-              user.role = 'VIEWER'
-              user.status = 'ACTIVE' as any
+              const pendingUserData = {
+                email: email,
+                name: nombre, // La tabla User usa 'name', no 'nombre'
+                hash: '', // No tiene contraseña porque usa Google OAuth
+                role: 'PENDING', // Rol especial para usuarios pendientes de aprobación
+              }
+
+              console.log(`[NextAuth] Creando usuario PENDING para aprobación: ${email}`)
+              
+              try {
+                // Crear usuario con rol PENDING
+                const newPendingUser = await supabase.createUser(pendingUserData)
+                
+                if (newPendingUser) {
+                  console.log(`[NextAuth] Usuario PENDING creado: ${email} (ID: ${newPendingUser.id}). Esperando aprobación de administrador.`)
+                } else {
+                  console.error(`[NextAuth] Error al crear usuario PENDING para ${email}`)
+                }
+              } catch (createError: any) {
+                console.error(`[NextAuth] Error creando usuario PENDING:`, createError)
+              }
+              
+              // Rechazar acceso pero el usuario queda guardado para aprobación
+              console.warn(`[NextAuth] Acceso denegado: ${email} no está autorizado. Usuario creado con estado PENDING para aprobación.`)
+              return false
             }
-          } else if (existingUser) {
-            // Usuario existe, asignar su rol
-            user.role = existingUser.role || 'VIEWER'
-            user.status = (existingUser.status || 'ACTIVE') as any
+
+            // Email está en lista permitida - crear nuevo usuario
+            const assignedRole = determineUserRole(email)
+            
+            // Preparar datos del nuevo usuario
+            const nameParts = (profile.name || 'Usuario').split(' ')
+            const nombre = nameParts[0] || 'Usuario'
+
+            // Estructura según tabla User: id, name, email, role, hashedPassword, createdAt
+            const userData = {
+              email: email,
+              name: nombre, // La tabla User usa 'name', no 'nombre'
+              hash: '', // No tiene contraseña porque usa Google OAuth
+              role: assignedRole, // La tabla User usa 'role'
+            }
+
+            console.log(`[NextAuth] Creando nuevo usuario autorizado: ${email} con rol ${assignedRole}`)
+            
+            // Crear nuevo usuario usando el método correcto
+            const newUser = await supabase.createUser(userData)
+
+            if (newUser) {
+              user.role = assignedRole
+              user.status = 'ACTIVE' as any
+              console.log(`[NextAuth] Usuario creado exitosamente: ${email} (ID: ${newUser.id})`)
+              return true
+            } else {
+              // Error al crear usuario - rechazar acceso
+              console.error(`[NextAuth] Error al crear usuario ${email}, acceso denegado`)
+              return false
+            }
+          } else {
+            // Usuario existe - verificar estado y rol
+            const userRole = existingUser.role || 'VIEWER'
+            const userStatus = existingUser.status || 'ACTIVE'
+            
+            // Verificar si el usuario está pendiente de aprobación
+            if (userRole === 'PENDING') {
+              console.warn(`[NextAuth] Acceso denegado: ${email} está pendiente de aprobación por un administrador`)
+              return false
+            }
+            
+            // Verificar si el usuario está activo
+            if (userStatus === 'INACTIVE' || userStatus === 'SUSPENDED') {
+              console.warn(`[NextAuth] Acceso denegado: ${email} tiene estado ${userStatus}`)
+              return false
+            }
+            
+            // Verificar que el rol sea válido (no PENDING)
+            const validRoles: UserRole[] = ['ADMIN', 'MANAGER', 'ANALISTA', 'VENDEDOR', 'VIEWER']
+            if (!validRoles.includes(userRole as UserRole)) {
+              console.warn(`[NextAuth] Acceso denegado: ${email} tiene rol inválido ${userRole}`)
+              return false
+            }
+            
+            // Usuario existe, está activo y tiene rol válido - permitir acceso
+            user.role = userRole as UserRole
+            user.status = userStatus as UserStatus
+            
+            console.log(`[NextAuth] Usuario autorizado: ${email} con rol ${userRole}`)
+            return true
           }
-        } catch (error) {
-          console.error('Error creando/actualizando usuario de Google:', error)
-          // Permitir login de todos modos con rol VIEWER por defecto
-          user.role = 'VIEWER'
-          user.status = 'ACTIVE' as any
+        } catch (error: any) {
+          console.error('[NextAuth] Error verificando/autorizando usuario de Google:', error)
+          console.error('[NextAuth] Error details:', {
+            message: error.message,
+            stack: error.stack,
+            email: profile.email
+          })
+          
+          // En caso de error, rechazar acceso por seguridad
+          console.warn(`[NextAuth] Acceso denegado debido a error para ${profile.email}`)
+          return false
         }
       }
+      
+      // Para otros providers o casos, permitir acceso (compatibilidad)
       return true
     },
     async jwt({ token, user, account }) {

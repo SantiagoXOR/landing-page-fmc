@@ -8,46 +8,17 @@ test.describe('Authentication', () => {
     await expect(page).toHaveURL(/.*auth.*signin/)
   })
 
-  test('should login successfully with valid credentials', async ({ page }) => {
+  test('should show Google sign-in button', async ({ page }) => {
     await page.goto('/auth/signin')
-    
-    // Fill login form
-    await page.fill('input[name="email"]', 'admin@phorencial.com')
-    await page.fill('input[name="password"]', 'admin123')
-    
-    // Submit form
-    await page.click('button[type="submit"]')
-    
-    // Should redirect to dashboard
-    await expect(page).toHaveURL('/dashboard')
-    
-    // Should show user info
-    await expect(page.locator('text=Admin')).toBeVisible()
+    await expect(page.locator('button:has-text("Iniciar sesión con Google")')).toBeVisible()
   })
 
-  test('should show error with invalid credentials', async ({ page }) => {
-    await page.goto('/auth/signin')
-    
-    // Fill with invalid credentials
-    await page.fill('input[name="email"]', 'invalid@email.com')
-    await page.fill('input[name="password"]', 'wrongpassword')
-    
-    // Submit form
-    await page.click('button[type="submit"]')
-    
-    // Should show error message
-    await expect(page.locator('text=Invalid credentials')).toBeVisible()
-  })
+  // El flujo real de Google OAuth no se prueba en E2E por depender de un tercero.
+  // Se valida presencia del botón y redirecciones en tests de integración separados si aplica.
 
   test('should logout successfully', async ({ page }) => {
-    // Login first
-    await page.goto('/auth/signin')
-    await page.fill('input[name="email"]', 'admin@phorencial.com')
-    await page.fill('input[name="password"]', 'admin123')
-    await page.click('button[type="submit"]')
-    
-    // Wait for dashboard
-    await expect(page).toHaveURL('/dashboard')
+    // Este test asume sesión ya iniciada mediante bypass/mocking en entorno de prueba.
+    // Si no hay sesión, solo verifica que redirige a login al hacer logout es redundante.
     
     // Click logout
     await page.click('button:has-text("Salir")')

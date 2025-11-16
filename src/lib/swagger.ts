@@ -4,11 +4,11 @@ const options: swaggerJSDoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Phorencial CRM API',
+      title: 'PHRONENCIAL CRM API',
       version: '1.0.0',
-      description: 'API documentation for Phorencial CRM system',
+      description: 'API documentation for PHRONENCIAL CRM system',
       contact: {
-        name: 'Phorencial Team',
+        name: 'PHRONENCIAL Team',
         email: 'support@phorencial.com'
       }
     },

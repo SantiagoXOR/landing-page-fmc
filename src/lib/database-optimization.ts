@@ -1,5 +1,5 @@
 /**
- * Optimizaciones de base de datos para el CRM Phorencial
+ * Optimizaciones de base de datos para el CRM PHRONENCIAL
  * Incluye scripts SQL para crear índices y optimizar consultas
  */
 

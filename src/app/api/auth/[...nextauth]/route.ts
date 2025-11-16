@@ -17,38 +17,13 @@ import { authOptions } from '@/lib/auth'
  *             schema:
  *               type: string
  *   post:
- *     summary: Sign in user
- *     description: Authenticates a user with credentials
+ *     summary: Start Google OAuth sign-in
+ *     description: Initiates the Google OAuth flow via NextAuth (no passwords)
  *     tags:
  *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 description: User email
- *                 example: "admin@example.com"
- *               password:
- *                 type: string
- *                 description: User password
- *                 example: "password123"
- *               csrfToken:
- *                 type: string
- *                 description: CSRF token
  *     responses:
  *       200:
- *         description: Authentication successful
- *       401:
- *         description: Invalid credentials
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         description: Sign-in flow initiated
  * 
  * /api/auth/signout:
  *   get:

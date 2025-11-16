@@ -1,5 +1,5 @@
 /**
- * Servicio de cache inteligente para el CRM Phorencial
+ * Servicio de cache inteligente para el CRM PHRONENCIAL
  * Implementa estrategias de cache con invalidación automática
  */
 

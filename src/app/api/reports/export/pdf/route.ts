@@ -60,7 +60,7 @@ function generateReportHTML(reportData: any, config: any, userEmail: string): st
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>${config.name || 'Reporte'} - CRM Phorencial</title>
+  <title>${config.name || 'Reporte'} - CRM PHRONENCIAL</title>
   <style>
     @media print {
       .no-print { display: none; }
@@ -143,7 +143,7 @@ function generateReportHTML(reportData: any, config: any, userEmail: string): st
   </table>
 
   <div class="footer">
-    <p>CRM Phorencial - Sistema de Gestión de Leads para Formosa</p>
+    <p>CRM PHRONENCIAL - Sistema de Gestión de Leads para Formosa</p>
     <p>Este reporte es confidencial y solo para uso interno</p>
   </div>
 </body>

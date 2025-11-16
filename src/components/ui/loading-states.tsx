@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { Loader2, Search, Database, Users, BarChart3, FileText } from 'lucide-react'
+import { FMCLogo } from '@/components/branding/FMCLogo'
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg'
@@ -184,18 +185,23 @@ export function PageLoadingState({
   description?: string
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-6">
-        <div className="relative">
-          <div className="h-20 w-20 mx-auto border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-8 w-8 bg-blue-500 rounded-full animate-pulse"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="relative">
+        {/* Spinner más grande que rodea el logo */}
+        <div className="absolute inset-0 flex items-center justify-center -m-8">
+          <div className="w-48 h-48 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+        </div>
+        {/* Logo centrado */}
+        <div className="relative z-10">
+          <FMCLogo variant="icon" size="lg" />
+        </div>
+        {/* Texto y descripción (opcional) */}
+        {(title || description) && (
+          <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex flex-col items-center space-y-2 w-64">
+            {title && <h2 className="text-lg font-semibold text-gray-900 text-center">{title}</h2>}
+            {description && <p className="text-sm text-gray-600 text-center">{description}</p>}
           </div>
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-          <p className="text-gray-600">{description}</p>
-        </div>
+        )}
       </div>
     </div>
   )

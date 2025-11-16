@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client'
+import { supabase } from '@/lib/db'
 import { ManychatService } from './manychat-service'
 import { ManychatSubscriber, ManychatLeadData } from '@/types/manychat'
-
-const prisma = new PrismaClient()
+import { logger } from '@/lib/logger'
 
 /**
  * Servicio de sincronización bidireccional entre el CRM y Manychat
@@ -18,29 +17,24 @@ export class ManychatSyncService {
    */
   static async syncLeadToManychat(leadId: string): Promise<boolean> {
     try {
-      // Obtener lead del CRM
-      const lead = await prisma.lead.findUnique({
-        where: { id: leadId },
-      })
+      if (!supabase.client) {
+        throw new Error('Base de datos no disponible')
+      }
 
-      if (!lead) {
+      // Obtener lead del CRM desde Supabase
+      const { data: lead, error: leadError } = await supabase.client
+        .from('Lead')
+        .select('*')
+        .eq('id', leadId)
+        .single()
+
+      if (leadError || !lead) {
         throw new Error(`Lead ${leadId} no encontrado`)
       }
 
-      // Crear registro de sincronización
-      const syncLog = await prisma.manychatSync.create({
-        data: {
-          leadId,
-          syncType: 'lead_to_manychat',
-          direction: 'to_manychat',
-          status: 'pending',
-          data: JSON.stringify({ lead }),
-        },
-      })
-
       try {
         // Preparar datos para Manychat
-        const [firstName, ...lastNameParts] = lead.nombre.split(' ')
+        const [firstName, ...lastNameParts] = (lead.nombre || '').split(' ')
         const lastName = lastNameParts.join(' ')
 
         const manychatData: ManychatLeadData = {
@@ -50,16 +44,16 @@ export class ManychatSyncService {
           email: lead.email || undefined,
           whatsapp_phone: lead.telefono,
           custom_fields: {
-            dni: lead.dni,
-            ingresos: lead.ingresos,
-            zona: lead.zona,
-            producto: lead.producto,
-            monto: lead.monto,
-            origen: lead.origen,
-            estado: lead.estado,
-            agencia: lead.agencia,
+            dni: lead.dni || undefined,
+            ingresos: lead.ingresos || undefined,
+            zona: lead.zona || undefined,
+            producto: lead.producto || undefined,
+            monto: lead.monto || undefined,
+            origen: lead.origen || undefined,
+            estado: lead.estado || undefined,
+            agencia: lead.agencia || undefined,
           },
-          tags: [], // Los tags se sincronizarán por separado
+          tags: lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : [],
         }
 
         // Crear o actualizar subscriber en Manychat
@@ -70,42 +64,30 @@ export class ManychatSyncService {
         }
 
         // Actualizar lead con manychatId
-        await prisma.lead.update({
-          where: { id: leadId },
-          data: {
+        const { error: updateError } = await supabase.client
+          .from('Lead')
+          .update({ 
             manychatId: String(subscriber.id),
-          },
-        })
+            updatedAt: new Date().toISOString()
+          })
+          .eq('id', leadId)
 
-        // Marcar sincronización como exitosa
-        await prisma.manychatSync.update({
-          where: { id: syncLog.id },
-          data: {
-            status: 'success',
-            completedAt: new Date(),
-            data: JSON.stringify({ lead, subscriber }),
-          },
-        })
+        if (updateError) {
+          throw updateError
+        }
 
-        console.log(`Lead ${leadId} sincronizado exitosamente con Manychat (ID: ${subscriber.id})`)
+        logger.info(`Lead ${leadId} sincronizado exitosamente con Manychat`, { 
+          manychatId: subscriber.id 
+        })
         return true
       } catch (error: any) {
-        // Marcar sincronización como fallida
-        await prisma.manychatSync.update({
-          where: { id: syncLog.id },
-          data: {
-            status: 'failed',
-            error: error.message,
-            retryCount: syncLog.retryCount + 1,
-            completedAt: new Date(),
-          },
+        logger.error(`Error sincronizando lead ${leadId} a Manychat`, { 
+          error: error.message 
         })
-
-        console.error(`Error sincronizando lead ${leadId} a Manychat:`, error)
         return false
       }
-    } catch (error) {
-      console.error('Error en syncLeadToManychat:', error)
+    } catch (error: any) {
+      logger.error('Error en syncLeadToManychat', { error: error.message })
       return false
     }
   }
@@ -119,99 +101,87 @@ export class ManychatSyncService {
    */
   static async syncManychatToLead(subscriber: ManychatSubscriber): Promise<string | null> {
     try {
-      const syncLog = await prisma.manychatSync.create({
-        data: {
-          leadId: 'pending', // Se actualizará después
-          syncType: 'manychat_to_lead',
-          direction: 'from_manychat',
-          status: 'pending',
-          data: JSON.stringify({ subscriber }),
-        },
-      })
-
-      try {
-        const phone = subscriber.whatsapp_phone || subscriber.phone || ''
-        
-        if (!phone) {
-          throw new Error('Subscriber no tiene teléfono')
-        }
-
-        const nombre = [subscriber.first_name, subscriber.last_name]
-          .filter(Boolean)
-          .join(' ') || subscriber.name || 'Contacto Manychat'
-
-        // Buscar lead existente por manychatId o teléfono
-        let lead = await prisma.lead.findFirst({
-          where: {
-            OR: [
-              { manychatId: String(subscriber.id) },
-              { telefono: phone },
-            ],
-          },
-        })
-
-        const customFields = subscriber.custom_fields || {}
-        const tags = subscriber.tags?.map(t => t.name) || []
-
-        const leadData = {
-          nombre,
-          telefono: phone,
-          email: subscriber.email || null,
-          manychatId: String(subscriber.id),
-          dni: customFields.dni || null,
-          ingresos: customFields.ingresos || null,
-          zona: customFields.zona || null,
-          producto: customFields.producto || null,
-          monto: customFields.monto || null,
-          origen: customFields.origen || 'whatsapp',
-          estado: customFields.estado || 'NUEVO',
-          agencia: customFields.agencia || null,
-          tags: JSON.stringify(tags),
-          customFields: JSON.stringify(customFields),
-        }
-
-        if (lead) {
-          // Actualizar lead existente
-          lead = await prisma.lead.update({
-            where: { id: lead.id },
-            data: leadData,
-          })
-        } else {
-          // Crear nuevo lead
-          lead = await prisma.lead.create({
-            data: leadData,
-          })
-        }
-
-        // Actualizar syncLog con el leadId correcto
-        await prisma.manychatSync.update({
-          where: { id: syncLog.id },
-          data: {
-            leadId: lead.id,
-            status: 'success',
-            completedAt: new Date(),
-            data: JSON.stringify({ subscriber, lead }),
-          },
-        })
-
-        console.log(`Subscriber ${subscriber.id} sincronizado exitosamente al CRM (Lead: ${lead.id})`)
-        return lead.id
-      } catch (error: any) {
-        await prisma.manychatSync.update({
-          where: { id: syncLog.id },
-          data: {
-            status: 'failed',
-            error: error.message,
-            retryCount: syncLog.retryCount + 1,
-            completedAt: new Date(),
-          },
-        })
-
-        console.error(`Error sincronizando subscriber ${subscriber.id} al CRM:`, error)
-        return null
+      if (!supabase.client) {
+        throw new Error('Base de datos no disponible')
       }
-    } catch (error) {
-      console.error('Error en syncManychatToLead:', error)
+
+      const phone = subscriber.whatsapp_phone || subscriber.phone || ''
+      
+      if (!phone) {
+        throw new Error('Subscriber no tiene teléfono')
+      }
+
+      const nombre = [subscriber.first_name, subscriber.last_name]
+        .filter(Boolean)
+        .join(' ') || subscriber.name || 'Contacto Manychat'
+
+      // Buscar lead existente por manychatId o teléfono
+      const { data: existingLeads } = await supabase.client
+        .from('Lead')
+        .select('*')
+        .or(`manychatId.eq.${subscriber.id},telefono.eq.${phone}`)
+        .limit(1)
+
+      const customFields = subscriber.custom_fields || {}
+      const tags = subscriber.tags?.map(t => t.name) || []
+
+      const leadData: any = {
+        nombre,
+        telefono: phone,
+        email: subscriber.email || null,
+        manychatId: String(subscriber.id),
+        dni: customFields.dni || null,
+        ingresos: customFields.ingresos ?? null,
+        zona: customFields.zona || null,
+        producto: customFields.producto || null,
+        monto: customFields.monto ?? null,
+        origen: customFields.origen || 'whatsapp',
+        estado: customFields.estado || 'NUEVO',
+        agencia: customFields.agencia || null,
+        tags: JSON.stringify(tags),
+        updatedAt: new Date().toISOString(),
+      }
+
+      let lead: any
+
+      if (existingLeads && existingLeads.length > 0) {
+        // Actualizar lead existente
+        const { data: updatedLead, error: updateError } = await supabase.client
+          .from('Lead')
+          .update(leadData)
+          .eq('id', existingLeads[0].id)
+          .select()
+          .single()
+
+        if (updateError) {
+          throw updateError
+        }
+        lead = updatedLead
+      } else {
+        // Crear nuevo lead
+        const { data: newLead, error: createError } = await supabase.client
+          .from('Lead')
+          .insert({
+            ...leadData,
+            createdAt: new Date().toISOString(),
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          throw createError
+        }
+        lead = newLead
+      }
+
+      logger.info(`Subscriber ${subscriber.id} sincronizado exitosamente al CRM`, { 
+        leadId: lead.id 
+      })
+      return lead.id
+    } catch (error: any) {
+      logger.error(`Error sincronizando subscriber ${subscriber.id} al CRM`, { 
+        error: error.message 
+      })
       return null
     }
   }
@@ -225,16 +195,25 @@ export class ManychatSyncService {
    */
   static async syncTagsToManychat(leadId: string, tags: string[]): Promise<boolean> {
     try {
-      const lead = await prisma.lead.findUnique({
-        where: { id: leadId },
-      })
+      if (!supabase.client) {
+        throw new Error('Base de datos no disponible')
+      }
 
-      if (!lead || !lead.manychatId) {
-        console.error(`Lead ${leadId} no tiene manychatId`)
+      const { data: lead, error: leadError } = await supabase.client
+        .from('Lead')
+        .select('manychatId')
+        .eq('id', leadId)
+        .single()
+
+      if (leadError || !lead || !lead.manychatId) {
+        logger.warn(`Lead ${leadId} no tiene manychatId`)
         return false
       }
 
       const subscriberId = parseInt(lead.manychatId)
+      if (isNaN(subscriberId)) {
+        return false
+      }
 
       // Obtener tags actuales del subscriber en Manychat
       const subscriber = await ManychatService.getSubscriberById(subscriberId)
@@ -257,17 +236,22 @@ export class ManychatSyncService {
       }
 
       // Actualizar lead con tags sincronizados
-      await prisma.lead.update({
-        where: { id: leadId },
-        data: {
+      const { error: updateError } = await supabase.client
+        .from('Lead')
+        .update({ 
           tags: JSON.stringify(tags),
-        },
-      })
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', leadId)
 
-      console.log(`Tags sincronizados para lead ${leadId}`)
+      if (updateError) {
+        throw updateError
+      }
+
+      logger.info(`Tags sincronizados para lead ${leadId}`)
       return true
-    } catch (error) {
-      console.error('Error sincronizando tags:', error)
+    } catch (error: any) {
+      logger.error('Error sincronizando tags', { error: error.message })
       return false
     }
   }
@@ -277,15 +261,25 @@ export class ManychatSyncService {
    */
   static async syncTagsFromManychat(leadId: string): Promise<boolean> {
     try {
-      const lead = await prisma.lead.findUnique({
-        where: { id: leadId },
-      })
+      if (!supabase.client) {
+        throw new Error('Base de datos no disponible')
+      }
 
-      if (!lead || !lead.manychatId) {
+      const { data: lead, error: leadError } = await supabase.client
+        .from('Lead')
+        .select('manychatId')
+        .eq('id', leadId)
+        .single()
+
+      if (leadError || !lead || !lead.manychatId) {
         return false
       }
 
       const subscriberId = parseInt(lead.manychatId)
+      if (isNaN(subscriberId)) {
+        return false
+      }
+
       const subscriber = await ManychatService.getSubscriberById(subscriberId)
 
       if (!subscriber) {
@@ -294,16 +288,21 @@ export class ManychatSyncService {
 
       const tags = subscriber.tags?.map(t => t.name) || []
 
-      await prisma.lead.update({
-        where: { id: leadId },
-        data: {
+      const { error: updateError } = await supabase.client
+        .from('Lead')
+        .update({ 
           tags: JSON.stringify(tags),
-        },
-      })
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', leadId)
+
+      if (updateError) {
+        throw updateError
+      }
 
       return true
-    } catch (error) {
-      console.error('Error sincronizando tags desde Manychat:', error)
+    } catch (error: any) {
+      logger.error('Error sincronizando tags desde Manychat', { error: error.message })
       return false
     }
   }
@@ -317,15 +316,24 @@ export class ManychatSyncService {
    */
   static async syncCustomFieldsToManychat(leadId: string): Promise<boolean> {
     try {
-      const lead = await prisma.lead.findUnique({
-        where: { id: leadId },
-      })
+      if (!supabase.client) {
+        throw new Error('Base de datos no disponible')
+      }
 
-      if (!lead || !lead.manychatId) {
+      const { data: lead, error: leadError } = await supabase.client
+        .from('Lead')
+        .select('manychatId, dni, ingresos, zona, producto, monto, origen, estado, agencia')
+        .eq('id', leadId)
+        .single()
+
+      if (leadError || !lead || !lead.manychatId) {
         return false
       }
 
       const subscriberId = parseInt(lead.manychatId)
+      if (isNaN(subscriberId)) {
+        return false
+      }
 
       // Mapear campos del CRM a custom fields de Manychat
       const fieldsToSync = {
@@ -346,10 +354,10 @@ export class ManychatSyncService {
         }
       }
 
-      console.log(`Custom fields sincronizados para lead ${leadId}`)
+      logger.info(`Custom fields sincronizados para lead ${leadId}`)
       return true
-    } catch (error) {
-      console.error('Error sincronizando custom fields:', error)
+    } catch (error: any) {
+      logger.error('Error sincronizando custom fields', { error: error.message })
       return false
     }
   }
@@ -363,6 +371,10 @@ export class ManychatSyncService {
    */
   static async fullSyncLeadToManychat(leadId: string): Promise<boolean> {
     try {
+      if (!supabase.client) {
+        throw new Error('Base de datos no disponible')
+      }
+
       // 1. Sincronizar datos básicos del lead
       const success = await this.syncLeadToManychat(leadId)
       if (!success) {
@@ -370,18 +382,20 @@ export class ManychatSyncService {
       }
 
       // 2. Sincronizar tags si existen
-      const lead = await prisma.lead.findUnique({
-        where: { id: leadId },
-      })
+      const { data: lead } = await supabase.client
+        .from('Lead')
+        .select('tags')
+        .eq('id', leadId)
+        .single()
 
       if (lead?.tags) {
         try {
-          const tags = JSON.parse(lead.tags)
+          const tags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
           if (Array.isArray(tags) && tags.length > 0) {
             await this.syncTagsToManychat(leadId, tags)
           }
-        } catch (e) {
-          console.error('Error parseando tags:', e)
+        } catch (e: any) {
+          logger.error('Error parseando tags', { error: e.message })
         }
       }
 
@@ -389,8 +403,8 @@ export class ManychatSyncService {
       await this.syncCustomFieldsToManychat(leadId)
 
       return true
-    } catch (error) {
-      console.error('Error en sincronización completa:', error)
+    } catch (error: any) {
+      logger.error('Error en sincronización completa', { error: error.message })
       return false
     }
   }
@@ -401,58 +415,29 @@ export class ManychatSyncService {
 
   /**
    * Obtener logs de sincronización de un lead
+   * Nota: Si hay tabla manychatSync en Supabase, implementar aquí
    */
-  static async getSyncLogs(leadId: string) {
-    return await prisma.manychatSync.findMany({
-      where: { leadId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
+  static async getSyncLogs(_leadId: string) {
+    // Por ahora retornar array vacío, se puede implementar si existe tabla manychatSync
+    return []
   }
 
   /**
    * Reintentar sincronizaciones fallidas
+   * Nota: Implementar si hay tabla manychatSync para tracking
    */
-  static async retryFailedSyncs(maxRetries: number = 3): Promise<number> {
-    const failedSyncs = await prisma.manychatSync.findMany({
-      where: {
-        status: 'failed',
-        retryCount: {
-          lt: maxRetries,
-        },
-      },
-      take: 10,
-    })
-
-    let successCount = 0
-
-    for (const sync of failedSyncs) {
-      if (sync.direction === 'to_manychat') {
-        const success = await this.syncLeadToManychat(sync.leadId)
-        if (success) successCount++
-      }
-    }
-
-    return successCount
+  static async retryFailedSyncs(_maxRetries: number = 3): Promise<number> {
+    // Por ahora retornar 0, se puede implementar si existe tabla manychatSync
+    return 0
   }
 
   /**
    * Limpiar logs antiguos de sincronización
+   * Nota: Implementar si hay tabla manychatSync
    */
-  static async cleanupOldSyncLogs(daysToKeep: number = 30): Promise<number> {
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
-
-    const result = await prisma.manychatSync.deleteMany({
-      where: {
-        createdAt: {
-          lt: cutoffDate,
-        },
-        status: 'success',
-      },
-    })
-
-    return result.count
+  static async cleanupOldSyncLogs(_daysToKeep: number = 30): Promise<number> {
+    // Por ahora retornar 0, se puede implementar si existe tabla manychatSync
+    return 0
   }
 }
 

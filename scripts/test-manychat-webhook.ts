@@ -1,9 +1,10 @@
 /**
  * Script de prueba para simular webhooks de Manychat
  * Ejecutar con: npx tsx scripts/test-manychat-webhook.ts
+ * 
+ * NOTA: Este script usa fetch nativo de Node.js 18+
+ * Si usas Node.js < 18, instala node-fetch: npm install node-fetch
  */
-
-import fetch from 'node-fetch'
 
 const WEBHOOK_URL = process.env.WEBHOOK_URL || 'http://localhost:3000/api/webhooks/manychat'
 const MANYCHAT_API_KEY = process.env.MANYCHAT_API_KEY

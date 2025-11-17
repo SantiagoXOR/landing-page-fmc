@@ -260,33 +260,38 @@ export default function ManychatSettingsPage() {
                 <div className="border-t pt-4">
                   <h4 className="font-medium text-sm mb-2">Configurar en Manychat:</h4>
                   <div className="text-sm text-gray-600 space-y-3">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                      <p className="font-medium text-blue-900 mb-2">⚠️ ¿No encuentras los webhooks?</p>
-                      <p className="text-blue-800 text-xs mb-2">
-                        Manychat puede tener los webhooks en diferentes ubicaciones según tu plan:
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                      <p className="font-medium text-yellow-900 mb-2">⚠️ Manychat NO tiene webhooks directos</p>
+                      <p className="text-yellow-800 text-xs mb-2">
+                        Manychat no ofrece webhooks salientes configurables. Debes usar <strong>Flows (Automatizaciones)</strong> con acciones <strong>HTTP Request</strong>.
                       </p>
-                      <ul className="text-blue-800 text-xs space-y-1 list-disc list-inside ml-2">
-                        <li><strong>Settings → API → Webhooks</strong> (Planes Pro/Business)</li>
-                        <li><strong>Settings → Integraciones → Webhooks</strong></li>
-                        <li><strong>Automatizaciones → Crear Flow con acción Webhook</strong> (Alternativa)</li>
-                      </ul>
                       <a 
-                        href="/docs/COMO-ENCONTRAR-WEBHOOKS-MANYCHAT.md"
+                        href="/docs/CONFIGURAR-WEBHOOK-MANYCHAT-PASO-A-PASO.md"
                         target="_blank"
-                        className="text-blue-600 hover:text-blue-800 text-xs underline mt-2 inline-block"
+                        className="text-yellow-700 hover:text-yellow-900 text-xs underline mt-2 inline-block font-medium"
                       >
-                        Ver guía completa: Cómo encontrar webhooks en Manychat →
+                        📖 Ver guía paso a paso: Cómo crear Flows con HTTP Request →
                       </a>
                     </div>
-                    <ol className="space-y-1 list-decimal list-inside">
-                      <li>Busca la sección de Webhooks en Manychat (ver ubicaciones arriba)</li>
-                      <li>Si existe "Add Webhook", haz clic y pega la URL de arriba</li>
-                      <li>Si no existe, crea un Flow en Automatizaciones con acción "HTTP Request"</li>
-                      <li>Configura la URL: <code className="bg-gray-100 px-1 rounded text-xs">{config.webhookUrl}</code></li>
-                      <li>Método: POST, Content-Type: application/json</li>
-                      <li>Selecciona todos los eventos listados arriba</li>
-                      <li>Haz clic en "Verify" y luego "Save"</li>
-                    </ol>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                      <p className="font-medium text-blue-900 mb-2">📋 Pasos Rápidos:</p>
+                      <ol className="text-blue-800 text-xs space-y-1 list-decimal list-inside ml-2">
+                        <li>Ve a <strong>Automatizaciones</strong> → <strong>Nuevo Flow</strong></li>
+                        <li>Configura trigger: <strong>"Message Received"</strong></li>
+                        <li>Agrega acción: <strong>"HTTP Request"</strong> o <strong>"Webhook"</strong></li>
+                        <li>URL: <code className="bg-blue-100 px-1 rounded">{config.webhookUrl}</code></li>
+                        <li>Método: <strong>POST</strong>, Content-Type: <strong>application/json</strong></li>
+                        <li>Body: Ver guía completa para el formato JSON correcto</li>
+                        <li>Repite para cada evento (mensajes enviados, nuevos subscribers, tags, etc.)</li>
+                      </ol>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <p className="font-medium text-gray-900 mb-2 text-xs">💡 Tip:</p>
+                      <p className="text-gray-700 text-xs">
+                        Necesitarás crear <strong>6 flows diferentes</strong> (uno por cada tipo de evento). 
+                        La guía completa incluye ejemplos de JSON para cada flow.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>

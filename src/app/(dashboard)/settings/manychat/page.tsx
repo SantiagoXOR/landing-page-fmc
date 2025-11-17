@@ -47,9 +47,21 @@ export default function ManychatSettingsPage() {
       const healthResponse = await fetch('/api/manychat/health')
       const healthData = await healthResponse.json()
       
+      // Obtener URL del webhook desde el servidor (para producción)
+      let webhookUrl = `${window.location.origin}/api/webhooks/manychat`
+      try {
+        const webhookUrlResponse = await fetch('/api/webhooks/manychat/webhook-url')
+        if (webhookUrlResponse.ok) {
+          const webhookData = await webhookUrlResponse.json()
+          webhookUrl = webhookData.webhookUrl || webhookUrl
+        }
+      } catch (error) {
+        console.warn('No se pudo obtener URL del webhook del servidor, usando URL local')
+      }
+      
       setConfig({
         apiKeyConfigured: healthData.status === 'healthy',
-        webhookUrl: `${window.location.origin}/api/whatsapp/webhook`,
+        webhookUrl: webhookUrl,
         webhookConfigured: true, // Simplificado
       })
     } catch (error) {

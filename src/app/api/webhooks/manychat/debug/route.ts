@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       manychatConfigured: true,
       databaseAvailable: true,
-      webhookEndpoint: `${process.env.NEXT_PUBLIC_APP_URL || 'https://tu-dominio.com'}/api/webhooks/manychat`,
+      webhookEndpoint: `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://www.formosafmc.com.ar'}/api/webhooks/manychat`,
     }
 
     // 1. Verificar leads con manychatId

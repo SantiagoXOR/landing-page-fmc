@@ -26,33 +26,109 @@ export async function POST(request: NextRequest) {
 
     logger.info('Webhook recibido de Manychat', {
       event_type: body.event_type || body.type,
-      subscriber_id: body.subscriber_id || body.subscriber?.id,
-      timestamp: new Date().toISOString()
+      subscriber_id: body.subscriber_id || body.subscriber?.id || body.id,
+      timestamp: new Date().toISOString(),
+      hasLastInputText: !!body.last_input_text
     })
 
-    // Validar que el webhook tenga un tipo de evento
-    const eventType = body.event_type || body.type
+    // Detectar si viene el formato "Full Contact Data" de Manychat
+    // Este formato no tiene event_type pero tiene datos del contacto
+    const isFullContactDataFormat = !body.event_type && !body.type && (body.id || body.first_name || body.last_input_text)
+
+    let normalizedBody = body
+
+    // Si es formato "Full Contact Data", transformarlo a nuestro formato esperado
+    if (isFullContactDataFormat) {
+      logger.info('Detectado formato Full Contact Data de Manychat, transformando...', {
+        contactId: body.id,
+        hasLastInputText: !!body.last_input_text
+      })
+
+      // Determinar el tipo de evento basado en los datos disponibles
+      let eventType = 'message_received' // Por defecto, asumimos mensaje recibido
+      
+      // Si hay last_input_text, es un mensaje recibido
+      if (body.last_input_text) {
+        eventType = 'message_received'
+      } else if (body.subscribed && !body.last_interaction) {
+        // Si tiene subscribed pero no last_interaction, podría ser nuevo subscriber
+        eventType = 'new_subscriber'
+      } else {
+        // Por defecto, subscriber actualizado
+        eventType = 'subscriber_updated'
+      }
+
+      // Transformar al formato esperado
+      normalizedBody = {
+        event_type: eventType,
+        subscriber_id: body.id || body.subscriber_id,
+        subscriber: {
+          id: parseInt(String(body.id || body.subscriber_id || '0')) || 0,
+          key: body.key || `user:${body.id}`,
+          page_id: parseInt(String(body.page_id || '0')) || 0,
+          status: (body.status as 'active' | 'inactive') || 'active',
+          first_name: body.first_name,
+          last_name: body.last_name,
+          name: body.name,
+          phone: body.phone || body.whatsapp_phone || null,
+          whatsapp_phone: body.whatsapp_phone || body.phone || null,
+          email: body.email || null,
+          custom_fields: body.custom_fields || {},
+          tags: body.tags || [],
+          gender: body.gender as 'male' | 'female' | undefined,
+          profile_pic: body.profile_pic,
+          locale: body.locale,
+          language: body.language,
+          timezone: body.timezone,
+          subscribed: body.subscribed,
+          last_interaction: body.last_interaction,
+          opted_in_phone: body.optin_phone || false,
+          opted_in_email: body.optin_email || false,
+          has_opt_in_sms: body.optin_phone || false,
+          has_opt_in_email: body.optin_email || false
+        },
+        message: body.last_input_text ? {
+          id: `msg_${body.id}_${Date.now()}`,
+          type: 'text',
+          text: body.last_input_text,
+          timestamp: body.last_interaction ? new Date(body.last_interaction).getTime() / 1000 : Date.now() / 1000,
+          direction: 'inbound',
+          platform_msg_id: `manychat_${body.id}_${Date.now()}`
+        } : undefined,
+        timestamp: body.last_interaction ? new Date(body.last_interaction).getTime() / 1000 : Date.now() / 1000,
+        created_at: body.subscribed || body.last_interaction
+      }
+
+      logger.info('Formato transformado exitosamente', {
+        event_type: normalizedBody.event_type,
+        subscriber_id: normalizedBody.subscriber_id,
+        has_message: !!normalizedBody.message
+      })
+    }
+
+    // Validar que el webhook tenga un tipo de evento (después de la transformación)
+    const eventType = normalizedBody.event_type || normalizedBody.type
     if (!eventType) {
-      logger.warn('Webhook sin event_type', { body })
+      logger.warn('Webhook sin event_type después de transformación', { body, normalizedBody })
       return NextResponse.json(
         { error: 'Missing event_type' },
         { status: 400 }
       )
     }
 
-    // Normalizar el evento a nuestro formato
+    // Normalizar el evento a nuestro formato (usar normalizedBody después de la transformación)
     const event: ManychatWebhookEvent = {
       event_type: eventType,
-      subscriber_id: body.subscriber_id,
-      subscriber: body.subscriber || (body.subscriber_id ? undefined : body.subscriber),
-      message: normalizeMessage(body.message),
-      tag: body.tag,
-      custom_field: body.custom_field,
-      flow: body.flow,
-      button: body.button,
-      timestamp: body.timestamp || Date.now() / 1000,
-      created_at: body.created_at,
-      data: body.data
+      subscriber_id: normalizedBody.subscriber_id,
+      subscriber: normalizedBody.subscriber || (normalizedBody.subscriber_id ? undefined : normalizedBody.subscriber),
+      message: normalizeMessage(normalizedBody.message),
+      tag: normalizedBody.tag,
+      custom_field: normalizedBody.custom_field,
+      flow: normalizedBody.flow,
+      button: normalizedBody.button,
+      timestamp: normalizedBody.timestamp || Date.now() / 1000,
+      created_at: normalizedBody.created_at,
+      data: normalizedBody.data
     }
 
     // Procesar el evento

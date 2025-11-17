@@ -21,7 +21,7 @@ export default function ManychatDashboardPage() {
           <div className="flex items-center gap-2">
             <ManychatConnectionStatus />
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/settings/manychat">
+              <Link href="/settings/manychat">
                 <Settings className="w-4 h-4 mr-2" />
                 Configuración
               </Link>

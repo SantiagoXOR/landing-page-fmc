@@ -76,7 +76,7 @@ export function ManychatSyncPanel({ leadId, onSyncComplete }: ManychatSyncPanelP
         </CardHeader>
         <CardContent>
           <Button variant="outline" size="sm" asChild>
-            <a href="/dashboard/settings/manychat" className="flex items-center gap-2">
+            <a href="/settings/manychat" className="flex items-center gap-2">
               Configurar Manychat
               <ExternalLink className="w-4 h-4" />
             </a>

@@ -1,0 +1,104 @@
+{
+  "message_received": {
+    "event_type": "message_received",
+    "subscriber_id": "{{subscriber.id}}",
+    "subscriber": {
+      "id": "{{subscriber.id}}",
+      "first_name": "{{subscriber.first_name}}",
+      "last_name": "{{subscriber.last_name}}",
+      "phone": "{{subscriber.phone}}",
+      "whatsapp_phone": "{{subscriber.whatsapp_phone}}",
+      "email": "{{subscriber.email}}",
+      "custom_fields": "{{subscriber.custom_fields}}",
+      "tags": "{{subscriber.tags}}"
+    },
+    "message": {
+      "id": "{{message.id}}",
+      "type": "text",
+      "text": "{{message.text}}",
+      "timestamp": "{{message.timestamp}}",
+      "direction": "inbound",
+      "platform_msg_id": "{{message.id}}"
+    },
+    "timestamp": "{{current_timestamp}}"
+  },
+  "message_sent": {
+    "event_type": "message_sent",
+    "subscriber_id": "{{subscriber.id}}",
+    "subscriber": {
+      "id": "{{subscriber.id}}",
+      "first_name": "{{subscriber.first_name}}",
+      "last_name": "{{subscriber.last_name}}",
+      "phone": "{{subscriber.phone}}",
+      "whatsapp_phone": "{{subscriber.whatsapp_phone}}"
+    },
+    "message": {
+      "id": "{{message.id}}",
+      "type": "text",
+      "text": "{{message.text}}",
+      "timestamp": "{{message.timestamp}}",
+      "direction": "outbound",
+      "platform_msg_id": "{{message.id}}"
+    },
+    "timestamp": "{{current_timestamp}}"
+  },
+  "new_subscriber": {
+    "event_type": "new_subscriber",
+    "subscriber_id": "{{subscriber.id}}",
+    "subscriber": {
+      "id": "{{subscriber.id}}",
+      "first_name": "{{subscriber.first_name}}",
+      "last_name": "{{subscriber.last_name}}",
+      "phone": "{{subscriber.phone}}",
+      "whatsapp_phone": "{{subscriber.whatsapp_phone}}",
+      "email": "{{subscriber.email}}",
+      "custom_fields": "{{subscriber.custom_fields}}",
+      "tags": "{{subscriber.tags}}"
+    },
+    "timestamp": "{{current_timestamp}}"
+  },
+  "tag_added": {
+    "event_type": "tag_added",
+    "subscriber_id": "{{subscriber.id}}",
+    "subscriber": {
+      "id": "{{subscriber.id}}",
+      "phone": "{{subscriber.phone}}",
+      "whatsapp_phone": "{{subscriber.whatsapp_phone}}"
+    },
+    "tag": {
+      "id": "{{tag.id}}",
+      "name": "{{tag.name}}"
+    },
+    "timestamp": "{{current_timestamp}}"
+  },
+  "tag_removed": {
+    "event_type": "tag_removed",
+    "subscriber_id": "{{subscriber.id}}",
+    "subscriber": {
+      "id": "{{subscriber.id}}",
+      "phone": "{{subscriber.phone}}",
+      "whatsapp_phone": "{{subscriber.whatsapp_phone}}"
+    },
+    "tag": {
+      "id": "{{tag.id}}",
+      "name": "{{tag.name}}"
+    },
+    "timestamp": "{{current_timestamp}}"
+  },
+  "custom_field_changed": {
+    "event_type": "custom_field_changed",
+    "subscriber_id": "{{subscriber.id}}",
+    "subscriber": {
+      "id": "{{subscriber.id}}",
+      "phone": "{{subscriber.phone}}",
+      "whatsapp_phone": "{{subscriber.whatsapp_phone}}"
+    },
+    "custom_field": {
+      "id": "{{custom_field.id}}",
+      "name": "{{custom_field.name}}",
+      "value": "{{custom_field.value}}"
+    },
+    "timestamp": "{{current_timestamp}}"
+  }
+}
+

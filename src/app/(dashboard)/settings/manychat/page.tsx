@@ -243,14 +243,35 @@ export default function ManychatSettingsPage() {
                 {/* Instrucciones */}
                 <div className="border-t pt-4">
                   <h4 className="font-medium text-sm mb-2">Configurar en Manychat:</h4>
-                  <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                    <li>Ve a Manychat → Settings → API → Webhooks</li>
-                    <li>Haz clic en "Add Webhook"</li>
-                    <li>Pega la Webhook URL de arriba</li>
-                    <li>Agrega tu MANYCHAT_WEBHOOK_SECRET como verify token</li>
-                    <li>Selecciona todos los eventos listados arriba</li>
-                    <li>Haz clic en "Verify" y luego "Save"</li>
-                  </ol>
+                  <div className="text-sm text-gray-600 space-y-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                      <p className="font-medium text-blue-900 mb-2">⚠️ ¿No encuentras los webhooks?</p>
+                      <p className="text-blue-800 text-xs mb-2">
+                        Manychat puede tener los webhooks en diferentes ubicaciones según tu plan:
+                      </p>
+                      <ul className="text-blue-800 text-xs space-y-1 list-disc list-inside ml-2">
+                        <li><strong>Settings → API → Webhooks</strong> (Planes Pro/Business)</li>
+                        <li><strong>Settings → Integraciones → Webhooks</strong></li>
+                        <li><strong>Automatizaciones → Crear Flow con acción Webhook</strong> (Alternativa)</li>
+                      </ul>
+                      <a 
+                        href="/docs/COMO-ENCONTRAR-WEBHOOKS-MANYCHAT.md"
+                        target="_blank"
+                        className="text-blue-600 hover:text-blue-800 text-xs underline mt-2 inline-block"
+                      >
+                        Ver guía completa: Cómo encontrar webhooks en Manychat →
+                      </a>
+                    </div>
+                    <ol className="space-y-1 list-decimal list-inside">
+                      <li>Busca la sección de Webhooks en Manychat (ver ubicaciones arriba)</li>
+                      <li>Si existe "Add Webhook", haz clic y pega la URL de arriba</li>
+                      <li>Si no existe, crea un Flow en Automatizaciones con acción "HTTP Request"</li>
+                      <li>Configura la URL: <code className="bg-gray-100 px-1 rounded text-xs">{config.webhookUrl}</code></li>
+                      <li>Método: POST, Content-Type: application/json</li>
+                      <li>Selecciona todos los eventos listados arriba</li>
+                      <li>Haz clic en "Verify" y luego "Save"</li>
+                    </ol>
+                  </div>
                 </div>
               </CardContent>
             </Card>

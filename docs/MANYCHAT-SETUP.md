@@ -62,17 +62,32 @@ Esta guía te ayudará a configurar la integración híbrida de Manychat con el 
 
 1. En Manychat, ve a **Settings** (⚙️)
 2. Selecciona la pestaña **API**
-3. Haz clic en **"Generate your API Key"**
+3. Haz clic en **"Generate your API Key"** o **"Regenerar Clave De API"**
 4. **¡IMPORTANTE!** Copia y guarda esta key de forma segura
    - Esta key solo se muestra una vez
    - Si la pierdes, deberás generar una nueva
    - Si generas una nueva, la anterior se desactivará
+   - El formato es: `3724482:3979953d3482a4cce1d1c1aceb69556c` (ID:Token) o `MCAPIKey-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 
 ### Formato de la API Key
 
+Manychat puede usar dos formatos:
+
+**Formato Nuevo (ID:Token):**
+```
+3724482:3979953d3482a4cce1d1c1aceb69556c
+```
+
+**Formato Clásico (MCAPIKey-):**
 ```
 MCAPIKey-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+Ambos formatos funcionan con nuestra integración.
+
+### 📚 Documentación Oficial
+
+Para más detalles sobre cómo generar tokens y obtener parámetros, consulta la [guía oficial de Manychat](https://help.manychat.com/hc/en-us/articles/14959510331420-How-to-generate-a-token-for-the-Manychat-API-and-where-to-get-parameters).
 
 ---
 

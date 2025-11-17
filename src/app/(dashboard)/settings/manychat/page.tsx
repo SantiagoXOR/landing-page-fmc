@@ -161,22 +161,38 @@ export default function ManychatSettingsPage() {
                     <li>Copia la key (empieza con MCAPIKey-)</li>
                     <li>Agrégala a tu archivo .env.local</li>
                   </ol>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    asChild
-                  >
-                    <a
-                      href="https://manychat.com/settings/api"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2"
+                  <div className="flex flex-col gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
                     >
-                      <ExternalLink className="w-3 h-3" />
-                      Ir a configuración de API
-                    </a>
-                  </Button>
+                      <a
+                        href="https://manychat.com/settings/api"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Ir a configuración de API
+                      </a>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                    >
+                      <a
+                        href="https://help.manychat.com/hc/en-us/articles/14959510331420-How-to-generate-a-token-for-the-Manychat-API-and-where-to-get-parameters"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Ver guía oficial de Manychat
+                      </a>
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

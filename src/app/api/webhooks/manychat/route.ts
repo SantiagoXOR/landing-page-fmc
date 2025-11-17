@@ -3,6 +3,9 @@ import { ManychatWebhookService } from '@/server/services/manychat-webhook-servi
 import { ManychatWebhookEvent, ManychatWebhookMessage } from '@/types/manychat'
 import { logger } from '@/lib/logger'
 
+// Forzar renderizado dinámico (webhooks son siempre dinámicos)
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/webhooks/manychat
  * Endpoint para recibir webhooks de Manychat

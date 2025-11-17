@@ -12,10 +12,10 @@ export default function Hero({ className = "" }: HeroProps) {
     fgSpeed: 0.28 
   });
 
-  // Evitar mismatch de hidratación: usar imágenes de escritorio en SSR y
-  // decidir según dispositivo sólo después del montaje en el cliente.
+  // Evitar mismatch de hidratación: usar versión 1 por defecto en SSR y
+  // decidir según dispositivo y versión aleatoria sólo después del montaje en el cliente.
   const [images, setImages] = useState({
-    background: "/landing/hero/hero-bg-desktop.svg",
+    background: "/landing/hero/hero-bg-desktop-1.svg",
     foreground: "",
     titule: "/landing/hero/hero-titule-desktop.svg",
     text: "/landing/hero/hero-text-desktop.svg"

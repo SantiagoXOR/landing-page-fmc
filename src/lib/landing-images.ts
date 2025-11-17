@@ -7,11 +7,19 @@ export const getHeroImages = () => {
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 768px)").matches;
 
+  // Selección aleatoria entre versión 1 y 2 del background
+  // Solo se ejecuta en el cliente para evitar hydration mismatch
+  const version = typeof window !== "undefined" 
+    ? (Math.random() < 0.5 ? "1" : "2")
+    : "1"; // Default para SSR
+
+  const backgroundPath = isMobile
+    ? `/landing/hero/hero-bg-mobile-${version}.svg`
+    : `/landing/hero/hero-bg-desktop-${version}.svg`;
+
   return {
-    // Moto unificada en el background
-    background: isMobile
-      ? "/landing/hero/hero-bg-mobile.svg"
-      : "/landing/hero/hero-bg-desktop.svg",
+    // Moto unificada en el background con rotación aleatoria entre versiones 1 y 2
+    background: backgroundPath,
     // No se usa foreground cuando la moto está en el fondo
     foreground: "",
     titule: isMobile

@@ -13,6 +13,7 @@ import {
   ManychatFlowsResponse,
   ManychatRequestOptions,
   ManychatLeadData,
+  ManychatWebhookMessage,
 } from '@/types/manychat'
 import { logger } from '@/lib/logger'
 
@@ -166,6 +167,44 @@ export class ManychatService {
     }
 
     return null
+  }
+
+  /**
+   * Obtener último mensaje conocido de un subscriber
+   * Nota: ManyChat no tiene endpoint directo para historial completo,
+   * pero podemos obtener el último mensaje desde la información del subscriber
+   * cuando está disponible en el webhook o en la respuesta de getInfo
+   */
+  static getLastMessageFromSubscriber(subscriber: ManychatSubscriber): ManychatWebhookMessage | null {
+    try {
+      // ManyChat puede incluir last_input_text en algunos casos
+      // pero no siempre está disponible cuando se obtiene con getInfo
+      // Solo lo usamos si está disponible
+      
+      if (!subscriber.last_input_text) {
+        return null
+      }
+
+      // Crear un mensaje basado en la información disponible
+      const message: ManychatWebhookMessage = {
+        id: `last_msg_${subscriber.id}_${Date.now()}`,
+        type: 'text',
+        text: subscriber.last_input_text,
+        timestamp: subscriber.last_interaction 
+          ? Math.floor(new Date(subscriber.last_interaction).getTime() / 1000)
+          : Math.floor(Date.now() / 1000),
+        direction: 'inbound',
+        platform_msg_id: `manychat_last_${subscriber.id}`
+      }
+
+      return message
+    } catch (error: any) {
+      logger.error('Error obteniendo último mensaje del subscriber', {
+        error: error.message,
+        subscriberId: subscriber.id
+      })
+      return null
+    }
   }
 
   /**

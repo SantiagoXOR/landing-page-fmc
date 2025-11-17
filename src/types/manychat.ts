@@ -25,6 +25,7 @@ export interface ManychatSubscriber {
   subscribed?: string // ISO date
   last_interaction?: string // ISO date
   last_seen?: string // ISO date
+  last_input_text?: string // Último mensaje enviado por el usuario
   opted_in_phone?: boolean
   opted_in_email?: boolean
   custom_fields?: Record<string, any>

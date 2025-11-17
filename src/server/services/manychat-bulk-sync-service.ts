@@ -4,6 +4,7 @@ import { ManychatService } from './manychat-service'
 import { ManychatSyncService } from './manychat-sync-service'
 import { ManychatSubscriber } from '@/types/manychat'
 import { ConversationService } from './conversation-service'
+import { ManychatHistorySyncService } from './manychat-history-sync-service'
 
 export interface BulkSyncProgress {
   status: 'idle' | 'running' | 'completed' | 'error'
@@ -12,6 +13,7 @@ export interface BulkSyncProgress {
   created: number
   updated: number
   errors: number
+  messagesSynced?: number // Mensajes históricos sincronizados
   currentStep?: string
   errorMessages: string[]
   startedAt?: string
@@ -99,6 +101,7 @@ export class ManychatBulkSyncService {
         created: 0,
         updated: 0,
         errors: 0,
+        messagesSynced: 0,
         errorMessages: [] as string[]
       }
 
@@ -177,6 +180,22 @@ export class ManychatBulkSyncService {
 
                 // Crear o actualizar conversación
                 await this.syncConversation(leadId, subscriber)
+
+                // Intentar sincronizar último mensaje histórico si está disponible
+                try {
+                  const historyResult = await ManychatHistorySyncService.syncLastMessage(subscriber, leadId)
+                  if (historyResult.success && historyResult.messageId) {
+                    results.messagesSynced++
+                    logger.debug(`Último mensaje sincronizado para lead ${leadId}`, {
+                      messageId: historyResult.messageId
+                    })
+                  }
+                } catch (historyError: any) {
+                  // Error silencioso, no afecta la sincronización principal
+                  logger.debug(`No se pudo sincronizar mensaje histórico para lead ${leadId}`, {
+                    error: historyError.message
+                  })
+                }
               } else {
                 results.errors++
                 results.errorMessages.push(`No se pudo sincronizar lead ${lead.id}`)
@@ -210,6 +229,7 @@ export class ManychatBulkSyncService {
         progress.created = results.created
         progress.updated = results.updated
         progress.errors = results.errors
+        progress.messagesSynced = results.messagesSynced
         progress.errorMessages = results.errorMessages.slice(-10) // Mantener solo últimos 10 errores
         this.syncProgress.set(syncId, progress)
 
@@ -242,6 +262,7 @@ export class ManychatBulkSyncService {
         created: results.created,
         updated: results.updated,
         errors: results.errors,
+        messagesSynced: results.messagesSynced,
         errorMessages: results.errorMessages,
         duration
       }

@@ -14,7 +14,8 @@ import {
   Users,
   UserPlus,
   UserCheck,
-  Loader2
+  Loader2,
+  MessageSquare
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -26,6 +27,7 @@ interface BulkSyncProgress {
   created: number
   updated: number
   errors: number
+  messagesSynced?: number
   currentStep?: string
   errorMessages: string[]
   startedAt?: string
@@ -211,7 +213,7 @@ export function ManychatBulkSync() {
               </div>
 
               {/* Estadísticas */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-3 bg-blue-50 rounded-md">
                   <div className="flex items-center gap-2 text-blue-700">
                     <Users className="w-4 h-4" />
@@ -233,6 +235,15 @@ export function ManychatBulkSync() {
                   </div>
                   <p className="text-2xl font-bold text-purple-900 mt-1">{progress.updated}</p>
                 </div>
+                {progress.messagesSynced !== undefined && (
+                  <div className="p-3 bg-orange-50 rounded-md">
+                    <div className="flex items-center gap-2 text-orange-700">
+                      <MessageSquare className="w-4 h-4" />
+                      <span className="text-xs font-medium">Mensajes</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-900 mt-1">{progress.messagesSynced}</p>
+                  </div>
+                )}
               </div>
 
               {/* Errores */}
@@ -263,7 +274,7 @@ export function ManychatBulkSync() {
               </div>
 
               {/* Estadísticas finales */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-3 bg-blue-50 rounded-md">
                   <div className="flex items-center gap-2 text-blue-700">
                     <Users className="w-4 h-4" />
@@ -285,6 +296,15 @@ export function ManychatBulkSync() {
                   </div>
                   <p className="text-2xl font-bold text-purple-900 mt-1">{progress.updated}</p>
                 </div>
+                {progress.messagesSynced !== undefined && progress.messagesSynced > 0 && (
+                  <div className="p-3 bg-orange-50 rounded-md">
+                    <div className="flex items-center gap-2 text-orange-700">
+                      <MessageSquare className="w-4 h-4" />
+                      <span className="text-xs font-medium">Mensajes</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-900 mt-1">{progress.messagesSynced}</p>
+                  </div>
+                )}
               </div>
 
               {/* Tiempo */}

@@ -78,18 +78,26 @@ export default function ChatsPage() {
         // Actualizar inmediatamente con las conversaciones retornadas
         if (syncedConversations.length > 0) {
           setConversations(syncedConversations)
-          setSyncStatus(
-            `Sincronizado: ${syncedCount} conversaciones${foundSubscribers > 0 ? `, ${foundSubscribers} nuevos subscribers encontrados` : ''}`
-          )
+          const conversationsWithMessages = data.conversationsWithMessages || 0
+          const conversationsWithoutMessages = data.conversationsWithoutMessages || 0
+          
+          let statusMessage = `Sincronizado: ${syncedCount} conversaciones`
+          if (foundSubscribers > 0) {
+            statusMessage += `, ${foundSubscribers} nuevos subscribers encontrados`
+          }
+          if (conversationsWithoutMessages > 0) {
+            statusMessage += `. ${conversationsWithoutMessages} sin mensajes aún (llegarán vía webhooks)`
+          }
+          
+          setSyncStatus(statusMessage)
         } else {
           // Si no hay conversaciones pero se encontraron subscribers, recargar
           if (foundSubscribers > 0) {
             await fetchConversations(false)
             setSyncStatus(`Encontrados ${foundSubscribers} subscribers. Recargando conversaciones...`)
           } else {
-            setSyncStatus(
-              data.message || 'No hay conversaciones para sincronizar. Asegúrate de tener leads con manychatId o teléfonos válidos.'
-            )
+            const errorMessage = data.message || 'No hay conversaciones para sincronizar. Asegúrate de tener leads con manychatId o teléfonos válidos.'
+            setSyncStatus(errorMessage)
           }
         }
       } else {

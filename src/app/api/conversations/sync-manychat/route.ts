@@ -81,8 +81,21 @@ export async function POST() {
 
     logger.info('Leads encontrados', {
       withManychatId: leadsWithManychatId?.length || 0,
-      withoutManychatId: leadsWithoutManychatId?.length || 0
+      withoutManychatId: leadsWithoutManychatId?.length || 0,
+      totalLeads: (leadsWithManychatId?.length || 0) + (leadsWithoutManychatId?.length || 0)
     })
+
+    // Debug: Log primeros leads encontrados
+    if (leadsWithManychatId && leadsWithManychatId.length > 0) {
+      logger.debug('Primeros leads con manychatId', {
+        leads: leadsWithManychatId.slice(0, 3).map(l => ({
+          id: l.id,
+          nombre: l.nombre,
+          telefono: l.telefono,
+          manychatId: l.manychatId
+        }))
+      })
+    }
 
     // Procesar leads sin manychatId: buscar en Manychat por teléfono
     if (leadsWithoutManychatId && leadsWithoutManychatId.length > 0) {
@@ -193,12 +206,18 @@ export async function POST() {
         // Obtener mensajes de la conversación
         let messages: any[] = []
         if (conversation.id) {
-          const { data: messagesData } = await supabase.client
+          const { data: messagesData, error: messagesError } = await supabase.client
             .from('messages')
             .select('*')
             .eq('conversation_id', conversation.id)
             .order('sent_at', { ascending: false })
             .limit(1)
+
+          if (messagesError) {
+            logger.warn(`Error obteniendo mensajes para conversación ${conversation.id}`, {
+              error: messagesError.message
+            })
+          }
 
           messages = (messagesData || []).map((msg: any) => ({
             id: msg.id,
@@ -209,6 +228,16 @@ export async function POST() {
             readAt: msg.read_at,
             isFromBot: msg.direction === 'outbound' || msg.is_from_bot || false
           }))
+
+          // Debug: Log si no hay mensajes
+          if (messages.length === 0) {
+            logger.debug(`Conversación ${conversation.id} no tiene mensajes aún`, {
+              leadId: lead.id,
+              platform,
+              platformId,
+              subscriberId
+            })
+          }
         }
 
         // Calcular unreadCount
@@ -288,14 +317,27 @@ export async function POST() {
       }
     }
 
-    logger.info(`Sincronización completada: ${syncedCount} conversaciones sincronizadas, ${foundSubscribersCount} nuevos subscribers encontrados`)
+    logger.info(`Sincronización completada: ${syncedCount} conversaciones sincronizadas, ${foundSubscribersCount} nuevos subscribers encontrados`, {
+      totalLeads: allLeads.length,
+      conversationsWithMessages: conversations.filter(c => c.messages && c.messages.length > 0).length,
+      conversationsWithoutMessages: conversations.filter(c => !c.messages || c.messages.length === 0).length
+    })
+
+    // Advertencia si hay conversaciones sin mensajes
+    const conversationsWithoutMessages = conversations.filter(c => !c.messages || c.messages.length === 0).length
+    let message = `Sincronización completada`
+    if (conversationsWithoutMessages > 0) {
+      message += `. ${conversationsWithoutMessages} conversaciones no tienen mensajes aún. Los mensajes llegarán vía webhooks cuando haya actividad.`
+    }
 
     return NextResponse.json({
-      message: `Sincronización completada`,
+      message,
       conversations,
       synced: syncedCount,
       total: allLeads.length,
-      foundSubscribers: foundSubscribersCount
+      foundSubscribers: foundSubscribersCount,
+      conversationsWithMessages: conversations.filter(c => c.messages && c.messages.length > 0).length,
+      conversationsWithoutMessages
     })
 
   } catch (error: any) {

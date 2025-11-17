@@ -5,6 +5,8 @@ import { LeadService } from '@/server/services/lead-service'
 import { LeadUpdateSchema } from '@/lib/validators'
 import { checkPermission, checkUserPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
+import { ManychatSyncService } from '@/server/services/manychat-sync-service'
+import { ManychatService } from '@/server/services/manychat-service'
 
 const leadService = new LeadService()
 
@@ -78,6 +80,31 @@ export async function PATCH(
     const validatedData = LeadUpdateSchema.parse(body)
 
     const lead = await leadService.updateLead(params.id, validatedData, session.user?.id || '')
+
+    // Sincronizar automáticamente con ManyChat si está configurado
+    if (ManychatService.isConfigured()) {
+      try {
+        // Sincronizar de forma asíncrona para no bloquear la respuesta
+        ManychatSyncService.fullSyncLeadToManychat(params.id)
+          .then((success) => {
+            if (success) {
+              logger.info(`Lead ${params.id} sincronizado automáticamente con ManyChat después de actualización`)
+            } else {
+              logger.warn(`No se pudo sincronizar lead ${params.id} con ManyChat después de actualización`)
+            }
+          })
+          .catch((error) => {
+            logger.error(`Error sincronizando lead ${params.id} con ManyChat`, {
+              error: error.message
+            })
+          })
+      } catch (error: any) {
+        // Error silencioso, no afecta la actualización del lead
+        logger.error(`Error iniciando sincronización automática para lead ${params.id}`, {
+          error: error.message
+        })
+      }
+    }
 
     return NextResponse.json(lead)
 

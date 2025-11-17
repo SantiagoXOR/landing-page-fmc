@@ -14,6 +14,7 @@ import {
   ManychatRequestOptions,
   ManychatLeadData,
 } from '@/types/manychat'
+import { logger } from '@/lib/logger'
 
 /**
  * Servicio para interactuar con la API de Manychat
@@ -170,13 +171,44 @@ export class ManychatService {
   /**
    * Obtener subscribers activos por tag
    * Nota: Manychat no tiene endpoint directo para listar todos los subscribers,
-   * pero podemos obtenerlos por tag o usar los leads sincronizados
+   * pero podemos usar una estrategia basada en obtener información de subscribers conocidos
+   * o usar broadcasts para obtener subscriber IDs por tag
    */
   static async getSubscribersByTag(tagName: string, limit: number = 100): Promise<ManychatSubscriber[]> {
-    // Manychat no tiene endpoint directo para obtener lista de subscribers
-    // Esta función está preparada para futuras implementaciones
-    // Por ahora, usaremos los leads sincronizados con manychatId
-    return []
+    try {
+      // ManyChat no tiene endpoint directo para obtener subscribers por tag
+      // Como alternativa, podemos usar el endpoint de broadcast que permite filtrar por tags
+      // pero esto requiere crear un broadcast temporal, lo cual no es ideal
+      
+      // Por ahora, retornamos array vacío ya que ManyChat no proporciona esta funcionalidad directamente
+      // La sincronización masiva se hará usando otras estrategias (por teléfono, por ID conocido, etc.)
+      logger.warn('ManyChat no tiene endpoint directo para obtener subscribers por tag', { tagName })
+      return []
+    } catch (error: any) {
+      logger.error('Error obteniendo subscribers por tag', { error: error.message, tagName })
+      return []
+    }
+  }
+
+  /**
+   * Obtener subscribers por custom field
+   * Útil para filtrar contactos por campos personalizados
+   */
+  static async getSubscribersByCustomField(
+    fieldName: string,
+    fieldValue: string,
+    limit: number = 100
+  ): Promise<ManychatSubscriber[]> {
+    try {
+      // ManyChat permite buscar por custom field usando findBySystemField
+      // pero solo para campos del sistema, no custom fields directamente
+      // Esta función está preparada para futuras implementaciones
+      logger.warn('ManyChat no tiene endpoint directo para obtener subscribers por custom field', { fieldName })
+      return []
+    } catch (error: any) {
+      logger.error('Error obteniendo subscribers por custom field', { error: error.message, fieldName })
+      return []
+    }
   }
 
   /**

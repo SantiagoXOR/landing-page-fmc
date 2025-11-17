@@ -27,7 +27,8 @@ import {
   LogOut,
   ChevronDown,
   Radio,
-  Workflow
+  Workflow,
+  RefreshCw
 } from "lucide-react"
 import { FMCLogo } from '@/components/branding/FMCLogo'
 import NotificationCenter from '@/components/notifications/NotificationCenter'
@@ -130,6 +131,11 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     name: "Dashboard",
     href: "/manychat/dashboard",
     icon: Bot
+  },
+  {
+    name: "Sincronización",
+    href: "/manychat/sync",
+    icon: RefreshCw
   },
   {
     name: "Broadcasts",

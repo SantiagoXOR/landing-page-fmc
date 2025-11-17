@@ -28,12 +28,26 @@ export async function POST(request: NextRequest) {
       event_type: body.event_type || body.type,
       subscriber_id: body.subscriber_id || body.subscriber?.id || body.id,
       timestamp: new Date().toISOString(),
-      hasLastInputText: !!body.last_input_text
+      hasLastInputText: !!body.last_input_text,
+      hasId: !!body.id,
+      hasFirstName: !!body.first_name,
+      bodyKeys: Object.keys(body)
     })
 
     // Detectar si viene el formato "Full Contact Data" de Manychat
     // Este formato no tiene event_type pero tiene datos del contacto
-    const isFullContactDataFormat = !body.event_type && !body.type && (body.id || body.first_name || body.last_input_text)
+    // Verificamos explícitamente que NO tenga event_type ni type, Y que tenga datos de contacto
+    const hasEventType = !!(body.event_type || body.type)
+    const hasContactData = !!(body.id || body.first_name || body.last_input_text || body.key)
+    const isFullContactDataFormat = !hasEventType && hasContactData
+
+    logger.info('Detección de formato', {
+      hasEventType,
+      hasContactData,
+      isFullContactDataFormat,
+      bodyId: body.id,
+      bodyKey: body.key
+    })
 
     let normalizedBody = body
 
@@ -59,13 +73,19 @@ export async function POST(request: NextRequest) {
       }
 
       // Transformar al formato esperado
+      // Convertir id a número si es posible, sino mantener como string
+      const subscriberId = body.id || body.subscriber_id
+      const subscriberIdNum = typeof subscriberId === 'string' 
+        ? (parseInt(subscriberId) || 0)
+        : (subscriberId || 0)
+
       normalizedBody = {
         event_type: eventType,
-        subscriber_id: body.id || body.subscriber_id,
+        subscriber_id: subscriberIdNum,
         subscriber: {
-          id: parseInt(String(body.id || body.subscriber_id || '0')) || 0,
+          id: subscriberIdNum,
           key: body.key || `user:${body.id}`,
-          page_id: parseInt(String(body.page_id || '0')) || 0,
+          page_id: typeof body.page_id === 'string' ? parseInt(body.page_id) || 0 : (body.page_id || 0),
           status: (body.status as 'active' | 'inactive') || 'active',
           first_name: body.first_name,
           last_name: body.last_name,
@@ -109,9 +129,30 @@ export async function POST(request: NextRequest) {
     // Validar que el webhook tenga un tipo de evento (después de la transformación)
     const eventType = normalizedBody.event_type || normalizedBody.type
     if (!eventType) {
-      logger.warn('Webhook sin event_type después de transformación', { body, normalizedBody })
+      logger.warn('Webhook sin event_type después de transformación', { 
+        originalBody: {
+          id: body.id,
+          key: body.key,
+          hasEventType: !!(body.event_type || body.type),
+          keys: Object.keys(body)
+        },
+        normalizedBody: {
+          event_type: normalizedBody.event_type,
+          type: normalizedBody.type,
+          keys: Object.keys(normalizedBody)
+        },
+        isFullContactDataFormat
+      })
       return NextResponse.json(
-        { error: 'Missing event_type' },
+        { 
+          error: 'Missing event_type',
+          debug: {
+            receivedFormat: isFullContactDataFormat ? 'Full Contact Data' : 'Standard',
+            hasId: !!body.id,
+            hasKey: !!body.key,
+            normalizedEventType: normalizedBody.event_type
+          }
+        },
         { status: 400 }
       )
     }

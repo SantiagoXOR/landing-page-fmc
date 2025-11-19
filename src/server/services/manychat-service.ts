@@ -312,44 +312,226 @@ export class ManychatService {
   }
 
   /**
+   * Validar y normalizar teléfono para ManyChat
+   * ManyChat requiere formato internacional con código de país
+   */
+  private static validateAndNormalizePhone(phone: string): string {
+    if (!phone) {
+      throw new Error('Teléfono requerido para crear contacto en ManyChat')
+    }
+
+    // Remover espacios, guiones y paréntesis
+    const cleaned = phone.replace(/\D/g, '')
+    
+    // Si ya tiene código de país (+54), mantenerlo
+    if (phone.startsWith('+')) {
+      return phone.replace(/\D/g, '').startsWith('54') 
+        ? `+${phone.replace(/\D/g, '')}`
+        : phone
+    }
+
+    // Normalizar formato argentino
+    if (cleaned.startsWith('54')) {
+      return `+${cleaned}`
+    }
+    
+    if (cleaned.startsWith('9')) {
+      return `+54${cleaned}`
+    }
+    
+    if (cleaned.length === 10) {
+      return `+549${cleaned}`
+    }
+    
+    // Si tiene 11 dígitos y empieza con 54, agregar +
+    if (cleaned.length === 11 && cleaned.startsWith('54')) {
+      return `+${cleaned}`
+    }
+    
+    // Por defecto, asumir formato argentino
+    return `+54${cleaned}`
+  }
+
+  /**
    * Crear o actualizar subscriber
+   * Si el contacto ya existe, intenta obtenerlo y actualizarlo
    */
   static async createOrUpdateSubscriber(data: ManychatLeadData): Promise<ManychatSubscriber | null> {
-    const body: any = {
-      phone: data.phone,
-      first_name: data.first_name,
-      last_name: data.last_name,
-      email: data.email,
-      whatsapp_phone: data.whatsapp_phone || data.phone,
-      has_opt_in_sms: true,
-    }
+    try {
+      // Validar y normalizar teléfono
+      const normalizedPhone = this.validateAndNormalizePhone(data.phone || data.whatsapp_phone || '')
+      const normalizedWhatsappPhone = data.whatsapp_phone 
+        ? this.validateAndNormalizePhone(data.whatsapp_phone)
+        : normalizedPhone
 
-    // Agregar custom fields si existen
-    if (data.custom_fields) {
-      body.custom_fields = data.custom_fields
-    }
+      const body: any = {
+        phone: normalizedPhone,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email,
+        whatsapp_phone: normalizedWhatsappPhone,
+        has_opt_in_sms: true,
+      }
 
-    const response = await this.executeWithRateLimit(() =>
-      this.makeRequest<ManychatSubscriber>({
-        method: 'POST',
-        endpoint: `/fb/subscriber/createSubscriber`,
-        body,
-      })
-    )
+      // Agregar custom fields si existen
+      if (data.custom_fields) {
+        body.custom_fields = data.custom_fields
+      }
 
-    if (response.status === 'success' && response.data) {
-      // Si hay tags, agregarlos
-      if (data.tags && data.tags.length > 0 && response.data.id) {
-        for (const tagName of data.tags) {
-          await this.addTagToSubscriber(response.data.id, tagName)
+      const response = await this.executeWithRateLimit(() =>
+        this.makeRequest<ManychatSubscriber>({
+          method: 'POST',
+          endpoint: `/fb/subscriber/createSubscriber`,
+          body,
+        })
+      )
+
+      if (response.status === 'success' && response.data) {
+        // Si hay tags, agregarlos
+        if (data.tags && data.tags.length > 0 && response.data.id) {
+          for (const tagName of data.tags) {
+            await this.addTagToSubscriber(response.data.id, tagName)
+          }
+        }
+
+        logger.info('Subscriber creado exitosamente en ManyChat', {
+          subscriberId: response.data.id,
+          phone: normalizedPhone
+        })
+
+        return response.data
+      }
+
+      // Si el error indica que el contacto ya existe, intentar obtenerlo
+      if (response.error && (
+        response.error.toLowerCase().includes('already exists') ||
+        response.error.toLowerCase().includes('duplicate') ||
+        response.error_code === 'subscriber_exists'
+      )) {
+        logger.info('Contacto ya existe en ManyChat, intentando obtenerlo', {
+          phone: normalizedPhone
+        })
+
+        // Intentar obtener el subscriber existente por teléfono
+        const existingSubscriber = await this.getSubscriberByPhone(normalizedPhone)
+        
+        if (existingSubscriber) {
+          logger.info('Subscriber existente encontrado en ManyChat', {
+            subscriberId: existingSubscriber.id,
+            phone: normalizedPhone
+          })
+
+          // Actualizar custom fields si se proporcionaron
+          if (data.custom_fields && existingSubscriber.id) {
+            for (const [fieldName, fieldValue] of Object.entries(data.custom_fields)) {
+              try {
+                await this.setCustomField(existingSubscriber.id, fieldName, fieldValue)
+              } catch (error: any) {
+                logger.warn('Error actualizando custom field', {
+                  subscriberId: existingSubscriber.id,
+                  fieldName,
+                  error: error.message
+                })
+              }
+            }
+          }
+
+          // Agregar tags si se proporcionaron
+          if (data.tags && data.tags.length > 0 && existingSubscriber.id) {
+            for (const tagName of data.tags) {
+              try {
+                await this.addTagToSubscriber(existingSubscriber.id, tagName)
+              } catch (error: any) {
+                logger.warn('Error agregando tag', {
+                  subscriberId: existingSubscriber.id,
+                  tagName,
+                  error: error.message
+                })
+              }
+            }
+          }
+
+          return existingSubscriber
+        }
+
+        // Si no se pudo encontrar, intentar con whatsapp_phone
+        if (normalizedWhatsappPhone !== normalizedPhone) {
+          const existingByWhatsapp = await this.getSubscriberByPhone(normalizedWhatsappPhone)
+          if (existingByWhatsapp) {
+            logger.info('Subscriber existente encontrado por WhatsApp', {
+              subscriberId: existingByWhatsapp.id,
+              whatsappPhone: normalizedWhatsappPhone
+            })
+            return existingByWhatsapp
+          }
         }
       }
 
-      return response.data
-    }
+      logger.error('Error creando subscriber en Manychat', {
+        error: response.error,
+        error_code: response.error_code,
+        phone: normalizedPhone
+      })
 
-    console.error('Error creando subscriber en Manychat:', response.error)
-    return null
+      return null
+    } catch (error: any) {
+      logger.error('Excepción al crear/actualizar subscriber en ManyChat', {
+        error: error.message,
+        stack: error.stack,
+        phone: data.phone
+      })
+      return null
+    }
+  }
+
+  /**
+   * Crear contacto de WhatsApp específicamente
+   * Optimizado para crear contactos de WhatsApp con validaciones adicionales
+   */
+  static async createWhatsAppSubscriber(data: {
+    phone: string
+    first_name?: string
+    last_name?: string
+    email?: string
+    custom_fields?: Record<string, any>
+    tags?: string[]
+  }): Promise<ManychatSubscriber | null> {
+    try {
+      // Validar que el teléfono esté presente
+      if (!data.phone) {
+        throw new Error('Teléfono requerido para crear contacto de WhatsApp')
+      }
+
+      // Normalizar teléfono
+      const normalizedPhone = this.validateAndNormalizePhone(data.phone)
+
+      // Preparar datos específicos para WhatsApp
+      const manychatData: ManychatLeadData = {
+        phone: normalizedPhone,
+        whatsapp_phone: normalizedPhone, // Para WhatsApp, ambos deben ser iguales
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email,
+        custom_fields: {
+          ...data.custom_fields,
+          origen: data.custom_fields?.origen || 'whatsapp',
+        },
+        tags: data.tags || [],
+      }
+
+      logger.info('Creando contacto de WhatsApp en ManyChat', {
+        phone: normalizedPhone,
+        firstName: data.first_name
+      })
+
+      return await this.createOrUpdateSubscriber(manychatData)
+    } catch (error: any) {
+      logger.error('Error creando contacto de WhatsApp en ManyChat', {
+        error: error.message,
+        phone: data.phone
+      })
+      return null
+    }
   }
 
   /**

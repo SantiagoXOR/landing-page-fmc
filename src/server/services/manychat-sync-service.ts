@@ -37,27 +37,49 @@ export class ManychatSyncService {
         const [firstName, ...lastNameParts] = (lead.nombre || '').split(' ')
         const lastName = lastNameParts.join(' ')
 
-        const manychatData: ManychatLeadData = {
-          phone: lead.telefono,
-          first_name: firstName,
-          last_name: lastName || undefined,
-          email: lead.email || undefined,
-          whatsapp_phone: lead.telefono,
-          custom_fields: {
-            dni: lead.dni || undefined,
-            ingresos: lead.ingresos || undefined,
-            zona: lead.zona || undefined,
-            producto: lead.producto || undefined,
-            monto: lead.monto || undefined,
-            origen: lead.origen || undefined,
-            estado: lead.estado || undefined,
-            agencia: lead.agencia || undefined,
-          },
-          tags: lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : [],
-        }
+        // Si el origen es WhatsApp, usar el método optimizado
+        let subscriber
+        if (lead.origen === 'whatsapp') {
+          subscriber = await ManychatService.createWhatsAppSubscriber({
+            phone: lead.telefono,
+            first_name: firstName,
+            last_name: lastName || undefined,
+            email: lead.email || undefined,
+            custom_fields: {
+              dni: lead.dni || undefined,
+              ingresos: lead.ingresos || undefined,
+              zona: lead.zona || undefined,
+              producto: lead.producto || undefined,
+              monto: lead.monto || undefined,
+              origen: lead.origen || 'whatsapp',
+              estado: lead.estado || undefined,
+              agencia: lead.agencia || undefined,
+            },
+            tags: lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : [],
+          })
+        } else {
+          // Para otros orígenes, usar el método estándar
+          const manychatData: ManychatLeadData = {
+            phone: lead.telefono,
+            first_name: firstName,
+            last_name: lastName || undefined,
+            email: lead.email || undefined,
+            whatsapp_phone: lead.telefono,
+            custom_fields: {
+              dni: lead.dni || undefined,
+              ingresos: lead.ingresos || undefined,
+              zona: lead.zona || undefined,
+              producto: lead.producto || undefined,
+              monto: lead.monto || undefined,
+              origen: lead.origen || undefined,
+              estado: lead.estado || undefined,
+              agencia: lead.agencia || undefined,
+            },
+            tags: lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : [],
+          }
 
-        // Crear o actualizar subscriber en Manychat
-        const subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+          subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+        }
 
         if (!subscriber) {
           throw new Error('No se pudo crear/actualizar subscriber en Manychat')

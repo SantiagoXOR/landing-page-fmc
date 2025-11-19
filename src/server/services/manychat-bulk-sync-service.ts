@@ -26,6 +26,7 @@ export interface BulkSyncResult {
   created: number
   updated: number
   errors: number
+  messagesSynced?: number // Mensajes históricos sincronizados
   errorMessages: string[]
   duration: number
 }

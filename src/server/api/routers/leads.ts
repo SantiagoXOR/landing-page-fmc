@@ -120,26 +120,48 @@ export const leadsRouter = createTRPCRouter({
             const [firstName, ...lastNameParts] = (input.nombre || '').split(' ')
             const lastName = lastNameParts.join(' ') || undefined
 
-            const manychatData = {
-              phone: input.telefono,
-              first_name: firstName,
-              last_name: lastName,
-              email: input.email || undefined,
-              whatsapp_phone: input.telefono,
-              custom_fields: {
-                dni: input.dni || undefined,
-                ingresos: input.ingresos ?? undefined,
-                zona: input.zona || undefined,
-                producto: input.producto || undefined,
-                monto: input.monto ?? undefined,
-                origen: input.origen || 'web',
-                estado: input.estado || 'NUEVO',
-                agencia: input.agencia || undefined,
-              },
-              tags: []
-            }
+            // Si el origen es WhatsApp, usar el método optimizado
+            if (input.origen === 'whatsapp') {
+              subscriber = await ManychatService.createWhatsAppSubscriber({
+                phone: input.telefono,
+                first_name: firstName,
+                last_name: lastName,
+                email: input.email || undefined,
+                custom_fields: {
+                  dni: input.dni || undefined,
+                  ingresos: input.ingresos ?? undefined,
+                  zona: input.zona || undefined,
+                  producto: input.producto || undefined,
+                  monto: input.monto ?? undefined,
+                  origen: input.origen || 'whatsapp',
+                  estado: input.estado || 'NUEVO',
+                  agencia: input.agencia || undefined,
+                },
+                tags: []
+              })
+            } else {
+              // Para otros orígenes, usar el método estándar
+              const manychatData = {
+                phone: input.telefono,
+                first_name: firstName,
+                last_name: lastName,
+                email: input.email || undefined,
+                whatsapp_phone: input.telefono,
+                custom_fields: {
+                  dni: input.dni || undefined,
+                  ingresos: input.ingresos ?? undefined,
+                  zona: input.zona || undefined,
+                  producto: input.producto || undefined,
+                  monto: input.monto ?? undefined,
+                  origen: input.origen || 'web',
+                  estado: input.estado || 'NUEVO',
+                  agencia: input.agencia || undefined,
+                },
+                tags: []
+              }
 
-            subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+              subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+            }
             
             if (subscriber && subscriber.id) {
               manychatId = String(subscriber.id)

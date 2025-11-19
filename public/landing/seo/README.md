@@ -38,3 +38,6 @@ Se han creado archivos SVG como base. Para generar las imágenes PNG finales:
 
 Los archivos SVG actuales son placeholders. Se recomienda crear versiones PNG optimizadas con el logo real y diseño profesional.
 
+
+
+

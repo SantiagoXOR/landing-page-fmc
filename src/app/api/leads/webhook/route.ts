@@ -112,26 +112,48 @@ export async function POST(request: NextRequest) {
         const [firstName, ...lastNameParts] = (validatedData.nombre || '').split(' ')
         const lastName = lastNameParts.join(' ') || undefined
 
-        const manychatData = {
-          phone: validatedData.telefono,
-          first_name: firstName,
-          last_name: lastName,
-          email: validatedData.email || undefined,
-          whatsapp_phone: validatedData.telefono,
-          custom_fields: {
-            dni: validatedData.dni || undefined,
-            ingresos: validatedData.ingresos ?? undefined,
-            zona: validatedData.zona || undefined,
-            producto: validatedData.producto || undefined,
-            monto: validatedData.monto ?? undefined,
-            origen: validatedData.origen || 'web',
-            estado: validatedData.estado || 'NUEVO',
-            agencia: validatedData.agencia || undefined,
-          },
-          tags: validatedData.tags || []
-        }
+        // Si el origen es WhatsApp, usar el método optimizado
+        if (validatedData.origen === 'whatsapp') {
+          subscriber = await ManychatService.createWhatsAppSubscriber({
+            phone: validatedData.telefono,
+            first_name: firstName,
+            last_name: lastName,
+            email: validatedData.email || undefined,
+            custom_fields: {
+              dni: validatedData.dni || undefined,
+              ingresos: validatedData.ingresos ?? undefined,
+              zona: validatedData.zona || undefined,
+              producto: validatedData.producto || undefined,
+              monto: validatedData.monto ?? undefined,
+              origen: validatedData.origen || 'whatsapp',
+              estado: validatedData.estado || 'NUEVO',
+              agencia: validatedData.agencia || undefined,
+            },
+            tags: validatedData.tags || []
+          })
+        } else {
+          // Para otros orígenes, usar el método estándar
+          const manychatData = {
+            phone: validatedData.telefono,
+            first_name: firstName,
+            last_name: lastName,
+            email: validatedData.email || undefined,
+            whatsapp_phone: validatedData.telefono,
+            custom_fields: {
+              dni: validatedData.dni || undefined,
+              ingresos: validatedData.ingresos ?? undefined,
+              zona: validatedData.zona || undefined,
+              producto: validatedData.producto || undefined,
+              monto: validatedData.monto ?? undefined,
+              origen: validatedData.origen || 'web',
+              estado: validatedData.estado || 'NUEVO',
+              agencia: validatedData.agencia || undefined,
+            },
+            tags: validatedData.tags || []
+          }
 
-        subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+          subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
+        }
         
         if (subscriber && subscriber.id) {
           manychatId = String(subscriber.id)

@@ -177,11 +177,25 @@ export class ManychatService {
    * Obtener subscriber por teléfono (WhatsApp)
    */
   static async getSubscriberByPhone(phone: string): Promise<ManychatSubscriber | null> {
+    if (!phone || typeof phone !== 'string') {
+      logger.warn('Teléfono inválido para buscar subscriber', { phone })
+      return null
+    }
+
     // Normalizar teléfono antes de buscar
-    const normalizedPhone = this.validateAndNormalizePhone(phone)
+    let normalizedPhone: string
+    try {
+      normalizedPhone = this.validateAndNormalizePhone(phone)
+    } catch (error: any) {
+      logger.warn('Error normalizando teléfono para buscar subscriber', {
+        phone: phone.substring(0, 5) + '***',
+        error: error.message
+      })
+      return null
+    }
     
     if (!normalizedPhone) {
-      logger.warn('Teléfono inválido para buscar subscriber', { phone })
+      logger.warn('Teléfono normalizado está vacío', { phone: phone.substring(0, 5) + '***' })
       return null
     }
 

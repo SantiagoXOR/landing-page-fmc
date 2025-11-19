@@ -4,9 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 
 const AssistantCreateSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),

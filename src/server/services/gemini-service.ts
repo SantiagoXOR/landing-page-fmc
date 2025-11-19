@@ -4,10 +4,8 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-
-const prisma = new PrismaClient()
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -110,17 +108,24 @@ export class GeminiService {
       const systemInstruction = assistant.instrucciones || 'Eres un asistente virtual útil y amigable.'
 
       // Preparar el historial de mensajes
-      // Gemini usa un formato diferente, necesitamos convertir los mensajes
-      const history = messages
-        .filter(msg => msg.role !== 'system') // Filtrar mensajes de sistema
-        .map(msg => ({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.content }]
-        }))
+      // Gemini requiere pares user-model alternados
+      const filteredMessages = messages.filter(msg => msg.role !== 'system')
+      const lastMessage = filteredMessages[filteredMessages.length - 1]
+      
+      if (!lastMessage || lastMessage.role !== 'user') {
+        throw new Error('El último mensaje debe ser del usuario')
+      }
+
+      // Construir historial (todos excepto el último mensaje)
+      const historyMessages = filteredMessages.slice(0, -1)
+      const history = historyMessages.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }]
+      }))
 
       // Crear el chat con historial
       const chat = model.startChat({
-        history: history.slice(0, -1), // Todos excepto el último mensaje
+        history: history,
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -129,12 +134,6 @@ export class GeminiService {
         },
         systemInstruction: systemInstruction
       })
-
-      // Obtener el último mensaje del usuario
-      const lastMessage = messages[messages.length - 1]
-      if (!lastMessage || lastMessage.role !== 'user') {
-        throw new Error('El último mensaje debe ser del usuario')
-      }
 
       // Enviar el mensaje y obtener respuesta
       const result = await chat.sendMessage(lastMessage.content)

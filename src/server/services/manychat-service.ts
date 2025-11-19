@@ -205,14 +205,13 @@ export class ManychatService {
     })
 
     // Manychat API requiere GET con params para findBySystemField
-    // El formato debe ser: ?field_name=phone&field_value=...
+    // El formato debe ser: ?phone=... (solo phone o email, no ambos)
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest<ManychatSubscriber>({
         method: 'GET',
         endpoint: `/fb/subscriber/findBySystemField`,
         params: { 
-          field_name: 'phone',
-          field_value: normalizedPhone,
+          phone: normalizedPhone,
         },
       })
     )

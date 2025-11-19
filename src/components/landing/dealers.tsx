@@ -12,7 +12,7 @@ type Dealer = {
 }
 
 const DEALERS: Dealer[] = [
-  { name: 'GIULIANO MOTOS', address: 'Mitre esq, Av. Napoleón Uriburu S/N', phone: '0370-452-9498', brands: ['CORVEN', 'MOTOMEL', 'SUZUKI', 'BAJAJ', 'MONDIAL'], zone: 'Capital' },
+  { name: 'GIULIANO MOTOS', address: 'Mitre esq, Av. Napoleón Uriburu S/N', phone: '*3704997344 y *3704628777', brands: ['CORVEN', 'MOTOMEL', 'SUZUKI', 'BAJAJ', 'MONDIAL'], zone: 'Capital' },
   { name: 'SAAVEDRA MOTORS', address: 'Saavedra 2125', phone: '0370-485-8982', brands: ['HONDA', 'YAMAHA', 'MOTOMEL', 'SUZUKI', 'ZANELLA', 'OKINOI'], zone: 'Capital' },
   { name: 'CRÉDITO GESTIÓN', address: 'Padre Pacifico Scozzina 445', phone: '0370-498-3866', brands: ['YAMAHA', 'ZANELLA', 'MOTOMEL', 'CORVEN', 'GILERA', 'KELLER', 'BRAVA', 'ROUSER', 'SIAM'], zone: 'Capital' },
   { name: 'MAQUIMOT', address: 'Julio A. Roca 610', phone: '0370-485-8840', brands: ['KELLER', 'CORVEN', 'ZANELLA', 'BAJAJ', 'MOTOMEL'], zone: 'Capital' },
@@ -23,7 +23,7 @@ const DEALERS: Dealer[] = [
   { name: 'RIO BERMEJO S.A', address: 'Av. 25 de Mayo 1264', phone: '0370-426-4934', brands: ['HONDA', 'BAJAJ', 'TRIAX', 'KELLER'], zone: 'Capital' },
   { name: 'PEREZ AUTOMOTORES', address: 'Belgrano 97', phone: '0370-420-7298', brands: ['KAWASAKI'], zone: 'Capital' },
   { name: 'VERA MOTOS Y TRUCKS', address: 'Saavedra 828', phone: '0370-431-9538', brands: ['HONDA'], zone: 'Capital' },
-  { name: 'NACER, YAMIL ANGEL', address: '9 de julio 0444', phone: '0370-426-4561', brands: ['YAMAHA'], zone: 'Capital' },
+  { name: 'NACER, YAMIL ANGEL', address: '*9 DE JULIO 444', phone: '0370-426-4561', brands: ['YAMAHA'], zone: 'Capital' },
   { name: 'MOTOLANDIA', address: 'Belgrano y Sarmiento', phone: '0371-841-3868', brands: ['GUERRERO'], zone: 'Interior' },
   { name: 'MAYANS SRL', address: 'Av. 12 de Octubre 1145', phone: '0371-844-4917', brands: ['HONDA'], zone: 'Interior' },
   { name: 'PUCARA MOTOS', address: 'Rivadavia 555', phone: '0370-427-6950', brands: ['KELLER', 'BAJAJ', 'MOTOMEL', 'MONDIAL'], zone: 'Capital' },

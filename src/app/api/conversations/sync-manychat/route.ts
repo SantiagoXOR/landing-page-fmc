@@ -171,7 +171,30 @@ export async function POST() {
         const subscriber = await ManychatService.getSubscriberById(subscriberId)
         
         if (!subscriber) {
-          logger.warn(`Subscriber ${subscriberId} no encontrado en Manychat`)
+          logger.warn(`Subscriber ${subscriberId} no encontrado en Manychat`, {
+            leadId: lead.id,
+            manychatId: subscriberId,
+            action: 'SKIP_SYNC'
+          })
+          
+          // Opcional: Limpiar manychatId si el subscriber ya no existe
+          // Esto evita intentar sincronizar con IDs inválidos en el futuro
+          try {
+            await supabase.client
+              .from('Lead')
+              .update({ 
+                manychatId: null,
+                updatedAt: new Date().toISOString()
+              })
+              .eq('id', lead.id)
+            
+            logger.info(`manychatId limpiado para lead ${lead.id} (subscriber ${subscriberId} no existe)`)
+          } catch (cleanupError: any) {
+            logger.warn(`Error limpiando manychatId para lead ${lead.id}`, {
+              error: cleanupError.message
+            })
+          }
+          
           continue
         }
 

@@ -121,18 +121,66 @@ export async function POST(request: NextRequest) {
       })
 
       // Determinar el tipo de evento basado en los datos disponibles
-      let eventType = 'message_received' // Por defecto, asumimos mensaje recibido
+      // Mejoramos la detección para identificar correctamente nuevos suscriptores
+      let eventType = 'new_subscriber' // Por defecto, priorizamos new_subscriber
       
-      // Si hay last_input_text, es un mensaje recibido
-      if (body.last_input_text) {
-        eventType = 'message_received'
-      } else if (body.subscribed && !body.last_interaction) {
-        // Si tiene subscribed pero no last_interaction, podría ser nuevo subscriber
+      // Verificar si la suscripción es reciente (últimas 24 horas)
+      const isRecentSubscription = body.subscribed ? (() => {
+        try {
+          const subscribedTime = new Date(body.subscribed).getTime()
+          const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000)
+          return subscribedTime > oneDayAgo
+        } catch {
+          return false
+        }
+      })() : false
+
+      // Verificar si la última interacción es muy reciente (última hora)
+      const hasRecentInteraction = body.last_interaction ? (() => {
+        try {
+          const lastInteractionTime = new Date(body.last_interaction).getTime()
+          const oneHourAgo = Date.now() - (60 * 60 * 1000)
+          return lastInteractionTime > oneHourAgo
+        } catch {
+          return false
+        }
+      })() : false
+
+      // Lógica mejorada de detección:
+      if (isRecentSubscription) {
+        // Suscripción reciente (últimas 24 horas) = nuevo suscriptor
+        // Incluso si tiene last_input_text, si la suscripción es reciente, es nuevo suscriptor
         eventType = 'new_subscriber'
-      } else {
-        // Por defecto, subscriber actualizado
+      } else if (body.subscribed && !body.last_interaction) {
+        // Tiene fecha de suscripción pero no tiene interacciones = nuevo suscriptor
+        eventType = 'new_subscriber'
+      } else if (body.last_input_text && hasRecentInteraction) {
+        // Tiene mensaje Y la interacción es muy reciente (última hora) = mensaje recibido
+        // Solo si la interacción es muy reciente, tratamos como mensaje
+        eventType = 'message_received'
+      } else if (body.last_input_text && !hasRecentInteraction && isRecentSubscription) {
+        // Tiene mensaje pero la interacción no es reciente Y la suscripción es reciente
+        // = nuevo suscriptor que envió mensaje
+        eventType = 'new_subscriber'
+      } else if (body.last_input_text && !body.subscribed) {
+        // Tiene mensaje pero no tiene fecha de suscripción = mensaje recibido
+        eventType = 'message_received'
+      } else if (!body.subscribed && body.last_interaction) {
+        // No tiene suscripción pero tiene interacción = actualización
         eventType = 'subscriber_updated'
       }
+      // Si no cumple ninguna condición, mantiene 'new_subscriber' por defecto
+
+      logger.info('Detección de tipo de evento mejorada', {
+        eventType,
+        isRecentSubscription,
+        hasRecentInteraction,
+        hasLastInputText: !!body.last_input_text,
+        hasSubscribed: !!body.subscribed,
+        hasLastInteraction: !!body.last_interaction,
+        subscribedDate: body.subscribed,
+        lastInteractionDate: body.last_interaction
+      })
 
       // Transformar al formato esperado
       // Convertir id a número si es posible, sino mantener como string

@@ -132,17 +132,42 @@ export class ManychatService {
 
   /**
    * Obtener información de un subscriber por ID
+   * @param subscriberId - ID del subscriber (puede ser number o string para IDs grandes de Facebook)
    */
-  static async getSubscriberById(subscriberId: number): Promise<ManychatSubscriber | null> {
+  static async getSubscriberById(subscriberId: number | string): Promise<ManychatSubscriber | null> {
+    // Convertir a string para evitar problemas con números muy grandes (IDs de Facebook)
+    const subscriberIdStr = String(subscriberId)
+    
+    // Validar que el ID no esté vacío
+    if (!subscriberIdStr || subscriberIdStr === 'NaN' || subscriberIdStr === 'null' || subscriberIdStr === 'undefined') {
+      logger.warn('ID de subscriber inválido', { subscriberId, subscriberIdStr })
+      return null
+    }
+
+    logger.debug('Obteniendo información de subscriber desde Manychat', {
+      subscriberId: subscriberIdStr,
+      originalType: typeof subscriberId
+    })
+
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest<ManychatSubscriber>({
         endpoint: `/fb/subscriber/getInfo`,
-        params: { subscriber_id: subscriberId },
+        params: { subscriber_id: subscriberIdStr },
       })
     )
 
     if (response.status === 'success' && response.data) {
       return response.data
+    }
+
+    // Log detallado del error para debugging
+    if (response.status === 'error') {
+      logger.error('Error obteniendo subscriber desde Manychat', {
+        subscriberId: subscriberIdStr,
+        error: response.error,
+        errorCode: response.error_code,
+        details: response.details
+      })
     }
 
     return null
@@ -538,16 +563,19 @@ export class ManychatService {
    * Actualizar custom field de un subscriber
    */
   static async setCustomField(
-    subscriberId: number,
+    subscriberId: number | string,
     fieldName: string,
     value: any
   ): Promise<boolean> {
+    // Convertir a string para evitar problemas con números muy grandes
+    const subscriberIdStr = String(subscriberId)
+    
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest({
         method: 'POST',
         endpoint: `/fb/subscriber/setCustomField`,
         body: {
-          subscriber_id: subscriberId,
+          subscriber_id: subscriberIdStr,
           field_name: fieldName,
           field_value: value,
         },
@@ -581,13 +609,16 @@ export class ManychatService {
   /**
    * Agregar tag a un subscriber
    */
-  static async addTagToSubscriber(subscriberId: number, tagName: string): Promise<boolean> {
+  static async addTagToSubscriber(subscriberId: number | string, tagName: string): Promise<boolean> {
+    // Convertir a string para evitar problemas con números muy grandes
+    const subscriberIdStr = String(subscriberId)
+    
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest({
         method: 'POST',
         endpoint: `/fb/subscriber/addTag`,
         body: {
-          subscriber_id: subscriberId,
+          subscriber_id: subscriberIdStr,
           tag_name: tagName,
         },
       })
@@ -599,13 +630,16 @@ export class ManychatService {
   /**
    * Remover tag de un subscriber
    */
-  static async removeTagFromSubscriber(subscriberId: number, tagName: string): Promise<boolean> {
+  static async removeTagFromSubscriber(subscriberId: number | string, tagName: string): Promise<boolean> {
+    // Convertir a string para evitar problemas con números muy grandes
+    const subscriberIdStr = String(subscriberId)
+    
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest({
         method: 'POST',
         endpoint: `/fb/subscriber/removeTag`,
         body: {
-          subscriber_id: subscriberId,
+          subscriber_id: subscriberIdStr,
           tag_name: tagName,
         },
       })

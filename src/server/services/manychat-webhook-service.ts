@@ -607,8 +607,9 @@ export class ManychatWebhookService {
 
   /**
    * Obtener subscriber por ID (helper privado)
+   * Acepta number o string para manejar IDs grandes de Facebook
    */
-  private static async getSubscriberById(subscriberId: number): Promise<ManychatSubscriber | null> {
+  private static async getSubscriberById(subscriberId: number | string): Promise<ManychatSubscriber | null> {
     try {
       return await ManychatService.getSubscriberById(subscriberId)
     } catch (error: any) {

@@ -240,8 +240,9 @@ export class ManychatSyncService {
         return false
       }
 
-      const subscriberId = parseInt(lead.manychatId)
-      if (isNaN(subscriberId)) {
+      // Usar manychatId como string directamente para evitar problemas con IDs grandes
+      const subscriberId = String(lead.manychatId).trim()
+      if (!subscriberId || subscriberId === 'null' || subscriberId === 'undefined' || subscriberId === 'NaN') {
         return false
       }
 
@@ -305,8 +306,9 @@ export class ManychatSyncService {
         return false
       }
 
-      const subscriberId = parseInt(lead.manychatId)
-      if (isNaN(subscriberId)) {
+      // Usar manychatId como string directamente para evitar problemas con IDs grandes
+      const subscriberId = String(lead.manychatId).trim()
+      if (!subscriberId || subscriberId === 'null' || subscriberId === 'undefined' || subscriberId === 'NaN') {
         return false
       }
 
@@ -360,8 +362,9 @@ export class ManychatSyncService {
         return false
       }
 
-      const subscriberId = parseInt(lead.manychatId)
-      if (isNaN(subscriberId)) {
+      // Usar manychatId como string directamente para evitar problemas con IDs grandes
+      const subscriberId = String(lead.manychatId).trim()
+      if (!subscriberId || subscriberId === 'null' || subscriberId === 'undefined' || subscriberId === 'NaN') {
         return false
       }
 

@@ -157,8 +157,9 @@ export class ManychatHistorySyncService {
             // Intentar obtener subscriber por manychatId
             if (lead.manychatId) {
               try {
-                const subscriberId = parseInt(String(lead.manychatId))
-                if (!isNaN(subscriberId)) {
+                // Usar manychatId como string directamente para evitar problemas con IDs grandes
+                const subscriberId = String(lead.manychatId).trim()
+                if (subscriberId && subscriberId !== 'null' && subscriberId !== 'undefined' && subscriberId !== 'NaN') {
                   subscriber = await ManychatService.getSubscriberById(subscriberId)
                 }
               } catch (error: any) {

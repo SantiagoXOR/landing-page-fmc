@@ -157,10 +157,17 @@ export async function POST() {
       try {
         if (!lead.manychatId) continue
 
-        const subscriberId = parseInt(lead.manychatId)
-        if (isNaN(subscriberId)) continue
+        // Usar manychatId como string directamente para evitar problemas con IDs grandes
+        // Los IDs de Facebook/Meta pueden ser muy largos y perder precisión al convertirlos a número
+        const subscriberId = lead.manychatId.trim()
+        
+        if (!subscriberId || subscriberId === 'null' || subscriberId === 'undefined') {
+          logger.warn(`Lead ${lead.id} tiene manychatId inválido: ${lead.manychatId}`)
+          continue
+        }
 
         // Obtener información actualizada del subscriber desde Manychat
+        // Pasar como string para mantener precisión con IDs grandes
         const subscriber = await ManychatService.getSubscriberById(subscriberId)
         
         if (!subscriber) {

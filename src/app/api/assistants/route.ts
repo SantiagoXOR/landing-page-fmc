@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/db'
 
 const AssistantCreateSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
@@ -24,23 +24,37 @@ export async function GET(request: NextRequest) {
 
     checkPermission(session.user.role, 'settings:read')
 
-    const assistants = await prisma.assistant.findMany({
-      orderBy: [
-        { isDefault: 'desc' },
-        { createdAt: 'desc' }
-      ],
-      include: {
-        creator: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true
+    // Obtener asistentes desde Supabase
+    const assistants = await supabase.request('/Assistant?select=*&order=isDefault.desc,createdAt.desc')
+    
+    if (!assistants || !Array.isArray(assistants)) {
+      return NextResponse.json([])
+    }
+    
+    // Obtener información del creador para cada asistente
+    const assistantsWithCreator = await Promise.all(
+      assistants.map(async (assistant: any) => {
+        try {
+          const creator = await supabase.request(`/User?id=eq.${assistant.createdBy}&select=id,name,email&limit=1`)
+          
+          return {
+            ...assistant,
+            creator: creator && creator[0] ? {
+              id: creator[0].id,
+              nombre: creator[0].name || 'Usuario',
+              email: creator[0].email
+            } : null
+          }
+        } catch (error) {
+          return {
+            ...assistant,
+            creator: null
           }
         }
-      }
-    })
+      })
+    )
     
-    return NextResponse.json(assistants)
+    return NextResponse.json(assistantsWithCreator)
 
   } catch (error: any) {
     logger.error('Error in GET /api/assistants', { error: error.message })
@@ -68,31 +82,69 @@ export async function POST(request: NextRequest) {
 
     // Si se marca como predeterminado, desmarcar los demás
     if (validatedData.isDefault) {
-      await prisma.assistant.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false }
-      })
+      try {
+        // Obtener todos los asistentes que están marcados como predeterminados
+        const defaultAssistants = await supabase.request('/Assistant?select=id&isDefault=eq.true')
+        
+        if (Array.isArray(defaultAssistants) && defaultAssistants.length > 0) {
+          // Actualizar cada uno para quitar el flag de predeterminado
+          await Promise.all(
+            defaultAssistants.map((a: any) =>
+              supabase.request(`/Assistant?id=eq.${a.id}`, {
+                method: 'PATCH',
+                headers: { 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ isDefault: false })
+              })
+            )
+          )
+        }
+      } catch (error) {
+        // Si falla, continuar de todas formas
+        logger.warn('Error updating default assistants', { error })
+      }
     }
 
-    const assistant = await prisma.assistant.create({
-      data: {
-        ...validatedData,
-        createdBy: session.user.id
-      },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true
-          }
+    // Crear el asistente
+    const assistantData = {
+      nombre: validatedData.nombre,
+      descripcion: validatedData.descripcion || null,
+      instrucciones: validatedData.instrucciones,
+      isDefault: validatedData.isDefault,
+      isActive: validatedData.isActive,
+      createdBy: session.user.id
+    }
+
+    const assistant = await supabase.request('/Assistant', {
+      method: 'POST',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(assistantData)
+    })
+    
+    const createdAssistant = Array.isArray(assistant) ? assistant[0] : assistant
+    
+    // Obtener información del creador
+    let creator = null
+    try {
+      const creatorData = await supabase.request(`/User?id=eq.${session.user.id}&select=id,name,email&limit=1`)
+      if (creatorData && creatorData[0]) {
+        creator = {
+          id: creatorData[0].id,
+          nombre: creatorData[0].name || 'Usuario',
+          email: creatorData[0].email
         }
       }
-    })
+    } catch (error) {
+      // Continuar sin información del creador
+    }
+    
+    const assistantWithCreator = {
+      ...createdAssistant,
+      creator
+    }
 
-    logger.info('Assistant created', { assistantId: assistant.id }, { userId: session.user.id })
+    logger.info('Assistant created', { assistantId: createdAssistant.id }, { userId: session.user.id })
 
-    return NextResponse.json(assistant, { status: 201 })
+    return NextResponse.json(assistantWithCreator, { status: 201 })
 
   } catch (error: any) {
     logger.error('Error in POST /api/assistants', { error: error.message })
@@ -108,7 +160,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error.message 
+    }, { status: 500 })
   }
 }
-

@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
 export interface ChatMessage {
@@ -87,14 +87,14 @@ export class GeminiService {
         }
       }
 
-      // Obtener el asistente de la base de datos
-      const assistant = await prisma.assistant.findUnique({
-        where: { id: assistantId }
-      })
-
-      if (!assistant) {
+      // Obtener el asistente de la base de datos usando Supabase
+      const assistants = await supabase.request(`/Assistant?id=eq.${assistantId}&select=*&limit=1`)
+      
+      if (!assistants || !Array.isArray(assistants) || assistants.length === 0) {
         throw new Error(`Asistente no encontrado: ${assistantId}`)
       }
+      
+      const assistant = assistants[0]
 
       if (!assistant.isActive) {
         throw new Error(`El asistente "${assistant.nombre}" está inactivo`)

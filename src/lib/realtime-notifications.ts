@@ -57,10 +57,21 @@ class RealtimeNotificationClient extends EventEmitter {
     this.isConnecting = true
     
     try {
-      // En desarrollo, usar ws://localhost:3001, en producción usar wss://
-      const wsUrl = process.env.NODE_ENV === 'development' 
-        ? 'ws://localhost:3001/ws'
-        : `wss://${window.location.host}/ws`
+      // En desarrollo, usar ws://localhost:3001
+      // En producción, WebSockets no están disponibles en Vercel serverless
+      // Solo intentar conectar en desarrollo o si hay un servidor WebSocket externo configurado
+      const wsServerUrl = process.env.NEXT_PUBLIC_WS_SERVER_URL
+      const wsUrl = wsServerUrl 
+        ? `${wsServerUrl}/ws`
+        : process.env.NODE_ENV === 'development' 
+          ? 'ws://localhost:3001/ws'
+          : null
+      
+      if (!wsUrl) {
+        console.log('ℹ️ WebSocket no disponible en producción (Vercel no soporta WebSockets)')
+        this.isConnecting = false
+        return
+      }
       
       this.ws = new WebSocket(wsUrl)
       
@@ -85,10 +96,24 @@ class RealtimeNotificationClient extends EventEmitter {
         this.isConnecting = false
         this.ws = null
         this.emit('disconnected')
+        
+        // En producción, no intentar reconectar ya que WebSockets no están disponibles
+        if (process.env.NODE_ENV === 'production') {
+          console.log('ℹ️ WebSocket no disponible en producción (Vercel serverless)')
+          return
+        }
+        
         this.scheduleReconnect()
       }
 
       this.ws.onerror = (error) => {
+        // En producción, ignorar errores silenciosamente ya que WebSockets no están disponibles
+        if (process.env.NODE_ENV === 'production') {
+          console.log('ℹ️ WebSocket no disponible en producción (Vercel serverless)')
+          this.isConnecting = false
+          return
+        }
+        
         console.warn('⚠️ Error WebSocket (servidor posiblemente no disponible):', error)
         this.isConnecting = false
 
@@ -100,6 +125,13 @@ class RealtimeNotificationClient extends EventEmitter {
         }
       }
     } catch (error) {
+      // En producción, no intentar reconectar ya que WebSockets no están disponibles
+      if (process.env.NODE_ENV === 'production') {
+        console.log('ℹ️ WebSocket no disponible en producción (Vercel serverless)')
+        this.isConnecting = false
+        return
+      }
+      
       console.warn('⚠️ No se pudo crear conexión WebSocket (servidor no disponible):', error)
       this.isConnecting = false
       this.scheduleReconnect()
@@ -107,6 +139,12 @@ class RealtimeNotificationClient extends EventEmitter {
   }
 
   private scheduleReconnect() {
+    // En producción, no intentar reconectar ya que WebSockets no están disponibles
+    if (process.env.NODE_ENV === 'production') {
+      console.log('ℹ️ WebSocket no disponible en producción (Vercel serverless)')
+      return
+    }
+    
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.warn('🚫 Máximo número de intentos de reconexión alcanzado. WebSocket deshabilitado.')
       this.emit('max_reconnects_reached')

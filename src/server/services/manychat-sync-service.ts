@@ -147,12 +147,16 @@ export class ManychatSyncService {
       const customFields = subscriber.custom_fields || {}
       const tags = subscriber.tags?.map(t => t.name) || []
 
+      // Extraer CUIL/CUIT (mantener formato original con guiones)
+      const cuil = customFields.cuit || null
+
       const leadData: any = {
         nombre,
         telefono: phone,
         email: subscriber.email || null,
         manychatId: String(subscriber.id),
         dni: customFields.dni || null,
+        cuil: cuil || null,  // Guardar CUIL en campo separado
         ingresos: customFields.ingresos ?? null,
         zona: customFields.zona || null,
         producto: customFields.producto || null,
@@ -160,7 +164,11 @@ export class ManychatSyncService {
         origen: customFields.origen || 'whatsapp',
         estado: customFields.estado || 'NUEVO',
         agencia: customFields.agencia || null,
+        banco: customFields.banco || null,  // Guardar banco en campo separado
+        trabajo_actual: customFields.trabajo_actual || null,  // Guardar trabajo_actual en campo separado
         tags: JSON.stringify(tags),
+        // Guardar todos los custom_fields como JSON para referencia futura
+        customFields: JSON.stringify(customFields),
         updatedAt: new Date().toISOString(),
       }
 

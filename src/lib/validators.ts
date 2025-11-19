@@ -102,6 +102,11 @@ export const LeadCreateSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
 
+  cuil: z.string()
+    .max(13, 'CUIL no puede exceder 13 caracteres')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+
   ingresos: z.number()
     .positive('Ingresos deben ser positivos')
     .min(50000, 'Ingresos mínimos: $50,000 ARS')
@@ -139,6 +144,16 @@ export const LeadCreateSchema = z.object({
 
   agencia: z.string()
     .max(100, 'Agencia no puede exceder 100 caracteres')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+
+  banco: z.string()
+    .max(100, 'Banco no puede exceder 100 caracteres')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+
+  trabajo_actual: z.string()
+    .max(200, 'Trabajo actual no puede exceder 200 caracteres')
     .optional()
     .or(z.literal('').transform(() => undefined)),
 
@@ -180,6 +195,10 @@ export const LeadUpdateSchema = z.object({
     .transform(val => val ? val.replace(/\D/g, '') : undefined)
     .optional(),
 
+  cuil: z.string()
+    .max(13, 'CUIL no puede exceder 13 caracteres')
+    .optional(),
+
   ingresos: z.number()
     .positive('Ingresos deben ser positivos')
     .min(50000, 'Ingresos mínimos: $50,000 ARS')
@@ -213,6 +232,14 @@ export const LeadUpdateSchema = z.object({
 
   agencia: z.string()
     .max(100, 'Agencia no puede exceder 100 caracteres')
+    .optional(),
+
+  banco: z.string()
+    .max(100, 'Banco no puede exceder 100 caracteres')
+    .optional(),
+
+  trabajo_actual: z.string()
+    .max(200, 'Trabajo actual no puede exceder 200 caracteres')
     .optional(),
 
   notas: z.string()

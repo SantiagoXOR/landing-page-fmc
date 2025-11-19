@@ -8,6 +8,7 @@ interface Lead {
   telefono: string
   email?: string | null
   dni?: string | null
+  cuil?: string | null
   ingresos?: number | null
   zona?: string | null
   producto?: string | null
@@ -16,6 +17,8 @@ interface Lead {
   utmSource?: string | null
   estado?: string
   agencia?: string | null
+  banco?: string | null
+  trabajo_actual?: string | null
   notas?: string | null
   createdAt?: string
   updatedAt?: string

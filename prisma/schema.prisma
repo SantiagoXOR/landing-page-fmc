@@ -14,6 +14,7 @@ model Lead {
   id          String   @id @default(cuid())
   nombre      String
   dni         String?  @unique
+  cuil        String?  // CUIL/CUIT del lead
   telefono    String
   email       String?
   ingresos    Int?
@@ -24,6 +25,8 @@ model Lead {
   utmSource   String?
   estado      String   @default("NUEVO") // NUEVO, EN_REVISION, PREAPROBADO, RECHAZADO, DOC_PENDIENTE, DERIVADO
   agencia     String?
+  banco       String?  // Banco donde cobra el lead
+  trabajo_actual String? // Trabajo actual del lead
   notas       String?
   manychatId  String?  @unique // ID del subscriber en Manychat
   tags        String?  // JSON array de tags de Manychat

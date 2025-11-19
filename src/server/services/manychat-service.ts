@@ -177,18 +177,41 @@ export class ManychatService {
    * Obtener subscriber por teléfono (WhatsApp)
    */
   static async getSubscriberByPhone(phone: string): Promise<ManychatSubscriber | null> {
+    // Normalizar teléfono antes de buscar
+    const normalizedPhone = this.validateAndNormalizePhone(phone)
+    
+    if (!normalizedPhone) {
+      logger.warn('Teléfono inválido para buscar subscriber', { phone })
+      return null
+    }
+
+    logger.debug('Buscando subscriber por teléfono en Manychat', {
+      originalPhone: phone,
+      normalizedPhone: normalizedPhone.substring(0, 5) + '***' // Ocultar parte del teléfono en logs
+    })
+
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest<ManychatSubscriber>({
         endpoint: `/fb/subscriber/findBySystemField`,
         params: { 
           field_name: 'phone',
-          field_value: phone,
+          field_value: normalizedPhone,
         },
       })
     )
 
     if (response.status === 'success' && response.data) {
       return response.data
+    }
+
+    // Log detallado del error para debugging
+    if (response.status === 'error') {
+      logger.error('Error buscando subscriber por teléfono en Manychat', {
+        phone: normalizedPhone.substring(0, 5) + '***',
+        error: response.error,
+        errorCode: response.error_code,
+        details: response.details
+      })
     }
 
     return null

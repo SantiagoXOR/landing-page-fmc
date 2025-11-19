@@ -103,7 +103,19 @@ export async function POST() {
       
       for (const lead of leadsWithoutManychatId) {
         try {
-          if (!lead.telefono) continue
+          if (!lead.telefono) {
+            logger.debug(`Lead ${lead.id} no tiene teléfono, saltando búsqueda en Manychat`)
+            continue
+          }
+
+          // Validar formato básico del teléfono antes de buscar
+          const phoneStr = String(lead.telefono).trim()
+          if (!phoneStr || phoneStr === 'null' || phoneStr === 'undefined' || phoneStr.length < 8) {
+            logger.debug(`Lead ${lead.id} tiene teléfono inválido: ${phoneStr}`, {
+              telefono: phoneStr.substring(0, 5) + '***'
+            })
+            continue
+          }
 
           // Buscar subscriber en Manychat por teléfono
           const subscriber = await ManychatService.getSubscriberByPhone(lead.telefono)
@@ -122,16 +134,30 @@ export async function POST() {
               // Agregar manychatId al objeto lead para usarlo después
               ;(lead as any).manychatId = String(subscriber.id)
               foundSubscribersCount++
-              logger.info(`Lead ${lead.id} ahora tiene manychatId: ${subscriber.id}`)
+              logger.info(`✅ Lead ${lead.id} ahora tiene manychatId: ${subscriber.id}`, {
+                telefono: phoneStr.substring(0, 5) + '***'
+              })
+            } else {
+              logger.warn(`Error actualizando manychatId para lead ${lead.id}`, {
+                error: updateError.message
+              })
             }
 
             // Pequeño delay para respetar rate limits
             await new Promise(resolve => setTimeout(resolve, 50))
+          } else {
+            // Subscriber no encontrado - esto es normal, no es un error
+            logger.debug(`Subscriber no encontrado en Manychat para lead ${lead.id}`, {
+              telefono: phoneStr.substring(0, 5) + '***'
+            })
           }
         } catch (error: any) {
+          // Error al buscar subscriber - continuar con el siguiente lead
           logger.warn(`Error buscando subscriber para lead ${lead.id}`, {
-            error: error.message
+            error: error.message,
+            telefono: lead.telefono ? String(lead.telefono).substring(0, 5) + '***' : 'sin teléfono'
           })
+          // Continuar con el siguiente lead sin fallar toda la sincronización
         }
       }
     }

@@ -128,13 +128,37 @@ POST
 
 ## 📋 Paso 3: Crear Flow para Nuevos Subscribers
 
+### ⚠️ IMPORTANTE: Configuración Correcta del Trigger
+
+**Para asegurar que se creen contactos nuevos en el CRM, es CRÍTICO configurar correctamente el trigger.**
+
 ### 3.1. Crear Nuevo Flow
 
-1. Nombre: `"Webhook CRM - Nuevo Subscriber"`
+1. Nombre: `"Webhook CRM - Nuevo Subscriber"` o `"Webhook CRM - Mensajes Recibidos"`
 
-### 3.2. Configurar Trigger
+### 3.2. Configurar Trigger (⚠️ PASO CRÍTICO)
 
-1. Trigger: **"New Subscriber"** o **"Nuevo Subscriber"**
+**Debes habilitar AMBOS triggers para capturar contactos nuevos:**
+
+#### Opción A: Trigger "Nuevo Contacto Creado" (RECOMENDADO)
+
+1. Haz clic en **"Agregar Trigger"** o **"Add Trigger"**
+2. Selecciona **"Contact Event"** o **"Se produce un evento de contactos"**
+3. Selecciona **"New Contact Created"** o **"Nuevo contacto creado"**
+4. **⚠️ Asegúrate de que este trigger esté HABILITADO (ON/Verde)**
+
+Este trigger se dispara **inmediatamente** cuando se crea un nuevo contacto en Manychat, antes de que complete cualquier flujo.
+
+#### Opción B: Trigger "Otro Flujo" (Para actualizaciones)
+
+1. Haz clic en **"Agregar Trigger"** o **"Add Trigger"**
+2. Selecciona **"Another Flow"** o **"Otro flujo"**
+3. Selecciona el flujo que quieres monitorear (ej: "FLOW 01 - Intake Lead Phronencial")
+4. Este trigger se dispara cuando se **completa** el flujo seleccionado
+
+**⚠️ PROBLEMA COMÚN**: Si solo usas el trigger "Otro flujo", el webhook se dispara cuando el contacto **ya completó el flujo**, lo que significa que el contacto ya existe. Por eso es importante tener **AMBOS triggers habilitados**:
+- **"Nuevo contacto creado"**: Para crear contactos nuevos inmediatamente
+- **"Otro flujo"**: Para actualizar contactos cuando completan flujos
 
 ### 3.3. Agregar Acción HTTP Request
 
@@ -142,24 +166,45 @@ POST
 
 **Método:** `POST`
 
-**Body:**
+**Body (Formato "Full Contact Data" - RECOMENDADO):**
+
+Manychat puede enviar datos en formato "Full Contact Data" que incluye toda la información del contacto. El sistema detecta automáticamente este formato y lo transforma correctamente.
+
+**Opción 1: Usar "Full Contact Data" (Más completo):**
+En Manychat, en la acción HTTP Request, selecciona **"Add Full Contact Data"** o **"+ Añadir Full Contact Data"**. Esto enviará todos los datos del contacto automáticamente.
+
+**Opción 2: Formato JSON manual:**
 ```json
 {
-  "event_type": "new_subscriber",
-  "subscriber_id": "{{subscriber.id}}",
-  "subscriber": {
-    "id": "{{subscriber.id}}",
-    "first_name": "{{subscriber.first_name}}",
-    "last_name": "{{subscriber.last_name}}",
-    "phone": "{{subscriber.phone}}",
-    "whatsapp_phone": "{{subscriber.whatsapp_phone}}",
-    "email": "{{subscriber.email}}",
-    "custom_fields": {{subscriber.custom_fields}},
-    "tags": {{subscriber.tags}}
-  },
-  "timestamp": "{{current_timestamp}}"
+  "id": "{{subscriber.id}}",
+  "key": "{{subscriber.key}}",
+  "first_name": "{{subscriber.first_name}}",
+  "last_name": "{{subscriber.last_name}}",
+  "phone": "{{subscriber.phone}}",
+  "whatsapp_phone": "{{subscriber.whatsapp_phone}}",
+  "email": "{{subscriber.email}}",
+  "custom_fields": {{subscriber.custom_fields}},
+  "tags": {{subscriber.tags}},
+  "subscribed": "{{subscriber.subscribed}}",
+  "last_interaction": "{{subscriber.last_interaction}}"
 }
 ```
+
+**Nota**: El sistema detecta automáticamente si es un nuevo contacto basándose en:
+- Fecha de suscripción reciente (últimas 24 horas)
+- Ausencia de interacciones previas
+- Comparación entre fecha de suscripción e interacción
+
+### 3.4. Verificar Configuración
+
+**Checklist antes de activar:**
+
+- [ ] Trigger "Nuevo contacto creado" está **HABILITADO** (ON/Verde)
+- [ ] Trigger "Otro flujo" está configurado (opcional, para actualizaciones)
+- [ ] URL del webhook es correcta: `https://www.formosafmc.com.ar/api/webhooks/manychat`
+- [ ] Método HTTP es `POST`
+- [ ] Headers incluyen `Content-Type: application/json`
+- [ ] Body incluye datos del contacto (Full Contact Data o formato manual)
 
 ---
 
@@ -247,18 +292,56 @@ Similar al anterior pero con trigger **"Tag Removed"** y `event_type: "tag_remov
 
 Asegúrate de que todos los flows estén **activados** (el interruptor debe estar en verde/ON).
 
-### 2. Enviar Mensaje de Prueba
+### 2. Verificar Configuración del Trigger "Nuevo Contacto"
 
-1. Envía un mensaje de prueba desde WhatsApp a tu número de Manychat
-2. Verifica en `/api/webhooks/manychat/debug` que se recibió el evento
-3. Verifica en la base de datos que se guardaron los datos
+**⚠️ PASO CRÍTICO**: Antes de probar, verifica que el trigger "Nuevo contacto creado" esté habilitado:
 
-### 3. Verificar Logs
+1. Abre el flow "Webhook CRM - Mensajes Recibidos" o "Webhook CRM - Nuevo Subscriber"
+2. Revisa la sección de triggers
+3. Verifica que **"Se produce un evento de contactos" → "Nuevo contacto creado"** esté:
+   - ✅ **HABILITADO** (toggle en verde/ON)
+   - ✅ **NO deshabilitado** (no debe mostrar "Deshabilitado" en gris)
+
+**Si el trigger está deshabilitado:**
+- El webhook solo se disparará cuando se complete un flujo
+- Los contactos nuevos NO se crearán automáticamente
+- Solo se actualizarán contactos existentes
+
+### 3. Probar con Contacto Nuevo
+
+1. **Crear contacto completamente nuevo**:
+   - Usa un número de teléfono que NO exista en Manychat
+   - Envía un mensaje inicial desde WhatsApp
+   - O crea el contacto manualmente en Manychat
+
+2. **Verificar en el CRM**:
+   - El contacto debe aparecer como **nuevo lead** en el CRM
+   - Debe tener el estado "NUEVO"
+   - Debe tener el `manychatId` asociado
+
+3. **Verificar logs**:
+   - Busca en los logs: `🆕 Lead CREADO automáticamente desde subscriber (NUEVO)`
+   - Verifica que el `event_type` sea `new_subscriber`
+   - Verifica que `action: CREATE` aparezca en los logs
+
+### 4. Verificar Logs
 
 Si algo no funciona, revisa:
-- Los logs de Manychat (en cada flow hay un historial de ejecuciones)
-- Los logs de tu aplicación en Vercel
+
+**En Manychat:**
+- Los logs de ejecución del flow (en cada flow hay un historial)
+- Verifica que el webhook se haya ejecutado
+- Verifica el código de respuesta (debe ser 200)
+
+**En el CRM:**
+- Los logs de la aplicación en Vercel
 - El endpoint de debug: `/api/webhooks/manychat/debug`
+- Busca logs con emojis: `📥 Evento NEW_SUBSCRIBER recibido` o `🆕 Lead CREADO`
+
+**Errores comunes:**
+- Si ves `✅ Lead encontrado por teléfono (EXISTENTE)` → El contacto ya existía
+- Si ves `action: UPDATE` en lugar de `action: CREATE` → El contacto no es nuevo
+- Si no ves ningún log → El webhook no se está disparando (verificar triggers)
 
 ---
 

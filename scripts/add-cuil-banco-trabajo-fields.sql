@@ -20,3 +20,4 @@ WHERE table_name = 'Lead'
 AND column_name IN ('cuil', 'banco', 'trabajo_actual')
 ORDER BY column_name;
 
+

@@ -12,19 +12,44 @@ export default function Hero({ className = "" }: HeroProps) {
     fgSpeed: 0.28 
   });
 
-  // Evitar mismatch de hidratación: usar versión 1 por defecto en SSR y
-  // decidir según dispositivo y versión aleatoria sólo después del montaje en el cliente.
-  const [images, setImages] = useState({
-    background: "/landing/hero/hero-bg-desktop-1.svg",
-    foreground: "",
-    titule: "/landing/hero/hero-titule-desktop.svg",
-    text: "/landing/hero/hero-text-desktop.svg"
+  // Inicializar con la versión correcta desde el inicio para evitar cambios visuales
+  // getHeroImages() ahora usa sessionStorage para mantener consistencia
+  const [images, setImages] = useState(() => {
+    // En el cliente, obtener la versión correcta inmediatamente
+    if (typeof window !== "undefined") {
+      return getHeroImages();
+    }
+    // En SSR, usar valores por defecto
+    return {
+      background: "/landing/hero/hero-bg-desktop-1.svg",
+      foreground: "",
+      titule: "/landing/hero/hero-titule-desktop.svg",
+      text: "/landing/hero/hero-text-desktop.svg"
+    };
   });
 
+  // Actualizar imágenes si cambia el tamaño de pantalla (mobile/desktop)
   useEffect(() => {
+    const handleResize = () => {
+      const nextImages = getHeroImages();
+      setImages(prev => ({ ...prev, ...nextImages }));
+    };
+
+    // Verificar en el montaje inicial por si acaso
     const nextImages = getHeroImages();
-    // Mezclar con el estado previo para no perder 'titule' y 'text'
-    setImages(prev => ({ ...prev, ...nextImages }));
+    setImages(prev => {
+      // Solo actualizar si realmente cambió (evitar renders innecesarios)
+      if (prev.background !== nextImages.background || 
+          prev.titule !== nextImages.titule || 
+          prev.text !== nextImages.text) {
+        return { ...prev, ...nextImages };
+      }
+      return prev;
+    });
+
+    // Escuchar cambios de tamaño para cambiar entre mobile/desktop
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return (

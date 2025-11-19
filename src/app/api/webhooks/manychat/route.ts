@@ -86,14 +86,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    logger.info('Webhook recibido de Manychat', {
+    logger.info('📨 Webhook recibido de Manychat', {
       event_type: body.event_type || body.type,
       subscriber_id: body.subscriber_id || body.subscriber?.id || body.id,
       timestamp: new Date().toISOString(),
       hasLastInputText: !!body.last_input_text,
       hasId: !!body.id,
       hasFirstName: !!body.first_name,
-      bodyKeys: Object.keys(body)
+      hasSubscribed: !!body.subscribed,
+      hasLastInteraction: !!body.last_interaction,
+      phone: body.phone || body.whatsapp_phone ? `${(body.phone || body.whatsapp_phone).substring(0, 3)}***` : 'sin teléfono',
+      bodyKeys: Object.keys(body),
+      subscribedDate: body.subscribed,
+      lastInteractionDate: body.last_interaction
     })
 
     // Detectar si viene el formato "Full Contact Data" de Manychat
@@ -129,8 +134,16 @@ export async function POST(request: NextRequest) {
         try {
           const subscribedTime = new Date(body.subscribed).getTime()
           const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000)
-          return subscribedTime > oneDayAgo
-        } catch {
+          const isRecent = subscribedTime > oneDayAgo
+          logger.debug('Verificación de suscripción reciente', {
+            subscribedTime: new Date(subscribedTime).toISOString(),
+            oneDayAgo: new Date(oneDayAgo).toISOString(),
+            isRecent,
+            hoursAgo: Math.round((Date.now() - subscribedTime) / (60 * 60 * 1000))
+          })
+          return isRecent
+        } catch (error: any) {
+          logger.warn('Error parseando fecha de suscripción', { error: error.message, subscribed: body.subscribed })
           return false
         }
       })() : false
@@ -140,38 +153,90 @@ export async function POST(request: NextRequest) {
         try {
           const lastInteractionTime = new Date(body.last_interaction).getTime()
           const oneHourAgo = Date.now() - (60 * 60 * 1000)
-          return lastInteractionTime > oneHourAgo
-        } catch {
+          const isRecent = lastInteractionTime > oneHourAgo
+          logger.debug('Verificación de interacción reciente', {
+            lastInteractionTime: new Date(lastInteractionTime).toISOString(),
+            oneHourAgo: new Date(oneHourAgo).toISOString(),
+            isRecent,
+            minutesAgo: Math.round((Date.now() - lastInteractionTime) / (60 * 1000))
+          })
+          return isRecent
+        } catch (error: any) {
+          logger.warn('Error parseando fecha de interacción', { error: error.message, last_interaction: body.last_interaction })
           return false
         }
       })() : false
 
-      // Lógica mejorada de detección:
+      // Lógica mejorada de detección con prioridad para new_subscriber:
       if (isRecentSubscription) {
         // Suscripción reciente (últimas 24 horas) = nuevo suscriptor
         // Incluso si tiene last_input_text, si la suscripción es reciente, es nuevo suscriptor
         eventType = 'new_subscriber'
+        logger.info('✅ Detectado como NEW_SUBSCRIBER: Suscripción reciente', {
+          subscribedDate: body.subscribed,
+          hoursAgo: Math.round((Date.now() - new Date(body.subscribed).getTime()) / (60 * 60 * 1000))
+        })
       } else if (body.subscribed && !body.last_interaction) {
         // Tiene fecha de suscripción pero no tiene interacciones = nuevo suscriptor
         eventType = 'new_subscriber'
-      } else if (body.last_input_text && hasRecentInteraction) {
-        // Tiene mensaje Y la interacción es muy reciente (última hora) = mensaje recibido
-        // Solo si la interacción es muy reciente, tratamos como mensaje
+        logger.info('✅ Detectado como NEW_SUBSCRIBER: Tiene suscripción pero sin interacciones', {
+          subscribedDate: body.subscribed
+        })
+      } else if (body.subscribed && body.last_interaction && !hasRecentInteraction) {
+        // Tiene suscripción e interacción, pero la interacción NO es reciente
+        // Si la suscripción es más reciente que la interacción, es nuevo suscriptor
+        try {
+          const subscribedTime = new Date(body.subscribed).getTime()
+          const lastInteractionTime = new Date(body.last_interaction).getTime()
+          if (subscribedTime >= lastInteractionTime || (lastInteractionTime - subscribedTime) < (2 * 60 * 60 * 1000)) {
+            // Suscripción es más reciente o muy cercana a la interacción = nuevo suscriptor
+            eventType = 'new_subscriber'
+            logger.info('✅ Detectado como NEW_SUBSCRIBER: Suscripción más reciente que interacción', {
+              subscribedDate: body.subscribed,
+              lastInteractionDate: body.last_interaction,
+              diffHours: Math.round((lastInteractionTime - subscribedTime) / (60 * 60 * 1000))
+            })
+          } else {
+            eventType = 'message_received'
+            logger.info('📩 Detectado como MESSAGE_RECEIVED: Interacción más reciente', {
+              subscribedDate: body.subscribed,
+              lastInteractionDate: body.last_interaction
+            })
+          }
+        } catch {
+          eventType = 'new_subscriber'
+        }
+      } else if (body.last_input_text && hasRecentInteraction && !isRecentSubscription) {
+        // Tiene mensaje Y la interacción es muy reciente (última hora) PERO la suscripción NO es reciente
+        // = mensaje recibido de contacto existente
         eventType = 'message_received'
-      } else if (body.last_input_text && !hasRecentInteraction && isRecentSubscription) {
-        // Tiene mensaje pero la interacción no es reciente Y la suscripción es reciente
-        // = nuevo suscriptor que envió mensaje
-        eventType = 'new_subscriber'
+        logger.info('📩 Detectado como MESSAGE_RECEIVED: Mensaje reciente de contacto existente', {
+          hasLastInputText: true,
+          lastInteractionDate: body.last_interaction
+        })
       } else if (body.last_input_text && !body.subscribed) {
         // Tiene mensaje pero no tiene fecha de suscripción = mensaje recibido
         eventType = 'message_received'
+        logger.info('📩 Detectado como MESSAGE_RECEIVED: Mensaje sin fecha de suscripción', {
+          hasLastInputText: true
+        })
       } else if (!body.subscribed && body.last_interaction) {
         // No tiene suscripción pero tiene interacción = actualización
         eventType = 'subscriber_updated'
+        logger.info('📝 Detectado como SUBSCRIBER_UPDATED: Sin suscripción pero con interacción', {
+          lastInteractionDate: body.last_interaction
+        })
+      } else {
+        // Por defecto, tratar como nuevo suscriptor si no hay información clara
+        eventType = 'new_subscriber'
+        logger.info('✅ Detectado como NEW_SUBSCRIBER: Por defecto (sin información clara)', {
+          hasSubscribed: !!body.subscribed,
+          hasLastInteraction: !!body.last_interaction,
+          hasLastInputText: !!body.last_input_text
+        })
       }
-      // Si no cumple ninguna condición, mantiene 'new_subscriber' por defecto
 
-      logger.info('Detección de tipo de evento mejorada', {
+      logger.info('🎯 Detección de tipo de evento completada', {
         eventType,
         isRecentSubscription,
         hasRecentInteraction,
@@ -179,7 +244,8 @@ export async function POST(request: NextRequest) {
         hasSubscribed: !!body.subscribed,
         hasLastInteraction: !!body.last_interaction,
         subscribedDate: body.subscribed,
-        lastInteractionDate: body.last_interaction
+        lastInteractionDate: body.last_interaction,
+        phone: body.phone || body.whatsapp_phone ? `${(body.phone || body.whatsapp_phone).substring(0, 3)}***` : 'sin teléfono'
       })
 
       // Transformar al formato esperado
@@ -306,11 +372,14 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    logger.info('Webhook procesado exitosamente', {
+    logger.info('✅ Webhook procesado exitosamente', {
       event_type: eventType,
+      subscriber_id: event.subscriber_id,
       leadId: result.leadId,
       conversationId: result.conversationId,
-      messageId: result.messageId
+      messageId: result.messageId,
+      success: result.success,
+      timestamp: new Date().toISOString()
     })
 
     return NextResponse.json({

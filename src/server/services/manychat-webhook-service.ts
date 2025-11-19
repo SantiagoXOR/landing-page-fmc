@@ -41,8 +41,56 @@ export class ManychatWebhookService {
       // Procesar según el tipo de evento
       switch (event.event_type) {
         case 'new_subscriber':
+          logger.info('📥 Evento NEW_SUBSCRIBER recibido', {
+            subscriberId: subscriber.id,
+            phone: subscriber.whatsapp_phone || subscriber.phone || 'sin teléfono',
+            hasMessage: !!event.message,
+            subscribed: subscriber.subscribed
+          })
+
+          // Si es nuevo subscriber pero tiene mensaje, procesar ambos
+          if (event.message) {
+            // Primero crear/actualizar el lead (forzar creación si es nuevo)
+            const leadResult = await this.handleSubscriberEvent(subscriber, true)
+            if (!leadResult.success || !leadResult.leadId) {
+              return leadResult
+            }
+            
+            logger.info('Lead procesado para new_subscriber con mensaje', {
+              leadId: leadResult.leadId,
+              wasCreated: leadResult.wasCreated
+            })
+
+            // Luego procesar el mensaje
+            const messageResult = await this.handleMessageEvent(
+              subscriber, 
+              event.message, 
+              'message_received'
+            )
+            return {
+              success: messageResult.success,
+              leadId: leadResult.leadId || messageResult.leadId,
+              conversationId: messageResult.conversationId,
+              messageId: messageResult.messageId,
+              error: messageResult.error
+            }
+          }
+          
+          // Solo evento de nuevo subscriber sin mensaje
+          const subscriberResult = await this.handleSubscriberEvent(subscriber, true)
+          logger.info('Resultado de procesamiento new_subscriber', {
+            success: subscriberResult.success,
+            leadId: subscriberResult.leadId,
+            wasCreated: subscriberResult.wasCreated
+          })
+          return subscriberResult
+
         case 'subscriber_updated':
-          return await this.handleSubscriberEvent(subscriber)
+          logger.info('📝 Evento SUBSCRIBER_UPDATED recibido', {
+            subscriberId: subscriber.id,
+            phone: subscriber.whatsapp_phone || subscriber.phone || 'sin teléfono'
+          })
+          return await this.handleSubscriberEvent(subscriber, false)
 
         case 'message_received':
         case 'message_sent':
@@ -72,8 +120,15 @@ export class ManychatWebhookService {
   /**
    * Buscar o crear lead desde subscriber de Manychat
    * Prioridad: 1) subscriber_id (manychatId), 2) teléfono
+   * 
+   * @param subscriber - Subscriber de Manychat
+   * @param forceCreate - Si es true, crea un nuevo lead incluso si existe por teléfono (útil para eventos new_subscriber)
+   * @returns ID del lead encontrado o creado
    */
-  static async findOrCreateLeadFromSubscriber(subscriber: ManychatSubscriber): Promise<string | null> {
+  static async findOrCreateLeadFromSubscriber(
+    subscriber: ManychatSubscriber, 
+    forceCreate: boolean = false
+  ): Promise<string | null> {
     try {
       if (!supabase.client) {
         throw new Error('Database connection error')
@@ -82,36 +137,64 @@ export class ManychatWebhookService {
       const subscriberId = String(subscriber.id)
       const phone = subscriber.whatsapp_phone || subscriber.phone || ''
 
+      logger.info('Buscando o creando lead desde subscriber', {
+        subscriberId,
+        phone: phone ? `${phone.substring(0, 3)}***` : 'sin teléfono',
+        forceCreate,
+        hasManychatId: !!subscriberId,
+        hasPhone: !!phone
+      })
+
       // Prioridad 1: Buscar por manychatId (subscriber_id)
       if (subscriberId) {
         const { data: leadByManychatId } = await supabase.client
           .from('Lead')
-          .select('id')
+          .select('id, nombre, telefono, createdAt')
           .eq('manychatId', subscriberId)
           .single()
 
         if (leadByManychatId) {
-          logger.debug('Lead encontrado por manychatId', { leadId: leadByManychatId.id, manychatId: subscriberId })
+          logger.info('✅ Lead encontrado por manychatId (EXISTENTE)', {
+            leadId: leadByManychatId.id,
+            manychatId: subscriberId,
+            nombre: leadByManychatId.nombre,
+            telefono: leadByManychatId.telefono ? `${leadByManychatId.telefono.substring(0, 3)}***` : 'sin teléfono',
+            createdAt: leadByManychatId.createdAt,
+            action: 'UPDATE'
+          })
           return leadByManychatId.id
         }
       }
 
-      // Prioridad 2: Buscar por teléfono
-      if (phone) {
+      // Prioridad 2: Buscar por teléfono (solo si no se fuerza la creación)
+      if (phone && !forceCreate) {
         const { data: leadByPhone } = await supabase.client
           .from('Lead')
-          .select('id')
+          .select('id, nombre, manychatId, createdAt')
           .eq('telefono', phone)
           .single()
 
         if (leadByPhone) {
           // Actualizar lead con manychatId si no lo tiene
+          const updateData: any = { updatedAt: new Date().toISOString() }
+          if (!leadByPhone.manychatId) {
+            updateData.manychatId = subscriberId
+          }
+
           await supabase.client
             .from('Lead')
-            .update({ manychatId: subscriberId, updatedAt: new Date().toISOString() })
+            .update(updateData)
             .eq('id', leadByPhone.id)
 
-          logger.debug('Lead encontrado por teléfono', { leadId: leadByPhone.id, phone })
+          logger.info('✅ Lead encontrado por teléfono (EXISTENTE)', {
+            leadId: leadByPhone.id,
+            phone: `${phone.substring(0, 3)}***`,
+            nombre: leadByPhone.nombre,
+            manychatId: leadByPhone.manychatId || 'sin manychatId',
+            createdAt: leadByPhone.createdAt,
+            action: 'UPDATE',
+            updatedManychatId: !leadByPhone.manychatId
+          })
           return leadByPhone.id
         }
       }
@@ -121,37 +204,72 @@ export class ManychatWebhookService {
         .filter(Boolean)
         .join(' ') || subscriber.name || 'Contacto Manychat'
 
+      const customFields = subscriber.custom_fields || {}
+      const tags = subscriber.tags || []
+
+      const leadData = {
+        nombre,
+        telefono: phone || `manychat_${subscriber.id}`,
+        email: subscriber.email || null,
+        manychatId: subscriberId,
+        origen: subscriber.instagram_id ? 'instagram' : 'whatsapp',
+        estado: customFields.estado || 'NUEVO',
+        dni: customFields.dni || null,
+        cuil: customFields.cuit || customFields.cuil || null,
+        ingresos: customFields.ingresos ?? null,
+        zona: customFields.zona || null,
+        producto: customFields.producto || null,
+        monto: customFields.monto ?? null,
+        agencia: customFields.agencia || null,
+        banco: customFields.banco || null,
+        trabajo_actual: customFields.trabajo_actual || null,
+        tags: tags.length > 0 ? JSON.stringify(tags.map(t => typeof t === 'string' ? t : t.name)) : null,
+        customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
       const { data: newLead, error: createError } = await supabase.client
         .from('Lead')
-        .insert({
-          nombre,
-          telefono: phone || `manychat_${subscriber.id}`,
-          email: subscriber.email || null,
-          manychatId: subscriberId,
-          origen: subscriber.instagram_id ? 'instagram' : 'whatsapp',
-          estado: 'NUEVO',
-          tags: subscriber.tags ? JSON.stringify(subscriber.tags.map(t => t.name)) : null,
-          customFields: subscriber.custom_fields ? JSON.stringify(subscriber.custom_fields) : null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
+        .insert(leadData)
         .select()
         .single()
 
       if (createError) {
-        logger.error('Error creando lead desde subscriber', { error: createError.message })
+        logger.error('❌ Error creando lead desde subscriber', {
+          error: createError.message,
+          errorCode: createError.code,
+          subscriberId,
+          phone: phone ? `${phone.substring(0, 3)}***` : 'sin teléfono',
+          leadData: {
+            nombre,
+            origen: leadData.origen,
+            estado: leadData.estado
+          }
+        })
         throw createError
       }
 
-      logger.info('Lead creado automáticamente desde subscriber', {
+      logger.info('🆕 Lead CREADO automáticamente desde subscriber (NUEVO)', {
         leadId: newLead.id,
         subscriberId: subscriber.id,
-        phone
+        phone: phone ? `${phone.substring(0, 3)}***` : `manychat_${subscriber.id}`,
+        nombre: newLead.nombre,
+        origen: newLead.origen,
+        estado: newLead.estado,
+        hasManychatId: !!newLead.manychatId,
+        action: 'CREATE',
+        timestamp: new Date().toISOString()
       })
 
       return newLead.id
     } catch (error: any) {
-      logger.error('Error en findOrCreateLeadFromSubscriber', { error: error.message })
+      logger.error('❌ Error en findOrCreateLeadFromSubscriber', {
+        error: error.message,
+        stack: error.stack,
+        subscriberId: subscriber.id,
+        phone: subscriber.whatsapp_phone || subscriber.phone || 'sin teléfono'
+      })
       return null
     }
   }
@@ -307,17 +425,51 @@ export class ManychatWebhookService {
   /**
    * Manejar evento de subscriber (nuevo o actualizado)
    */
-  private static async handleSubscriberEvent(subscriber: ManychatSubscriber): Promise<{
+  private static async handleSubscriberEvent(
+    subscriber: ManychatSubscriber,
+    isNewSubscriber: boolean = false
+  ): Promise<{
     success: boolean
     leadId?: string
     error?: string
+    wasCreated?: boolean
   }> {
     try {
-      const leadId = await this.findOrCreateLeadFromSubscriber(subscriber)
+      // Si es nuevo subscriber, forzar creación incluso si existe por teléfono
+      // (pero no si ya existe por manychatId)
+      const leadId = await this.findOrCreateLeadFromSubscriber(subscriber, isNewSubscriber)
 
       if (!leadId) {
+        logger.error('No se pudo encontrar o crear lead', {
+          subscriberId: subscriber.id,
+          phone: subscriber.whatsapp_phone || subscriber.phone || 'sin teléfono',
+          isNewSubscriber
+        })
         return { success: false, error: 'Could not find or create lead' }
       }
+
+      // Verificar si el lead fue creado recientemente (últimos 5 segundos)
+      // para determinar si fue creado o actualizado
+      const { data: lead } = await supabase.client
+        ?.from('Lead')
+        .select('id, createdAt, updatedAt')
+        .eq('id', leadId)
+        .single() || { data: null }
+
+      const wasCreated = lead ? (() => {
+        const createdAt = new Date(lead.createdAt).getTime()
+        const updatedAt = new Date(lead.updatedAt).getTime()
+        const now = Date.now()
+        // Si fue creado en los últimos 5 segundos, es nuevo
+        return (now - createdAt) < 5000 && Math.abs(createdAt - updatedAt) < 1000
+      })() : false
+
+      logger.info(`Procesando evento de subscriber (${isNewSubscriber ? 'NUEVO' : 'ACTUALIZADO'})`, {
+        leadId,
+        subscriberId: subscriber.id,
+        wasCreated,
+        action: wasCreated ? 'CREATE' : 'UPDATE'
+      })
 
       // Sincronizar datos del subscriber al lead
       await ManychatSyncService.syncManychatToLead(subscriber)
@@ -325,8 +477,13 @@ export class ManychatWebhookService {
       // Actualizar actividad
       await this.updateLeadActivity(leadId)
 
-      return { success: true, leadId }
+      return { success: true, leadId, wasCreated }
     } catch (error: any) {
+      logger.error('Error en handleSubscriberEvent', {
+        error: error.message,
+        subscriberId: subscriber.id,
+        isNewSubscriber
+      })
       return { success: false, error: error.message }
     }
   }

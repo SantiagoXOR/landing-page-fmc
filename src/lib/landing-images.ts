@@ -2,16 +2,29 @@
  * Helper functions for selecting appropriate image assets based on device type
  */
 
+const HERO_VERSION_KEY = 'hero-image-version';
+
 export const getHeroImages = () => {
   const isMobile =
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 768px)").matches;
 
-  // Selección aleatoria entre versión 1 y 2 del background
+  // Selección aleatoria consistente usando sessionStorage para evitar cambios visuales
   // Solo se ejecuta en el cliente para evitar hydration mismatch
-  const version = typeof window !== "undefined" 
-    ? (Math.random() < 0.5 ? "1" : "2")
-    : "1"; // Default para SSR
+  let version = "1"; // Default para SSR
+  
+  if (typeof window !== "undefined") {
+    // Verificar si ya tenemos una versión guardada en sessionStorage
+    const savedVersion = sessionStorage.getItem(HERO_VERSION_KEY);
+    
+    if (savedVersion) {
+      version = savedVersion;
+    } else {
+      // Si no existe, generar una nueva y guardarla para esta sesión
+      version = Math.random() < 0.5 ? "1" : "2";
+      sessionStorage.setItem(HERO_VERSION_KEY, version);
+    }
+  }
 
   const backgroundPath = isMobile
     ? `/landing/hero/hero-bg-mobile-${version}.svg`
@@ -19,6 +32,7 @@ export const getHeroImages = () => {
 
   return {
     // Moto unificada en el background con rotación aleatoria entre versiones 1 y 2
+    // Versión persistente durante la sesión para evitar cambios visuales
     background: backgroundPath,
     // No se usa foreground cuando la moto está en el fondo
     foreground: "",

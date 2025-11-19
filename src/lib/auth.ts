@@ -219,10 +219,18 @@ export const authOptions: NextAuthOptions = {
       // Para otros providers o casos, permitir acceso (compatibilidad)
       return true
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, profile }) {
       if (user) {
         token.role = user.role || 'VIEWER'
         token.status = user.status || 'ACTIVE'
+        // Guardar email para buscar el UUID real en la base de datos
+        if (user.email) {
+          token.email = user.email
+        }
+      }
+      // También guardar email del profile si está disponible
+      if (profile?.email) {
+        token.email = profile.email.toLowerCase().trim()
       }
       if (account?.provider === 'google') {
         token.provider = 'google'
@@ -230,7 +238,33 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
-      if (token) {
+      if (token && token.email) {
+        try {
+          // Buscar usuario por email para obtener su UUID real de la base de datos
+          const dbUser = await supabase.findUserByEmailNew(token.email as string)
+          
+          if (dbUser) {
+            // Usar el UUID de la base de datos, no el ID de Google
+            session.user.id = dbUser.id
+            session.user.role = (token.role as UserRole) || dbUser.role || 'VIEWER'
+            session.user.status = (token.status as UserStatus) || dbUser.status || 'ACTIVE'
+          } else {
+            // Fallback: usar el email como ID si no se encuentra en la BD
+            // Esto no debería pasar si el signIn fue exitoso, pero por seguridad
+            console.warn(`[NextAuth] Usuario no encontrado en BD para email: ${token.email}`)
+            session.user.id = token.email // Usar email como fallback
+            session.user.role = (token.role as UserRole) || 'VIEWER'
+            session.user.status = (token.status as UserStatus) || 'ACTIVE'
+          }
+        } catch (error: any) {
+          console.error('[NextAuth] Error obteniendo usuario de BD en session:', error)
+          // Fallback seguro: usar email como ID
+          session.user.id = (token.email as string) || token.sub!
+          session.user.role = (token.role as UserRole) || 'VIEWER'
+          session.user.status = (token.status as UserStatus) || 'ACTIVE'
+        }
+      } else {
+        // Fallback si no hay email en token
         session.user.id = token.sub!
         session.user.role = (token.role as UserRole) || 'VIEWER'
         session.user.status = (token.status as UserStatus) || 'ACTIVE'

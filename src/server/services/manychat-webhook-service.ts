@@ -388,18 +388,41 @@ export class ManychatWebhookService {
         .single()
 
       if (createError) {
-        logger.error('Error guardando mensaje', { error: createError.message })
+        logger.error('❌ Error guardando mensaje en base de datos', {
+          error: createError.message,
+          errorCode: createError.code,
+          conversationId,
+          direction,
+          messageType: message.type,
+          platformMsgId: message.platform_msg_id || message.id,
+          content: content.substring(0, 100) // Primeros 100 caracteres para debug
+        })
         throw createError
       }
 
       // Actualizar última actividad de la conversación
       await ConversationService.updateLastActivity(conversationId)
 
-      logger.debug('Mensaje guardado', { messageId: newMessage.id, direction, conversationId })
+      logger.info('✅ Mensaje guardado exitosamente en base de datos', {
+        messageId: newMessage.id,
+        direction,
+        conversationId,
+        messageType: message.type,
+        platformMsgId: message.platform_msg_id || message.id,
+        contentLength: content.length,
+        hasMedia: !!mediaUrl
+      })
 
       return newMessage.id
     } catch (error: any) {
-      logger.error('Error en saveMessage', { error: error.message })
+      logger.error('❌ Error en saveMessage', {
+        error: error.message,
+        stack: error.stack,
+        conversationId,
+        direction,
+        messageType: message.type,
+        platformMsgId: message.platform_msg_id || message.id
+      })
       return null
     }
   }
@@ -503,33 +526,110 @@ export class ManychatWebhookService {
     error?: string
   }> {
     try {
+      logger.info('📩 Procesando evento de mensaje', {
+        eventType,
+        subscriberId: subscriber.id,
+        messageType: message.type,
+        messageId: message.id || message.platform_msg_id,
+        hasText: !!message.text,
+        phone: subscriber.whatsapp_phone || subscriber.phone || 'sin teléfono'
+      })
+
       // Buscar o crear lead
       const leadId = await this.findOrCreateLeadFromSubscriber(subscriber)
 
       if (!leadId) {
+        logger.error('No se pudo encontrar o crear lead para mensaje', {
+          subscriberId: subscriber.id,
+          eventType,
+          messageId: message.id
+        })
         return { success: false, error: 'Could not find or create lead' }
       }
+
+      logger.debug('Lead encontrado/creado para mensaje', {
+        leadId,
+        subscriberId: subscriber.id
+      })
 
       // Determinar plataforma y platformId
       const platform = subscriber.instagram_id ? 'instagram' : 'whatsapp'
       const platformId = subscriber.instagram_id || subscriber.whatsapp_phone || subscriber.phone || String(subscriber.id)
 
+      logger.debug('Plataforma determinada para mensaje', {
+        platform,
+        platformId: platformId.substring(0, 5) + '***',
+        leadId
+      })
+
       // Buscar o crear conversación
       const conversationId = await this.findOrCreateConversation(leadId, platform, platformId)
 
       if (!conversationId) {
+        logger.error('No se pudo encontrar o crear conversación para mensaje', {
+          leadId,
+          platform,
+          platformId: platformId.substring(0, 5) + '***',
+          subscriberId: subscriber.id
+        })
         return { success: false, error: 'Could not find or create conversation' }
+      }
+
+      logger.debug('Conversación encontrada/creada para mensaje', {
+        conversationId,
+        leadId,
+        platform
+      })
+
+      // Verificar que la conversación existe en la base de datos
+      if (supabase.client) {
+        const { data: conversation, error: convError } = await supabase.client
+          .from('conversations')
+          .select('id')
+          .eq('id', conversationId)
+          .single()
+
+        if (convError || !conversation) {
+          logger.error('Conversación no existe en la base de datos', {
+            conversationId,
+            error: convError?.message,
+            leadId
+          })
+          return { success: false, error: 'Conversation does not exist in database' }
+        }
       }
 
       // Determinar dirección del mensaje
       const direction = eventType === 'message_received' ? 'inbound' : 'outbound'
 
+      logger.debug('Guardando mensaje', {
+        conversationId,
+        direction,
+        messageType: message.type,
+        hasContent: !!(message.text || message.caption)
+      })
+
       // Guardar mensaje
       const messageId = await this.saveMessage(conversationId, message, direction)
 
       if (!messageId) {
+        logger.error('No se pudo guardar mensaje', {
+          conversationId,
+          leadId,
+          messageType: message.type,
+          direction,
+          messageId: message.id || message.platform_msg_id
+        })
         return { success: false, error: 'Could not save message' }
       }
+
+      logger.info('✅ Mensaje guardado exitosamente', {
+        messageId,
+        conversationId,
+        leadId,
+        direction,
+        messageType: message.type
+      })
 
       // Actualizar actividad del lead
       await this.updateLeadActivity(leadId)
@@ -541,6 +641,13 @@ export class ManychatWebhookService {
         messageId
       }
     } catch (error: any) {
+      logger.error('❌ Error en handleMessageEvent', {
+        error: error.message,
+        stack: error.stack,
+        subscriberId: subscriber.id,
+        eventType,
+        messageId: message.id || message.platform_msg_id
+      })
       return { success: false, error: error.message }
     }
   }
@@ -587,20 +694,157 @@ export class ManychatWebhookService {
     error?: string
   }> {
     try {
+      if (!supabase.client) {
+        throw new Error('Database connection error')
+      }
+
+      logger.info('📝 Procesando evento custom_field_changed', {
+        subscriberId: subscriber.id,
+        fieldName: customField.name,
+        fieldValue: customField.value,
+        fieldId: customField.id
+      })
+
       const leadId = await this.findOrCreateLeadFromSubscriber(subscriber)
 
       if (!leadId) {
+        logger.error('No se pudo encontrar o crear lead para custom_field_changed', {
+          subscriberId: subscriber.id,
+          fieldName: customField.name
+        })
         return { success: false, error: 'Could not find or create lead' }
       }
 
-      // Sincronizar subscriber completo para actualizar custom fields
+      // Mapeo de custom fields de Manychat a campos del Lead
+      const fieldMapping: Record<string, string> = {
+        'dni': 'dni',
+        'ingresos': 'ingresos',
+        'zona': 'zona',
+        'producto': 'producto',
+        'monto': 'monto',
+        'origen': 'origen',
+        'estado': 'estado',
+        'agencia': 'agencia',
+        'banco': 'banco',
+        'trabajo_actual': 'trabajo_actual',
+        'cuit': 'cuil',
+        'cuil': 'cuil'
+      }
+
+      const dbFieldName = fieldMapping[customField.name.toLowerCase()]
+
+      // Intentar actualizar el campo específico directamente primero
+      if (dbFieldName) {
+        try {
+          // Obtener el lead actual para preservar otros campos
+          const { data: currentLead, error: fetchError } = await supabase.client
+            .from('Lead')
+            .select('customFields')
+            .eq('id', leadId)
+            .single()
+
+          if (fetchError) {
+            logger.warn('Error obteniendo lead actual para actualizar custom field', {
+              leadId,
+              error: fetchError.message
+            })
+          } else {
+            // Actualizar el campo específico en el lead
+            const updateData: any = {
+              updatedAt: new Date().toISOString()
+            }
+
+            // Actualizar el campo mapeado si existe
+            updateData[dbFieldName] = customField.value !== null && customField.value !== undefined 
+              ? customField.value 
+              : null
+
+            // Actualizar también el JSON de customFields completo
+            let customFieldsJson: Record<string, any> = {}
+            if (currentLead?.customFields) {
+              try {
+                customFieldsJson = typeof currentLead.customFields === 'string' 
+                  ? JSON.parse(currentLead.customFields) 
+                  : currentLead.customFields
+              } catch (parseError) {
+                logger.warn('Error parseando customFields existentes', { leadId })
+                customFieldsJson = {}
+              }
+            }
+
+            // Actualizar el campo en el JSON
+            customFieldsJson[customField.name] = customField.value
+            updateData.customFields = JSON.stringify(customFieldsJson)
+
+            const { error: updateError } = await supabase.client
+              .from('Lead')
+              .update(updateData)
+              .eq('id', leadId)
+
+            if (updateError) {
+              logger.error('Error actualizando custom field directamente', {
+                leadId,
+                fieldName: customField.name,
+                dbFieldName,
+                error: updateError.message
+              })
+              throw updateError
+            }
+
+            logger.info('✅ Custom field actualizado directamente', {
+              leadId,
+              fieldName: customField.name,
+              dbFieldName,
+              value: customField.value
+            })
+
+            // Actualizar actividad
+            await this.updateLeadActivity(leadId)
+
+            return { success: true, leadId }
+          }
+        } catch (directUpdateError: any) {
+          logger.warn('Error en actualización directa de custom field, intentando sincronización completa', {
+            leadId,
+            fieldName: customField.name,
+            error: directUpdateError.message
+          })
+          // Continuar con sincronización completa como fallback
+        }
+      } else {
+        logger.debug('Custom field no tiene mapeo directo, usando sincronización completa', {
+          fieldName: customField.name,
+          leadId
+        })
+      }
+
+      // Fallback: Sincronizar subscriber completo para actualizar custom fields
+      // Esto asegura que todos los campos se actualicen correctamente
+      logger.info('Sincronizando subscriber completo como fallback', {
+        leadId,
+        subscriberId: subscriber.id
+      })
+
       await ManychatSyncService.syncManychatToLead(subscriber)
 
       // Actualizar actividad
       await this.updateLeadActivity(leadId)
 
+      logger.info('✅ Custom field actualizado vía sincronización completa', {
+        leadId,
+        fieldName: customField.name,
+        value: customField.value
+      })
+
       return { success: true, leadId }
     } catch (error: any) {
+      logger.error('❌ Error en handleCustomFieldEvent', {
+        error: error.message,
+        stack: error.stack,
+        subscriberId: subscriber.id,
+        fieldName: customField.name,
+        fieldValue: customField.value
+      })
       return { success: false, error: error.message }
     }
   }

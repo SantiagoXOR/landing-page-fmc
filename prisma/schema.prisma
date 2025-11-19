@@ -67,6 +67,25 @@ model User {
   createdAt DateTime @default(now())
   
   assignedConversations Conversation[]
+  createdAssistants     Assistant[]
+}
+
+model Assistant {
+  id            String   @id @default(cuid())
+  nombre        String
+  descripcion   String?
+  instrucciones String   @db.Text
+  isDefault     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  creator       User     @relation(fields: [createdBy], references: [id])
+  
+  @@index([createdBy])
+  @@index([isActive])
+  @@index([isDefault])
 }
 
 model Rule {

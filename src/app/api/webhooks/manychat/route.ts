@@ -333,6 +333,93 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Normalizar custom_field si existe
+    let normalizedCustomField: { id: number; name: string; value: any } | undefined = undefined
+    
+    if (normalizedBody.custom_field) {
+      // Manychat puede enviar custom_field en diferentes formatos
+      const cf = normalizedBody.custom_field
+      
+      if (typeof cf === 'object' && cf !== null) {
+        // Formato estándar: { id, name, value }
+        if ('name' in cf && 'value' in cf) {
+          normalizedCustomField = {
+            id: cf.id || 0,
+            name: String(cf.name),
+            value: cf.value
+          }
+        } 
+        // Formato alternativo: { field_name, field_value }
+        else if ('field_name' in cf && 'field_value' in cf) {
+          normalizedCustomField = {
+            id: cf.id || cf.field_id || 0,
+            name: String(cf.field_name),
+            value: cf.field_value
+          }
+        }
+        // Formato con clave-valor directo
+        else {
+          // Intentar extraer nombre y valor del objeto
+          const keys = Object.keys(cf)
+          if (keys.length > 0) {
+            const firstKey = keys[0]
+            normalizedCustomField = {
+              id: cf.id || 0,
+              name: firstKey,
+              value: cf[firstKey]
+            }
+          }
+        }
+      }
+
+      logger.info('📝 Custom field normalizado', {
+        original: normalizedBody.custom_field,
+        normalized: normalizedCustomField,
+        eventType
+      })
+    } else if (body.custom_field) {
+      // Si está en el body original pero no en normalizedBody, normalizarlo
+      const cf = body.custom_field
+      if (typeof cf === 'object' && cf !== null) {
+        if ('name' in cf && 'value' in cf) {
+          normalizedCustomField = {
+            id: cf.id || 0,
+            name: String(cf.name),
+            value: cf.value
+          }
+        } else if ('field_name' in cf && 'field_value' in cf) {
+          normalizedCustomField = {
+            id: cf.id || cf.field_id || 0,
+            name: String(cf.field_name),
+            value: cf.field_value
+          }
+        }
+      }
+    }
+
+    // Logging detallado para eventos específicos
+    if (eventType === 'custom_field_changed') {
+      logger.info('🔔 Evento custom_field_changed detectado', {
+        subscriberId: normalizedBody.subscriber_id || body.id,
+        customField: normalizedCustomField,
+        hasSubscriber: !!normalizedBody.subscriber,
+        phone: normalizedBody.subscriber?.phone || normalizedBody.subscriber?.whatsapp_phone || body.phone || body.whatsapp_phone || 'sin teléfono',
+        payload: JSON.stringify(body).substring(0, 500) // Primeros 500 caracteres para debug
+      })
+    }
+
+    if (eventType === 'message_received' || eventType === 'message_sent') {
+      logger.info('📨 Evento de mensaje detectado', {
+        eventType,
+        subscriberId: normalizedBody.subscriber_id || body.id,
+        hasMessage: !!normalizedBody.message,
+        messageType: normalizedBody.message?.type,
+        hasText: !!normalizedBody.message?.text,
+        phone: normalizedBody.subscriber?.phone || normalizedBody.subscriber?.whatsapp_phone || body.phone || body.whatsapp_phone || 'sin teléfono',
+        payload: JSON.stringify(body).substring(0, 500) // Primeros 500 caracteres para debug
+      })
+    }
+
     // Normalizar el evento a nuestro formato (usar normalizedBody después de la transformación)
     const event: ManychatWebhookEvent = {
       event_type: eventType,
@@ -340,13 +427,24 @@ export async function POST(request: NextRequest) {
       subscriber: normalizedBody.subscriber || (normalizedBody.subscriber_id ? undefined : normalizedBody.subscriber),
       message: normalizeMessage(normalizedBody.message),
       tag: normalizedBody.tag,
-      custom_field: normalizedBody.custom_field,
+      custom_field: normalizedCustomField,
       flow: normalizedBody.flow,
       button: normalizedBody.button,
       timestamp: normalizedBody.timestamp || Date.now() / 1000,
       created_at: normalizedBody.created_at,
       data: normalizedBody.data
     }
+
+    // Logging del evento normalizado antes de procesarlo
+    logger.info('📋 Evento normalizado listo para procesar', {
+      event_type: event.event_type,
+      subscriber_id: event.subscriber_id,
+      hasSubscriber: !!event.subscriber,
+      hasMessage: !!event.message,
+      hasCustomField: !!event.custom_field,
+      customFieldName: event.custom_field?.name,
+      customFieldValue: event.custom_field?.value
+    })
 
     // Procesar el evento
     const result = await ManychatWebhookService.processWebhookEvent(event)
@@ -379,7 +477,18 @@ export async function POST(request: NextRequest) {
       conversationId: result.conversationId,
       messageId: result.messageId,
       success: result.success,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      // Información adicional según el tipo de evento
+      ...(eventType === 'custom_field_changed' && {
+        customFieldName: event.custom_field?.name,
+        customFieldValue: event.custom_field?.value,
+        customFieldId: event.custom_field?.id
+      }),
+      ...(eventType === 'message_received' || eventType === 'message_sent' ? {
+        messageType: event.message?.type,
+        messageDirection: eventType === 'message_received' ? 'inbound' : 'outbound',
+        hasMessageContent: !!(event.message?.text || event.message?.caption)
+      } : {})
     })
 
     return NextResponse.json({

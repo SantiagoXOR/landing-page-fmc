@@ -7,6 +7,27 @@ import { logger } from '@/lib/logger'
 export const dynamic = 'force-dynamic'
 
 /**
+ * OPTIONS /api/webhooks/manychat
+ * Manejar preflight requests para CORS (requerido por ManyChat)
+ */
+export async function OPTIONS(request: NextRequest) {
+  logger.info('OPTIONS request recibido (CORS preflight)', {
+    origin: request.headers.get('origin'),
+    method: request.headers.get('access-control-request-method')
+  })
+  
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400', // 24 horas
+    },
+  })
+}
+
+/**
  * POST /api/webhooks/manychat
  * Endpoint para recibir webhooks de Manychat
  * 
@@ -21,8 +42,49 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Log inicial para debug
+    logger.info('POST request recibido de Manychat', {
+      origin: request.headers.get('origin'),
+      userAgent: request.headers.get('user-agent'),
+      contentType: request.headers.get('content-type'),
+      timestamp: new Date().toISOString()
+    })
+
     // Obtener payload del webhook
-    const body = await request.json()
+    let body
+    try {
+      const bodyText = await request.text()
+      try {
+        body = JSON.parse(bodyText)
+      } catch (parseError: any) {
+        logger.error('Error parseando JSON del webhook', {
+          error: parseError.message,
+          bodyText: bodyText.substring(0, 500) // Primeros 500 caracteres para debug
+        })
+        return NextResponse.json(
+          { error: 'Invalid JSON', details: parseError.message },
+          { 
+            status: 400,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+            }
+          }
+        )
+      }
+    } catch (readError: any) {
+      logger.error('Error leyendo body del webhook', {
+        error: readError.message
+      })
+      return NextResponse.json(
+        { error: 'Error reading request body', details: readError.message },
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+          }
+        }
+      )
+    }
 
     logger.info('Webhook recibido de Manychat', {
       event_type: body.event_type || body.type,
@@ -189,6 +251,10 @@ export async function POST(request: NextRequest) {
         success: false,
         error: result.error,
         processed: false
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        }
       })
     }
 
@@ -205,12 +271,20 @@ export async function POST(request: NextRequest) {
       leadId: result.leadId,
       conversationId: result.conversationId,
       messageId: result.messageId
+    }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      }
     })
 
   } catch (error: any) {
     logger.error('Error procesando webhook de Manychat', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      errorName: error.name,
+      errorCause: error.cause
     })
 
     // Responder 200 OK incluso en caso de error para evitar reintentos
@@ -218,7 +292,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: false,
       error: 'Internal server error',
-      processed: false
+      processed: false,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    }, {
+      status: 200, // Mantener 200 para evitar reintentos de ManyChat
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      }
     })
   }
 }

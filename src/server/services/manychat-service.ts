@@ -204,13 +204,13 @@ export class ManychatService {
       normalizedPhone: normalizedPhone.substring(0, 5) + '***' // Ocultar parte del teléfono en logs
     })
 
-    // Manychat API requiere que findBySystemField use POST con body, no GET con params
-    // El formato debe ser: { field_name: 'phone', field_value: '...' } o { phone: '...' }
+    // Manychat API requiere GET con params para findBySystemField
+    // El formato debe ser: ?field_name=phone&field_value=...
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest<ManychatSubscriber>({
-        method: 'POST',
+        method: 'GET',
         endpoint: `/fb/subscriber/findBySystemField`,
-        body: { 
+        params: { 
           field_name: 'phone',
           field_value: normalizedPhone,
         },

@@ -248,7 +248,21 @@ export class ManychatSyncService {
 
       // Obtener tags actuales del subscriber en Manychat
       const subscriber = await ManychatService.getSubscriberById(subscriberId)
-      const currentTags = subscriber?.tags?.map(t => t.name) || []
+      if (!subscriber) {
+        logger.warn(`Subscriber ${subscriberId} no encontrado en Manychat`)
+        return false
+      }
+      
+      const currentTags = subscriber.tags?.map(t => t.name) || []
+
+      // Obtener todos los tags disponibles en Manychat para validar
+      let availableTags: string[] = []
+      try {
+        const manychatTags = await ManychatService.getTags()
+        availableTags = manychatTags.map(t => t.name)
+      } catch (error: any) {
+        logger.warn('No se pudieron obtener tags de Manychat para validación', { error: error.message })
+      }
 
       // Tags a agregar (están en 'tags' pero no en 'currentTags')
       const tagsToAdd = tags.filter(tag => !currentTags.includes(tag))
@@ -256,14 +270,45 @@ export class ManychatSyncService {
       // Tags a remover (están en 'currentTags' pero no en 'tags')
       const tagsToRemove = currentTags.filter(tag => !tags.includes(tag))
 
-      // Agregar tags
+      // Agregar tags (solo los que existen en Manychat)
       for (const tag of tagsToAdd) {
-        await ManychatService.addTagToSubscriber(subscriberId, tag)
+        try {
+          // Si tenemos la lista de tags disponibles, validar que el tag existe
+          if (availableTags.length > 0 && !availableTags.includes(tag)) {
+            logger.warn(`Tag "${tag}" no existe en Manychat, se saltará`, {
+              leadId,
+              subscriberId,
+              availableTags: availableTags.slice(0, 10) // Log primeros 10 para referencia
+            })
+            continue
+          }
+          
+          const success = await ManychatService.addTagToSubscriber(subscriberId, tag)
+          if (!success) {
+            logger.warn(`No se pudo agregar tag "${tag}" a subscriber ${subscriberId}`)
+          }
+        } catch (error: any) {
+          logger.error(`Error agregando tag "${tag}" a subscriber ${subscriberId}`, {
+            error: error.message,
+            leadId,
+            subscriberId
+          })
+          // Continuar con el siguiente tag en lugar de fallar completamente
+        }
       }
 
       // Remover tags
       for (const tag of tagsToRemove) {
-        await ManychatService.removeTagFromSubscriber(subscriberId, tag)
+        try {
+          await ManychatService.removeTagFromSubscriber(subscriberId, tag)
+        } catch (error: any) {
+          logger.error(`Error removiendo tag "${tag}" de subscriber ${subscriberId}`, {
+            error: error.message,
+            leadId,
+            subscriberId
+          })
+          // Continuar con el siguiente tag
+        }
       }
 
       // Actualizar lead con tags sincronizados

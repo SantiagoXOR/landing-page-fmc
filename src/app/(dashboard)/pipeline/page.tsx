@@ -265,12 +265,39 @@ function PipelinePage() {
         </Card>
       </div>
 
+      {/* Explicación del Pipeline */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <BarChart3 className="h-8 w-8 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 mb-2">¿Qué es un Pipeline de Ventas?</h3>
+              <p className="text-sm text-blue-800 mb-3">
+                Un pipeline de ventas es un sistema visual que organiza tus contactos (leads) en diferentes etapas del proceso de ventas. 
+                Te permite ver en qué etapa está cada contacto y gestionar todo el proceso desde el primer contacto hasta el cierre de la venta.
+              </p>
+              <div className="text-sm text-blue-800 space-y-1">
+                <p className="font-medium mb-2">Cómo funciona:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Los contactos se organizan en <strong>etapas</strong> que representan diferentes fases del proceso de ventas</li>
+                  <li>Puedes <strong>arrastrar y soltar</strong> los contactos entre etapas para avanzar en el proceso</li>
+                  <li>Cada etapa muestra cuántos contactos tiene y el valor total de las oportunidades</li>
+                  <li>El sistema te ayuda a identificar dónde están tus contactos y qué acciones necesitas tomar</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Contenido principal con tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="board">Pipeline Board</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="forecast">Forecasting</TabsTrigger>
+          <TabsTrigger value="board">Tablero</TabsTrigger>
+          <TabsTrigger value="analytics">Análisis</TabsTrigger>
+          <TabsTrigger value="forecast">Pronóstico</TabsTrigger>
           <TabsTrigger value="settings">Configuración</TabsTrigger>
         </TabsList>
 
@@ -289,12 +316,12 @@ function PipelinePage() {
         <TabsContent value="analytics" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Analytics del Pipeline</CardTitle>
+              <CardTitle>Análisis del Pipeline</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center py-12 text-muted-foreground">
                 <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Analytics avanzados próximamente</p>
+                <p>Análisis avanzados próximamente</p>
               </div>
             </CardContent>
           </Card>
@@ -303,12 +330,12 @@ function PipelinePage() {
         <TabsContent value="forecast" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Forecasting de Ventas</CardTitle>
+              <CardTitle>Pronóstico de Ventas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center py-12 text-muted-foreground">
                 <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Forecasting próximamente</p>
+                <p>Pronóstico próximamente</p>
               </div>
             </CardContent>
           </Card>

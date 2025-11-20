@@ -652,16 +652,32 @@ export class ManychatService {
     // Convertir a string para evitar problemas con números muy grandes
     const subscriberIdStr = String(subscriberId)
     
+    // Validar que el tag name no esté vacío
+    if (!tagName || tagName.trim() === '') {
+      logger.warn('Intento de agregar tag vacío', { subscriberId: subscriberIdStr })
+      return false
+    }
+    
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest({
         method: 'POST',
         endpoint: `/fb/subscriber/addTag`,
         body: {
           subscriber_id: subscriberIdStr,
-          tag_name: tagName,
+          tag_name: tagName.trim(),
         },
       })
     )
+
+    if (response.status === 'error') {
+      logger.error('Error agregando tag a subscriber', {
+        subscriberId: subscriberIdStr,
+        tagName,
+        error: response.error,
+        details: response.details
+      })
+      return false
+    }
 
     return response.status === 'success'
   }

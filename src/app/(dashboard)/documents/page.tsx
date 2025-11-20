@@ -33,14 +33,20 @@ interface Document {
   fileName: string
   fileType: string
   fileSize: number
-  category: "DNI" | "COMPROBANTE_INGRESOS" | "RECIBO_SUELDO" | "OTROS"
+  category: string
   uploadedAt: string
   uploadedBy: string
   status: "PENDIENTE" | "APROBADO" | "RECHAZADO"
   url?: string
 }
 
-const DOCUMENT_CATEGORIES = {
+const DOCUMENT_CATEGORIES: Record<string, { label: string; icon: any; color: string }> = {
+  dni: { label: "DNI", icon: User, color: "blue" },
+  comprobantes: { label: "Comprobantes", icon: FileSpreadsheet, color: "green" },
+  contratos: { label: "Contratos", icon: FileText, color: "purple" },
+  recibos: { label: "Recibos", icon: FileText, color: "yellow" },
+  otros: { label: "Otros", icon: File, color: "gray" },
+  // Compatibilidad con valores antiguos
   DNI: { label: "DNI", icon: User, color: "blue" },
   COMPROBANTE_INGRESOS: { label: "Comprobante Ingresos", icon: FileSpreadsheet, color: "green" },
   RECIBO_SUELDO: { label: "Recibo de Sueldo", icon: FileText, color: "yellow" },
@@ -74,12 +80,33 @@ export default function DocumentsPage() {
   const [selectedLead, setSelectedLead] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory>('otros')
   const [fileDescription, setFileDescription] = useState('')
+  const [leads, setLeads] = useState<Array<{ id: string; nombre: string; telefono: string }>>([])
+  const [loadingLeads, setLoadingLeads] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchDocuments()
   }, [categoryFilter])
+
+  useEffect(() => {
+    fetchLeads()
+  }, [])
+
+  const fetchLeads = async () => {
+    try {
+      setLoadingLeads(true)
+      const response = await fetch('/api/leads?limit=100')
+      if (response.ok) {
+        const data = await response.json()
+        setLeads(data.leads || [])
+      }
+    } catch (error) {
+      console.error('Error fetching leads:', error)
+    } finally {
+      setLoadingLeads(false)
+    }
+  }
 
   const fetchDocuments = async () => {
     try {
@@ -266,7 +293,8 @@ export default function DocumentsPage() {
   }
 
   const getCategoryInfo = (category: string) => {
-    return DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES] || DOCUMENT_CATEGORIES.OTROS
+    const normalizedCategory = category.toLowerCase()
+    return DOCUMENT_CATEGORIES[normalizedCategory] || DOCUMENT_CATEGORIES[category] || DOCUMENT_CATEGORIES.otros
   }
 
   if (loading) {
@@ -590,16 +618,22 @@ export default function DocumentsPage() {
               {/* Selector de Lead */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Lead</label>
-                <Input
-                  type="text"
-                  placeholder="ID del lead"
+                <select
                   value={selectedLead}
                   onChange={(e) => setSelectedLead(e.target.value)}
-                  disabled={uploading}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Por ahora ingresa el ID del lead manualmente
-                </p>
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  disabled={uploading || loadingLeads}
+                >
+                  <option value="">Selecciona un lead</option>
+                  {leads.map((lead) => (
+                    <option key={lead.id} value={lead.id}>
+                      {lead.nombre} - {lead.telefono}
+                    </option>
+                  ))}
+                </select>
+                {loadingLeads && (
+                  <p className="text-xs text-gray-500 mt-1">Cargando leads...</p>
+                )}
               </div>
 
               {/* Selector de Categoría */}

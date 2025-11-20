@@ -77,11 +77,13 @@ function getTagColor(tagName: string): string {
 function AssignLeadsSelector({
   selectedLeads,
   onSelectionChange,
-  tagsData
+  tagsData,
+  highlightLeadId
 }: {
   selectedLeads: string[]
   onSelectionChange: (leads: string[]) => void
   tagsData: TagsResponse | null
+  highlightLeadId?: string
 }) {
   const [searchLeadQuery, setSearchLeadQuery] = useState("")
   
@@ -150,7 +152,9 @@ function AssignLeadsSelector({
           filteredLeads.map((lead) => (
             <div
               key={lead.id}
-              className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+              className={`flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer ${
+                highlightLeadId === lead.id ? 'bg-purple-50 border border-purple-200' : ''
+              }`}
               onClick={() => toggleLead(lead.id)}
             >
               <input
@@ -360,6 +364,16 @@ export default function SmartTagsPage() {
     }
   }
 
+  // Estado para resaltar un lead específico en el selector
+  const [highlightedLeadId, setHighlightedLeadId] = useState<string | undefined>()
+
+  // Función para abrir diálogo de asignar tags con un contacto preseleccionado
+  const handleContactClick = (leadId: string) => {
+    setSelectedLeads([leadId])
+    setHighlightedLeadId(leadId)
+    setShowAssignTagsDialog(true)
+  }
+
   // Función para asignar tags a leads
   const handleAssignTags = async () => {
     if (selectedLeads.length === 0 || selectedTags.length === 0) {
@@ -370,46 +384,64 @@ export default function SmartTagsPage() {
     try {
       setAssigningTags(true)
       
-      // Asignar tags a cada lead seleccionado
-      const promises = selectedLeads.map(async (leadId) => {
-        // Obtener lead actual para preservar tags existentes
-        const leadResponse = await fetch(`/api/leads/${leadId}`)
-        if (!leadResponse.ok) return
-        
-        const lead = await leadResponse.json()
-        const existingTags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
-        
-        // Combinar tags existentes con nuevos (sin duplicados)
-        const updatedTags = Array.from(new Set([...existingTags, ...selectedTags]))
-        
-        // Actualizar lead
-        const updateResponse = await fetch(`/api/leads/${leadId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            tags: JSON.stringify(updatedTags)
+      const results = await Promise.allSettled(
+        selectedLeads.map(async (leadId) => {
+          // Obtener lead actual para preservar tags existentes
+          const leadResponse = await fetch(`/api/leads/${leadId}`)
+          if (!leadResponse.ok) {
+            throw new Error(`Error al obtener lead ${leadId}`)
+          }
+          
+          const lead = await leadResponse.json()
+          const existingTags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
+          
+          // Combinar tags existentes con nuevos (sin duplicados)
+          const updatedTags = Array.from(new Set([...existingTags, ...selectedTags]))
+          
+          // Actualizar lead
+          const updateResponse = await fetch(`/api/leads/${leadId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              tags: JSON.stringify(updatedTags)
+            })
           })
+
+          if (!updateResponse.ok) {
+            const errorData = await updateResponse.json().catch(() => ({}))
+            throw new Error(errorData.message || `Error al actualizar lead ${leadId}`)
+          }
+
+          return { leadId, success: true }
         })
+      )
 
-        return updateResponse.ok
-      })
+      // Analizar resultados
+      const successful = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
 
-      await Promise.all(promises)
-      
       // Recargar datos
       await loadTagsData()
       
       // Limpiar selección
       setSelectedLeads([])
       setSelectedTags([])
+      setHighlightedLeadId(undefined)
       setShowAssignTagsDialog(false)
       
-      alert('Tags asignados exitosamente')
+      // Mostrar mensaje apropiado
+      if (failed === 0) {
+        alert(`Tags asignados exitosamente a ${successful} lead(s)`)
+      } else if (successful > 0) {
+        alert(`Tags asignados parcialmente: ${successful} exitoso(s), ${failed} fallido(s). Algunos tags pueden no existir en Manychat.`)
+      } else {
+        alert(`Error al asignar tags. Verifica que los tags existan en Manychat y que los leads tengan un manychatId válido.`)
+      }
     } catch (err: any) {
       console.error('Error assigning tags:', err)
-      alert('Error al asignar tags')
+      alert(`Error al asignar tags: ${err.message || 'Error desconocido'}`)
     } finally {
       setAssigningTags(false)
     }
@@ -820,6 +852,7 @@ export default function SmartTagsPage() {
                         selectedLeads={selectedLeads}
                         onSelectionChange={setSelectedLeads}
                         tagsData={tagsData}
+                        highlightLeadId={highlightedLeadId}
                       />
                     </div>
                   </div>
@@ -829,6 +862,7 @@ export default function SmartTagsPage() {
                     setSelectedLeads([])
                     setSelectedTags([])
                     setNewTagName("")
+                    setHighlightedLeadId(undefined)
                     setShowAssignTagsDialog(false)
                   }}>
                     Cancelar
@@ -861,6 +895,7 @@ export default function SmartTagsPage() {
                   {leadsWithoutTags.map((lead, index) => (
                     <div 
                       key={lead.id} 
+                      onClick={() => handleContactClick(lead.id)}
                       className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
                     >
                       <Avatar className="h-10 w-10">
@@ -904,6 +939,7 @@ export default function SmartTagsPage() {
                   {tagGroup.leads.map((lead, index) => (
                     <div 
                       key={lead.id} 
+                      onClick={() => handleContactClick(lead.id)}
                       className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
                     >
                       <Avatar className="h-10 w-10">

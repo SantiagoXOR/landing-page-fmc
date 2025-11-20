@@ -27,6 +27,7 @@ export interface DocumentMetadata {
   description?: string
   uploaded_by: string
   created_at: string
+  status?: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
 }
 
 export class SupabaseStorageService {
@@ -127,6 +128,7 @@ export class SupabaseStorageService {
         public_url: urlData?.signedUrl,
         description: params.description,
         uploaded_by: userId,
+        status: 'PENDIENTE',
       }
 
       const { data: docData, error: dbError } = await supabase.client
@@ -307,7 +309,7 @@ export class SupabaseStorageService {
   }
 
   /**
-   * Buscar documentos con filtros
+   * Buscar documentos con filtros e incluir información del lead
    */
   static async searchDocuments(filters: {
     leadId?: string
@@ -316,7 +318,7 @@ export class SupabaseStorageService {
     uploadedBy?: string
     page?: number
     limit?: number
-  }): Promise<{ data: DocumentMetadata[]; total: number }> {
+  }): Promise<{ data: any[]; total: number }> {
     try {
       if (!supabase.client) {
         throw new Error('Database connection error')
@@ -326,6 +328,7 @@ export class SupabaseStorageService {
       const limit = filters.limit || 50
       const offset = (page - 1) * limit
 
+      // Primero obtener los documentos
       let query = supabase.client
         .from('documents')
         .select('*', { count: 'exact' })
@@ -352,8 +355,50 @@ export class SupabaseStorageService {
 
       if (error) throw error
 
+      // Obtener información de los leads para los documentos encontrados
+      const leadIds = [...new Set((data || []).map((doc: any) => doc.lead_id))]
+      const leadsMap: Record<string, any> = {}
+
+      if (leadIds.length > 0 && supabase.client) {
+        try {
+          const { data: leadsData } = await supabase.client
+            .from('Lead')
+            .select('id, nombre, telefono, email')
+            .in('id', leadIds)
+
+          if (leadsData) {
+            leadsData.forEach((lead: any) => {
+              leadsMap[lead.id] = lead
+            })
+          }
+        } catch (leadError) {
+          console.error('[Storage] Error fetching leads:', leadError)
+          // Continuar sin información de leads si falla
+        }
+      }
+
+      // Transformar los datos para incluir información del lead
+      const transformedData = (data || []).map((doc: any) => {
+        const lead = leadsMap[doc.lead_id]
+        return {
+          id: doc.id,
+          leadId: doc.lead_id,
+          leadName: lead?.nombre || 'Lead desconocido',
+          fileName: doc.original_filename,
+          fileType: doc.mime_type,
+          fileSize: doc.file_size,
+          category: doc.category,
+          uploadedAt: doc.created_at,
+          uploadedBy: doc.uploaded_by,
+          status: doc.status || 'PENDIENTE',
+          url: doc.public_url,
+          description: doc.description,
+          storagePath: doc.storage_path
+        }
+      })
+
       return {
-        data: data || [],
+        data: transformedData,
         total: count || 0
       }
     } catch (error) {

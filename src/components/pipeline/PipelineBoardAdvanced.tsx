@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import Link from 'next/link'
 import { DndContext, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -163,6 +164,10 @@ export function PipelineBoardAdvanced({
   }
 
   const filteredLeads = filteredLeadsByStage()
+  
+  // Verificar si hay leads en total
+  const totalLeads = Object.values(filteredLeads).reduce((sum, stageLeads) => sum + stageLeads.length, 0)
+  const hasAnyLeads = totalLeads > 0
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -171,7 +176,7 @@ export function PipelineBoardAdvanced({
         <div>
           <h2 className="text-2xl font-bold">Pipeline de Ventas</h2>
           <p className="text-muted-foreground">
-            Gestiona tus leads a través del proceso de ventas
+            Gestiona tus contactos a través del proceso de ventas
           </p>
         </div>
         
@@ -180,7 +185,7 @@ export function PipelineBoardAdvanced({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Buscar leads..."
+              placeholder="Buscar contactos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 border rounded-md w-64"
@@ -193,6 +198,31 @@ export function PipelineBoardAdvanced({
           </Button>
         </div>
       </div>
+
+      {/* Mensaje cuando no hay leads */}
+      {!hasAnyLeads && stages.length > 0 && (
+        <Card className="bg-gray-50 border-gray-200">
+          <CardContent className="p-8">
+            <div className="text-center">
+              <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                No hay contactos en el pipeline
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Comienza agregando contactos desde la página de Leads o crea un nuevo contacto directamente.
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Button asChild>
+                  <a href="/leads">Ver Leads</a>
+                </Button>
+                <Button asChild variant="outline">
+                  <a href="/leads/new">Nuevo Contacto</a>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pipeline Board */}
       <DndContext
@@ -359,7 +389,8 @@ function PipelineStageColumn({
           {leads.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No hay leads en esta etapa</p>
+              <p className="text-sm font-medium mb-1">No hay contactos en esta etapa</p>
+              <p className="text-xs">Arrastra contactos aquí o crea uno nuevo</p>
             </div>
           )}
         </CardContent>

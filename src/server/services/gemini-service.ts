@@ -101,9 +101,9 @@ export class GeminiService {
       }
 
       // Obtener el modelo
-      // Intentar con gemini-1.5-pro que debería estar disponible en v1beta
-      // Si falla, podemos probar otros modelos disponibles
-      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-pro' })
+      // Usar generateContent directamente en lugar de startChat para mejor compatibilidad
+      // Intentar con modelos disponibles - el SDK manejará el error si el modelo no está disponible
+      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
 
       // Construir el historial de conversación
       // Las instrucciones del asistente se usan como system prompt
@@ -180,45 +180,44 @@ export class GeminiService {
         history.length = 0 // Limpiar el historial
       }
 
-      // Crear el chat con historial (solo si hay historial válido que comience con usuario)
-      // Para gemini-pro en v1beta, systemInstruction puede no estar soportado en startChat
-      // Incluimos las instrucciones en el primer mensaje del usuario cuando no hay historial
-      const chatConfig: any = {
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        }
-      }
+      // Usar generateContent directamente en lugar de startChat para mejor compatibilidad
+      // Construir el contenido completo con historial e instrucciones
+      const contents: Array<{ role: 'user' | 'model', parts: Array<{ text: string }> }> = []
       
-      // Solo agregar historial si hay mensajes válidos y comienza con usuario
-      // IMPORTANTE: Gemini requiere que el historial comience con 'user', nunca con 'model'
+      // Agregar historial si existe
       if (history.length > 0 && history[0].role === 'user') {
-        chatConfig.history = history
+        contents.push(...history)
         logger.info('Including chat history', {
           assistantId,
           historyLength: history.length
         })
-      } else {
-        // Si no hay historial válido, no incluir historial (chat nuevo)
-        logger.info('Starting new chat without history', { assistantId })
       }
       
-      const chat = model.startChat(chatConfig)
-
-      // Preparar el mensaje del usuario
-      // Si no hay historial, incluimos las instrucciones del sistema en el primer mensaje
-      // Esto funciona mejor que systemInstruction que puede no estar soportado en gemini-pro v1beta
+      // Preparar el mensaje del usuario con instrucciones del sistema si es el primer mensaje
       let userMessage = lastMessage.content
       if (history.length === 0) {
         // Incluir instrucciones del sistema en el primer mensaje cuando no hay historial
         userMessage = `Instrucciones del sistema:\n${systemInstruction}\n\n---\n\nUsuario: ${lastMessage.content}`
         logger.info('Including system instructions in first user message', { assistantId })
       }
+      
+      // Agregar el mensaje del usuario
+      contents.push({
+        role: 'user',
+        parts: [{ text: userMessage }]
+      })
 
-      // Enviar el mensaje y obtener respuesta
-      const result = await chat.sendMessage(userMessage)
+      // Generar respuesta usando generateContent directamente
+      const result = await model.generateContent({
+        contents: contents,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        }
+      })
+      
       const response = await result.response
       const text = response.text()
 

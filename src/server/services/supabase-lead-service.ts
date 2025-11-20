@@ -628,6 +628,51 @@ export class SupabaseLeadService {
       return assignmentMap
     }
   }
+
+  /**
+   * Obtiene información del pipeline (current_stage) para múltiples leads
+   * Maneja errores gracefully si la tabla no existe
+   */
+  async getLeadPipelines(leadIds: string[]): Promise<Map<string, { current_stage: string; stage_entered_at: string }>> {
+    const pipelineMap = new Map<string, { current_stage: string; stage_entered_at: string }>()
+    
+    if (leadIds.length === 0) {
+      return pipelineMap
+    }
+
+    try {
+      // Construir filtro para obtener información de pipeline de múltiples leads
+      const response = await this.makeRequest(
+        `lead_pipeline?lead_id=in.(${leadIds.join(',')})&select=lead_id,current_stage,stage_entered_at`
+      )
+      
+      const pipelines = await response.json()
+      
+      if (!Array.isArray(pipelines)) {
+        logger.warn('getLeadPipelines: response is not an array', { response: pipelines })
+        return pipelineMap
+      }
+
+      pipelines.forEach((pipeline: any) => {
+        if (pipeline.lead_id && pipeline.current_stage) {
+          pipelineMap.set(pipeline.lead_id, {
+            current_stage: pipeline.current_stage,
+            stage_entered_at: pipeline.stage_entered_at || new Date().toISOString()
+          })
+        }
+      })
+
+      return pipelineMap
+
+    } catch (error: any) {
+      // Si la tabla no existe o hay un error, simplemente retornar mapa vacío
+      logger.warn('Could not fetch lead pipelines', {
+        error: error.message,
+        leadCount: leadIds.length
+      })
+      return pipelineMap
+    }
+  }
 }
 
 // Instancia singleton

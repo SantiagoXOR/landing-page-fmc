@@ -5,8 +5,33 @@ import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { PipelineLead } from '@/types/pipeline'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
+import { pipelineService } from '@/server/services/pipeline-service'
 
-// Mapeo de estados de leads a etapas del pipeline
+// Mapeo de pipeline_stage (enum de DB) a stageId (string usado en componente)
+const pipelineStageToStageId: Record<string, string> = {
+  'LEAD_NUEVO': 'nuevo',
+  'CONTACTO_INICIAL': 'contactado',
+  'CALIFICACION': 'calificado',
+  'PRESENTACION': 'calificado', // PRESENTACION se mapea a calificado ya que no hay etapa específica en el componente
+  'PROPUESTA': 'propuesta',
+  'NEGOCIACION': 'negociacion',
+  'CIERRE_GANADO': 'cerrado-ganado',
+  'CIERRE_PERDIDO': 'cerrado-perdido',
+  'SEGUIMIENTO': 'cerrado-ganado' // SEGUIMIENTO se mapea a cerrado-ganado ya que no hay etapa específica
+}
+
+// Mapeo inverso: stageId a pipeline_stage (para filtros)
+const stageIdToPipelineStage: Record<string, string[]> = {
+  'nuevo': ['LEAD_NUEVO'],
+  'contactado': ['CONTACTO_INICIAL'],
+  'calificado': ['CALIFICACION', 'PRESENTACION'],
+  'propuesta': ['PROPUESTA'],
+  'negociacion': ['NEGOCIACION'],
+  'cerrado-ganado': ['CIERRE_GANADO', 'SEGUIMIENTO'],
+  'cerrado-perdido': ['CIERRE_PERDIDO']
+}
+
+// Mapeo de estados de leads a etapas del pipeline (fallback si no hay pipeline)
 const estadoToStageId: Record<string, string> = {
   'NUEVO': 'nuevo',
   'CONTACTADO': 'contactado',
@@ -16,8 +41,8 @@ const estadoToStageId: Record<string, string> = {
   'PROPUESTA': 'propuesta',
   'NEGOCIACION': 'negociacion',
   'DOC_PENDIENTE': 'propuesta',
-  'RECHAZADO': 'perdido',
-  'DERIVADO': 'seguimiento'
+  'RECHAZADO': 'cerrado-perdido',
+  'DERIVADO': 'cerrado-ganado'
 }
 
 // Función para obtener probabilidad por etapa
@@ -36,21 +61,44 @@ function getProbabilityForStage(stageId: string): number {
 }
 
 // Función para mapear lead a PipelineLead
-// IMPORTANTE: Los leads deben tener un estado válido (NUEVO, CONTACTADO, etc.) 
-// para que aparezcan en el pipeline. Si un lead no tiene estado o tiene un estado
-// no mapeado, se asignará a la etapa 'nuevo' por defecto.
-function mapLeadToPipelineLead(lead: any, lastEvent: any = null, assignedTo?: string): PipelineLead {
-  // Normalizar el estado (trim espacios y convertir a mayúsculas para consistencia)
-  const estadoNormalizado = lead.estado ? String(lead.estado).trim().toUpperCase() : 'NUEVO'
-  
-  // Mapear el estado del lead a un stageId del pipeline
-  // Si el estado no está en el mapeo, usar 'nuevo' como defecto
-  const stageId = estadoToStageId[estadoNormalizado] || 'nuevo'
-  
-  // Log para debugging si el estado no está mapeado
-  if (!estadoToStageId[estadoNormalizado] && lead.estado) {
-    console.warn(`Estado no mapeado encontrado: "${lead.estado}" (normalizado: "${estadoNormalizado}") - Asignado a etapa "nuevo"`)
+// IMPORTANTE: Usa current_stage de lead_pipeline como fuente de verdad
+// Si no hay pipeline, usa el estado del lead como fallback
+function mapLeadToPipelineLead(
+  lead: any, 
+  pipelineInfo: { current_stage: string; stage_entered_at: string } | null,
+  lastEvent: any = null, 
+  assignedTo?: string
+): PipelineLead {
+  // Determinar stageId: usar current_stage del pipeline si existe, sino mapear desde estado del lead
+  let stageId: string
+  let stageEntryDate: Date
+
+  if (pipelineInfo && pipelineInfo.current_stage) {
+    // Usar current_stage del pipeline como fuente de verdad
+    stageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
+    stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+    
+    // Log si el current_stage no está mapeado
+    if (!pipelineStageToStageId[pipelineInfo.current_stage]) {
+      logger.warn(`Pipeline stage no mapeado: "${pipelineInfo.current_stage}" - Asignado a etapa "nuevo"`, {
+        leadId: lead.id,
+        currentStage: pipelineInfo.current_stage
+      })
+    }
+  } else {
+    // Fallback: mapear desde estado del lead
+    const estadoNormalizado = lead.estado ? String(lead.estado).trim().toUpperCase() : 'NUEVO'
+    stageId = estadoToStageId[estadoNormalizado] || 'nuevo'
+    stageEntryDate = new Date(lead.createdAt)
+    
+    // Log para debugging si el estado no está mapeado
+    if (!estadoToStageId[estadoNormalizado] && lead.estado) {
+      logger.warn(`Estado no mapeado encontrado: "${lead.estado}" (normalizado: "${estadoNormalizado}") - Asignado a etapa "nuevo"`, {
+        leadId: lead.id
+      })
+    }
   }
+
   const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
   
   // Usar el evento más reciente pasado como parámetro, o la fecha de creación del lead
@@ -76,7 +124,7 @@ function mapLeadToPipelineLead(lead: any, lastEvent: any = null, assignedTo?: st
     origen: lead.origen || 'web',
     estado: lead.estado,
     stageId,
-    stageEntryDate: new Date(lead.createdAt),
+    stageEntryDate,
     lastActivity,
     score: undefined, // Se puede calcular después
     tags: Array.isArray(tags) ? tags : [],
@@ -133,17 +181,9 @@ export async function GET(request: NextRequest) {
       offset: 0
     }
 
-    // Si hay stageId, mapear a estados correspondientes
-    if (stageId) {
-      const estados = Object.entries(estadoToStageId)
-        .filter(([, sid]) => sid === stageId)
-        .map(([estado]) => estado)
-      
-      if (estados.length > 0) {
-        // Usar el primer estado encontrado (se puede mejorar para múltiples)
-        filters.estado = estados[0]
-      }
-    }
+    // Si hay stageId, mapear a pipeline_stage correspondientes para filtrar en la consulta
+    // Nota: El filtro real se hará después de obtener los datos del pipeline
+    // Por ahora no aplicamos filtro aquí ya que necesitamos obtener todos los leads primero
 
     if (search) {
       filters.search = search
@@ -156,6 +196,9 @@ export async function GET(request: NextRequest) {
     // Filtrar undefined para cumplir con el tipo string[] requerido
     const leadIds = leads.map(l => l.id).filter((id): id is string => id !== undefined)
     
+    // Obtener información del pipeline para todos los leads (current_stage)
+    const pipelineMap = await supabaseLeadService.getLeadPipelines(leadIds)
+    
     // Obtener el evento más reciente para cada lead usando Supabase REST API
     // Esto asegura que cada lead tenga su evento más reciente, incluso si tiene muchos eventos antiguos
     const eventsMap = leadIds.length > 0 
@@ -166,15 +209,51 @@ export async function GET(request: NextRequest) {
     // Nota: lead_pipeline puede no existir para todos los leads, el método maneja errores gracefully
     const assignmentMap = await supabaseLeadService.getLeadAssignments(leadIds)
 
-    // Mapear leads a PipelineLead usando el evento más reciente de cada lead
+    // Crear pipelines para leads que no los tienen
+    const leadsWithoutPipeline: string[] = []
+    leadIds.forEach(leadId => {
+      if (!pipelineMap.has(leadId)) {
+        leadsWithoutPipeline.push(leadId)
+      }
+    })
+
+    // Crear pipelines automáticamente para leads que no los tienen
+    if (leadsWithoutPipeline.length > 0 && session.user?.id) {
+      logger.info(`Creando pipelines automáticamente para ${leadsWithoutPipeline.length} leads sin pipeline`)
+      const createPipelinePromises = leadsWithoutPipeline.map(async (leadId) => {
+        try {
+          await pipelineService.createLeadPipeline(leadId, session.user.id)
+          // Obtener el pipeline recién creado
+          const newPipeline = await pipelineService.getLeadPipeline(leadId)
+          if (newPipeline) {
+            pipelineMap.set(leadId, {
+              current_stage: newPipeline.current_stage,
+              stage_entered_at: newPipeline.stage_entered_at
+            })
+          }
+        } catch (error) {
+          logger.error(`Error creando pipeline para lead ${leadId}:`, error)
+          // Continuar con otros leads aunque falle uno
+        }
+      })
+      await Promise.allSettled(createPipelinePromises)
+    }
+
+    // Mapear leads a PipelineLead usando current_stage del pipeline como fuente de verdad
     // Filtrar leads sin id para evitar errores de tipo
     let pipelineLeads = leads
       .filter(lead => lead.id !== undefined)
       .map(lead => {
         const leadId = lead.id as string // Type assertion seguro después del filter
+        const pipelineInfo = pipelineMap.get(leadId) || null
         const lastEvent = eventsMap.get(leadId) || null
-        return mapLeadToPipelineLead(lead, lastEvent, assignmentMap.get(leadId))
+        return mapLeadToPipelineLead(lead, pipelineInfo, lastEvent, assignmentMap.get(leadId))
       })
+
+    // Aplicar filtro por stageId si se especificó
+    if (stageId) {
+      pipelineLeads = pipelineLeads.filter(lead => lead.stageId === stageId)
+    }
 
     // Aplicar filtros adicionales que no están en la base de datos
     if (priority) {
@@ -197,19 +276,21 @@ export async function GET(request: NextRequest) {
       return acc
     }, {} as Record<string, number>)
 
+    // Contar leads con y sin pipeline
+    const leadsWithPipeline = Array.from(pipelineMap.keys()).length
+    const leadsWithoutPipelineCount = leads.length - leadsWithPipeline
+
     logger.info('Pipeline leads requested', {
       userId: session.user.id,
       userName: session.user.name,
       filters: { stageId, priority, assignedTo, search },
       resultCount: pipelineLeads.length,
       totalLeads: total,
+      leadsWithPipeline,
+      leadsWithoutPipeline: leadsWithoutPipelineCount,
       leadsByEstado,
       leadsByStage,
-      estadoMapping: Object.entries(estadoToStageId).reduce((acc, [estado, stageId]) => {
-        if (!acc[stageId]) acc[stageId] = []
-        acc[stageId].push(estado)
-        return acc
-      }, {} as Record<string, string[]>)
+      pipelineStageMapping: Object.entries(pipelineStageToStageId)
     })
 
     return NextResponse.json(pipelineLeads)

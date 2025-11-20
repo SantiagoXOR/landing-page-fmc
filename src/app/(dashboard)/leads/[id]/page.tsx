@@ -167,9 +167,9 @@ export default function LeadDetailPage() {
               disabled={syncStatus === 'syncing'}
               variant="outline"
               size="sm"
+              className="p-2"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-              Sincronizar con Manychat
+              <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
             </Button>
           )}
         </div>

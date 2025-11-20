@@ -63,7 +63,7 @@ export default function ChatsPage() {
   const handleSyncManychat = async () => {
     try {
       setSyncing(true)
-      setSyncStatus('Sincronizando con Manychat...')
+      setSyncStatus('Sincronizando...')
       
       const response = await fetch('/api/conversations/sync-manychat', {
         method: 'POST',
@@ -102,7 +102,7 @@ export default function ChatsPage() {
         }
       } else {
         const errorData = await response.json().catch(() => ({}))
-        setSyncStatus(errorData.error || 'Error al sincronizar con Manychat')
+        setSyncStatus(errorData.error || 'Error al sincronizar')
       }
     } catch (error: any) {
       setSyncStatus(`Error de conexión: ${error.message || 'No se pudo conectar con el servidor'}`)
@@ -268,25 +268,13 @@ export default function ChatsPage() {
         disabled={syncing || loading}
         size="sm"
         className={cn(
-          "text-xs sm:text-sm h-9 sm:h-10 px-2.5 sm:px-3 lg:px-4 transition-all",
+          "h-9 sm:h-10 w-9 sm:w-10 p-0 flex items-center justify-center transition-all",
           syncing
             ? "bg-purple-400 cursor-not-allowed"
             : "bg-purple-600 hover:bg-purple-700 text-white"
         )}
       >
-        {syncing ? (
-          <>
-            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin sm:mr-1.5 lg:mr-2" />
-            <span className="hidden sm:inline">Sincronizando...</span>
-            <span className="sm:hidden">Sync...</span>
-          </>
-        ) : (
-          <>
-            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1.5 lg:mr-2" />
-            <span className="hidden sm:inline">Sincronizar Manychat</span>
-            <span className="sm:hidden">Sync</span>
-          </>
-        )}
+        <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${syncing ? 'animate-spin' : ''}`} />
       </Button>
     </div>
   )

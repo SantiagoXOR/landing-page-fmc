@@ -136,7 +136,7 @@ async function fetchFromSupabase(table: string, query: string = '') {
   }
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     // Verificar autenticación
     const session = await getServerSession(authOptions)
@@ -147,6 +147,11 @@ export async function GET(_request: NextRequest) {
     if (!session && !isTestingMode) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    // Obtener parámetros de fecha de la query string
+    const { searchParams } = new URL(request.url)
+    const dateFromParam = searchParams.get('dateFrom')
+    const dateToParam = searchParams.get('dateTo')
 
     // Validar configuración de Supabase
     const configValidation = validateSupabaseConfig()
@@ -172,7 +177,20 @@ export async function GET(_request: NextRequest) {
       })
     }
 
-    // Calcular fechas
+    // Filtrar leads por rango de fechas si se proporcionan
+    if (dateFromParam && dateToParam) {
+      const dateFrom = new Date(dateFromParam)
+      const dateTo = new Date(dateToParam)
+      // Ajustar dateTo al final del día
+      dateTo.setHours(23, 59, 59, 999)
+      
+      leads = leads.filter(lead => {
+        const leadDate = new Date(lead.createdAt)
+        return leadDate >= dateFrom && leadDate <= dateTo
+      })
+    }
+
+    // Calcular fechas para métricas relativas
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -217,24 +235,55 @@ export async function GET(_request: NextRequest) {
       createdAt: lead.createdAt
     }))
 
-    // Generar datos de tendencia para los últimos 7 días
-    const trendData = []
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000)
-      const dateStr = date.toISOString().split('T')[0]
+    // Generar datos de tendencia según el rango de fechas
+    let trendData = []
+    
+    if (dateFromParam && dateToParam) {
+      // Si hay un rango específico, generar datos para ese rango
+      const dateFrom = new Date(dateFromParam)
+      const dateTo = new Date(dateToParam)
+      const daysDiff = Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (24 * 60 * 60 * 1000))
+      const maxDays = Math.min(daysDiff, 30) // Limitar a 30 días máximo para evitar arrays muy grandes
+      
+      const startDate = new Date(dateFrom)
+      startDate.setHours(0, 0, 0, 0)
+      
+      for (let i = 0; i <= maxDays; i++) {
+        const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000)
+        const dateStr = date.toISOString().split('T')[0]
 
-      const dayLeads = leads.filter(lead => {
-        const leadDate = new Date(lead.createdAt).toISOString().split('T')[0]
-        return leadDate === dateStr
-      })
+        const dayLeads = leads.filter(lead => {
+          const leadDate = new Date(lead.createdAt).toISOString().split('T')[0]
+          return leadDate === dateStr
+        })
 
-      const dayConversions = dayLeads.filter(lead => lead.estado === 'PREAPROBADO')
+        const dayConversions = dayLeads.filter(lead => lead.estado === 'PREAPROBADO')
 
-      trendData.push({
-        date: dateStr,
-        leads: dayLeads.length,
-        conversions: dayConversions.length
-      })
+        trendData.push({
+          date: dateStr,
+          leads: dayLeads.length,
+          conversions: dayConversions.length
+        })
+      }
+    } else {
+      // Por defecto, últimos 7 días
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000)
+        const dateStr = date.toISOString().split('T')[0]
+
+        const dayLeads = leads.filter(lead => {
+          const leadDate = new Date(lead.createdAt).toISOString().split('T')[0]
+          return leadDate === dateStr
+        })
+
+        const dayConversions = dayLeads.filter(lead => lead.estado === 'PREAPROBADO')
+
+        trendData.push({
+          date: dateStr,
+          leads: dayLeads.length,
+          conversions: dayConversions.length
+        })
+      }
     }
 
     const metrics = {

@@ -9,13 +9,17 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import {
   MessageSquare,
   Plus,
-  MoreHorizontal
+  MoreHorizontal,
+  Users,
+  TrendingUp
 } from 'lucide-react'
 import Link from 'next/link'
 import { IndicatorCard } from '@/components/dashboard/IndicatorCard'
 import { AddIndicatorCard } from '@/components/dashboard/AddIndicatorCard'
 import { ConversationsByChannel } from '@/components/dashboard/ConversationsByChannel'
 import { WeeklyTrendChart } from '@/components/dashboard/WeeklyTrendChart'
+import { DateRange } from '@/components/ui/date-range-picker'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 interface DashboardMetrics {
@@ -54,20 +58,99 @@ interface DashboardMetrics {
 }
 
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    // Inicializar con "Esta semana"
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const startOfWeek = new Date(today)
+    const day = startOfWeek.getDay()
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
+    startOfWeek.setDate(diff)
+    return {
+      from: startOfWeek,
+      to: today,
+    }
+  })
   const sidebar = useSidebar()
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        if (!dateRange.from || !dateRange.to) {
+          return
+        }
+
+        const params = new URLSearchParams({
+          dateFrom: dateRange.from.toISOString(),
+          dateTo: dateRange.to.toISOString(),
+        })
+
+        const response = await fetch(`/api/dashboard/metrics?${params}`)
+        if (!response.ok) {
+          throw new Error('Error al cargar las métricas')
+        }
+
+        const data = await response.json()
+        setMetrics(data)
+      } catch (err: any) {
+        console.error('Error fetching metrics:', err)
+        setError(err.message || 'Error al cargar las métricas')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (dateRange.from && dateRange.to) {
+      fetchMetrics()
+    }
+  }, [dateRange])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <Header
+          title="Dashboard"
+          subtitle="Resumen de actividad y métricas principales de FMC"
+          showDateFilter={true}
+          showExportButton={true}
+          showNewButton={true}
+          newButtonText="Nuevo Lead"
+          newButtonHref="/leads/new"
+          onSidebarToggle={sidebar.toggle}
+        />
         <div className="space-y-8 p-6">
-          <div className="h-20 bg-gray-200 rounded animate-pulse"></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded animate-pulse"></div>
+              <Skeleton key={i} className="h-32" />
             ))}
           </div>
+          <Skeleton className="h-96" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header
+          title="Dashboard"
+          subtitle="Resumen de actividad y métricas principales de FMC"
+          showDateFilter={true}
+          showExportButton={true}
+          showNewButton={true}
+          newButtonText="Nuevo Lead"
+          newButtonHref="/leads/new"
+          onSidebarToggle={sidebar.toggle}
+        />
+        <div className="p-6">
+          <div className="text-center py-8 text-destructive">{error}</div>
         </div>
       </div>
     )
@@ -85,6 +168,8 @@ export default function DashboardPage() {
         newButtonText="Nuevo Lead"
         newButtonHref="/leads/new"
         onSidebarToggle={sidebar.toggle}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
       />
 
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 lg:space-y-8">
@@ -99,19 +184,45 @@ export default function DashboardPage() {
             {/* Card de Conversaciones */}
             <IndicatorCard
               title="Conversaciones"
-              value="18"
+              value={metrics?.leadsThisWeek?.toString() || '0'}
               icon={<MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />}
+              subtitle="Esta semana"
             />
             
-            {/* Cards de Añadir Indicador */}
-            <AddIndicatorCard />
-            <AddIndicatorCard />
-            <AddIndicatorCard />
+            {/* Card de Total Leads */}
+            <IndicatorCard
+              title="Total Leads"
+              value={metrics?.totalLeads?.toString() || '0'}
+              icon={<Users className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />}
+              subtitle="En el período"
+            />
+            
+            {/* Card de Leads Hoy */}
+            <IndicatorCard
+              title="Leads Hoy"
+              value={metrics?.newLeadsToday?.toString() || '0'}
+              icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />}
+              subtitle="Nuevos hoy"
+            />
+            
+            {/* Card de Tasa de Conversión */}
+            <IndicatorCard
+              title="Tasa Conversión"
+              value={`${metrics?.conversionRate?.toFixed(1) || '0'}%`}
+              icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />}
+              subtitle="Preaprobados"
+            />
           </div>
         </div>
 
         {/* Gráfico de Tendencia Semanal */}
-        <WeeklyTrendChart />
+        <WeeklyTrendChart 
+          data={metrics?.trendData?.map(item => ({
+            day: new Date(item.date).toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+            value: item.leads
+          }))}
+          dateRange={dateRange}
+        />
 
         {/* Grid inferior */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">

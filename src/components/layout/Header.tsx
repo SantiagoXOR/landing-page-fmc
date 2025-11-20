@@ -2,7 +2,8 @@
 
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { Calendar, Download, Plus, Settings, Menu } from 'lucide-react'
+import { Download, Plus, Settings, Menu } from 'lucide-react'
+import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker'
 import { cn } from '@/lib/utils'
 
 interface HeaderProps {
@@ -17,6 +18,8 @@ interface HeaderProps {
   className?: string
   actions?: React.ReactNode
   onSidebarToggle?: () => void
+  dateRange?: DateRange
+  onDateRangeChange?: (range: DateRange) => void
 }
 
 export function Header({
@@ -30,7 +33,9 @@ export function Header({
   onExport,
   className,
   actions,
-  onSidebarToggle
+  onSidebarToggle,
+  dateRange,
+  onDateRangeChange
 }: HeaderProps) {
   const { data: session } = useSession()
 
@@ -97,18 +102,14 @@ export function Header({
         {/* Lado derecho - Filtros y acciones */}
         <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2 md:space-x-2 lg:space-x-3 md:mt-0 md:flex-shrink-0">
           {/* Filtro de fecha */}
-          {showDateFilter && (
+          {showDateFilter && onDateRangeChange && (
             <div className="flex items-center space-x-1.5 sm:space-x-2">
               <span className="text-xs sm:text-sm text-gray-500 hidden lg:inline">Mostrando data desde:</span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-gray-700 border-gray-300 hover:bg-gray-50 text-xs sm:text-sm h-9 sm:h-10 px-2.5 sm:px-3 lg:px-4"
-              >
-                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1.5 lg:mr-2" />
-                <span className="hidden sm:inline">Esta semana</span>
-                <span className="sm:hidden">Semana</span>
-              </Button>
+              <DateRangePicker
+                value={dateRange}
+                onChange={onDateRangeChange}
+                className="w-auto"
+              />
             </div>
           )}
 

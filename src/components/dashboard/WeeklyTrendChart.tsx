@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { DateRange } from '@/components/ui/date-range-picker'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
 interface WeeklyTrendChartProps {
@@ -10,6 +13,7 @@ interface WeeklyTrendChartProps {
     day: string
     value: number
   }>
+  dateRange?: DateRange
   className?: string
 }
 
@@ -25,6 +29,7 @@ const defaultData = [
 
 export function WeeklyTrendChart({ 
   data = defaultData, 
+  dateRange,
   className 
 }: WeeklyTrendChartProps) {
   const [isMobile, setIsMobile] = useState(false)
@@ -39,20 +44,64 @@ export function WeeklyTrendChart({
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  const getTitle = () => {
+    if (!dateRange?.from || !dateRange?.to) {
+      return 'Tendencia Semanal'
+    }
+    
+    const from = dateRange.from
+    const to = dateRange.to
+    
+    if (from.getTime() === to.getTime()) {
+      return `Tendencia - ${format(from, 'dd/MM/yyyy', { locale: es })}`
+    }
+    
+    const daysDiff = Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000))
+    if (daysDiff <= 7) {
+      return 'Tendencia Semanal'
+    } else if (daysDiff <= 30) {
+      return 'Tendencia Mensual'
+    } else {
+      return 'Tendencia'
+    }
+  }
+
+  const getDescription = () => {
+    if (!dateRange?.from || !dateRange?.to) {
+      return 'Evolución de conversaciones en los últimos 7 días'
+    }
+    
+    const from = dateRange.from
+    const to = dateRange.to
+    
+    if (from.getTime() === to.getTime()) {
+      return `Conversaciones del ${format(from, 'dd/MM/yyyy', { locale: es })}`
+    }
+    
+    return `Evolución de conversaciones del ${format(from, 'dd/MM/yyyy', { locale: es })} al ${format(to, 'dd/MM/yyyy', { locale: es })}`
+  }
+
+  const chartData = data && data.length > 0 ? data : defaultData
+
   return (
     <Card className={cn('bg-white border-gray-200', className)}>
       <CardHeader className="px-4 sm:px-5 lg:px-6 pt-3 sm:pt-4 lg:pt-6 pb-2 sm:pb-3 lg:pb-4">
         <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
-          Tendencia Semanal
+          {getTitle()}
         </CardTitle>
         <p className="text-xs sm:text-sm text-gray-500">
-          Evolución de conversaciones en los últimos 7 días
+          {getDescription()}
         </p>
       </CardHeader>
       <CardContent className="px-4 sm:px-5 lg:px-6 pb-3 sm:pb-4 lg:pb-6">
-        <div className="h-56 sm:h-72 lg:h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
+        {chartData.length === 0 ? (
+          <div className="h-56 sm:h-72 lg:h-80 flex items-center justify-center text-muted-foreground">
+            No hay datos disponibles
+          </div>
+        ) : (
+          <div className="h-56 sm:h-72 lg:h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis 
                 dataKey="day" 
@@ -94,9 +143,10 @@ export function WeeklyTrendChart({
                 dot={{ fill: '#a855f7', strokeWidth: 2, r: isMobile ? 3 : 4 }}
                 activeDot={{ r: isMobile ? 5 : 6, stroke: '#a855f7', strokeWidth: 2 }}
               />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

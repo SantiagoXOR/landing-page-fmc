@@ -209,9 +209,9 @@ export class GeminiService {
 
       // Generar respuesta usando generateContent directamente
       // Manejar errores de modelo no disponible y probar con otros modelos
-      let result
-      let response
-      let text
+      let result: any
+      let response: any
+      let text: string | undefined
       
       try {
         result = await model.generateContent({
@@ -272,6 +272,11 @@ export class GeminiService {
           // Si es otro tipo de error, propagarlo
           throw error
         }
+      }
+
+      // Verificar que text fue asignada correctamente
+      if (!text) {
+        throw new Error('Failed to generate response from Gemini')
       }
 
       logger.info('Gemini chat response received', {

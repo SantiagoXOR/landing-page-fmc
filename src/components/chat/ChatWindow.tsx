@@ -98,7 +98,7 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
           </div>
         </div>
 
-        {/* Indicador de flujo de Manychat - Oculto en mobile muy pequeño */}
+        {/* Indicador de flujo del chatbot - Oculto en mobile muy pequeño */}
         {conversation.manychatData?.flowName && (
           <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
             <ManychatFlowIndicator

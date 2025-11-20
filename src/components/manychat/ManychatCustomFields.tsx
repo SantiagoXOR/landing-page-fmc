@@ -58,7 +58,7 @@ export function ManychatCustomFields({ leadId, manychatId }: ManychatCustomField
           }
         }
 
-        // Mapear campos del CRM a Manychat
+        // Mapear campos del CRM al chatbot
         const fieldsList: CustomField[] = [
           {
             name: 'dni',
@@ -123,7 +123,7 @@ export function ManychatCustomFields({ leadId, manychatId }: ManychatCustomField
     if (!manychatId) {
       addToast({
         title: 'Lead no sincronizado',
-        description: 'El lead debe estar sincronizado con Manychat primero',
+        description: 'El lead debe estar sincronizado con el chatbot primero',
         type: 'error',
       })
       return
@@ -216,7 +216,7 @@ export function ManychatCustomFields({ leadId, manychatId }: ManychatCustomField
             Custom Fields no disponibles
           </CardTitle>
           <CardDescription className="text-yellow-700">
-            El lead debe estar sincronizado con Manychat para gestionar custom fields
+            El lead debe estar sincronizado con el chatbot para gestionar custom fields
           </CardDescription>
         </CardHeader>
       </Card>
@@ -263,7 +263,7 @@ export function ManychatCustomFields({ leadId, manychatId }: ManychatCustomField
           </Button>
         </div>
         <CardDescription>
-          Mapeo de campos entre el CRM y Manychat
+          Mapeo de campos entre el CRM y el chatbot
         </CardDescription>
       </CardHeader>
 
@@ -328,7 +328,7 @@ export function ManychatCustomFields({ leadId, manychatId }: ManychatCustomField
                         </p>
                         {!field.synced && field.value && (
                           <p className="text-sm text-gray-600">
-                            <span className="text-xs text-gray-500">Manychat:</span>{' '}
+                            <span className="text-xs text-gray-500">Chatbot:</span>{' '}
                             {field.value}
                           </p>
                         )}
@@ -349,7 +349,7 @@ export function ManychatCustomFields({ leadId, manychatId }: ManychatCustomField
               {!field.synced && (
                 <div className="mt-2 pt-2 border-t border-yellow-200">
                   <p className="text-xs text-yellow-700">
-                    ⚠ Valor desincronizado. Sincroniza para actualizar Manychat.
+                    ⚠ Valor desincronizado. Sincroniza para actualizar el chatbot.
                   </p>
                 </div>
               )}

@@ -87,14 +87,14 @@ export function ManychatTagManager({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-blue-600" />
-            <CardTitle className="text-lg">Tags de Manychat</CardTitle>
+            <CardTitle className="text-lg">Tags del Chatbot</CardTitle>
           </div>
           {leadTags.length > 0 && (
             <Badge variant="outline">{leadTags.length} tags</Badge>
           )}
         </div>
         <CardDescription>
-          Gestiona los tags aplicados a este contacto en Manychat
+          Gestiona los tags aplicados a este contacto en el chatbot
         </CardDescription>
       </CardHeader>
 
@@ -190,7 +190,7 @@ export function ManychatTagManager({
         {/* Info footer */}
         <div className="pt-3 border-t">
           <ManychatBadge variant="info" size="sm">
-            Sincronizado con Manychat
+            Sincronizado con el chatbot
           </ManychatBadge>
         </div>
       </CardContent>

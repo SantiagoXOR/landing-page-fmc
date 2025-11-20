@@ -129,13 +129,13 @@ export function ManychatConnectionStatus({
               'w-3 h-3',
               status === 'checking' && 'animate-spin'
             )} />
-            <span>Manychat</span>
+            <span>Chatbot</span>
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-64" align="end">
           <div className="space-y-3">
             <div>
-              <h4 className="font-medium text-sm mb-1">Estado de Manychat</h4>
+              <h4 className="font-medium text-sm mb-1">Estado del Chatbot</h4>
               <div className="flex items-center gap-2">
                 <Icon className={cn('w-4 h-4', config.color)} />
                 <span className="text-sm">{config.text}</span>
@@ -184,7 +184,7 @@ export function ManychatConnectionStatus({
               config.color,
               status === 'checking' && 'animate-spin'
             )} />
-            <CardTitle className="text-base">Estado de Manychat</CardTitle>
+            <CardTitle className="text-base">Estado del Chatbot</CardTitle>
           </div>
           <Badge className={cn(config.bgColor, config.color, 'border', config.borderColor)}>
             {config.text}
@@ -201,7 +201,7 @@ export function ManychatConnectionStatus({
         {status === 'connected' && (
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-sm text-green-800">
-              ✓ Conexión establecida con Manychat API
+              ✓ Conexión establecida con el chatbot API
             </p>
           </div>
         )}

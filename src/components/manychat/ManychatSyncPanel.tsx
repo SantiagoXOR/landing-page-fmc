@@ -51,7 +51,7 @@ export function ManychatSyncPanel({ leadId, onSyncComplete }: ManychatSyncPanelP
       await syncNow()
       addToast({
         title: 'Sincronización exitosa',
-        description: 'El lead ha sido sincronizado con Manychat',
+        description: 'El lead ha sido sincronizado con el chatbot',
         type: 'success',
       })
       onSyncComplete?.()
@@ -67,17 +67,17 @@ export function ManychatSyncPanel({ leadId, onSyncComplete }: ManychatSyncPanelP
           <div className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-yellow-600" />
             <CardTitle className="text-lg text-yellow-900">
-              Manychat no configurado
+              Chatbot no configurado
             </CardTitle>
           </div>
           <CardDescription className="text-yellow-700">
-            La integración de Manychat no está configurada o no está disponible
+            La integración del chatbot no está configurada o no está disponible
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Button variant="outline" size="sm" asChild>
             <a href="/settings/manychat" className="flex items-center gap-2">
-              Configurar Manychat
+              Configurar Chatbot
               <ExternalLink className="w-4 h-4" />
             </a>
           </Button>
@@ -95,7 +95,7 @@ export function ManychatSyncPanel({ leadId, onSyncComplete }: ManychatSyncPanelP
               'w-5 h-5',
               syncStatus === 'syncing' ? 'animate-spin text-blue-600' : 'text-gray-600'
             )} />
-            <CardTitle className="text-lg">Sincronización Manychat</CardTitle>
+            <CardTitle className="text-lg">Sincronización del Chatbot</CardTitle>
           </div>
           {isSynced ? (
             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
@@ -109,7 +109,7 @@ export function ManychatSyncPanel({ leadId, onSyncComplete }: ManychatSyncPanelP
           )}
         </div>
         <CardDescription>
-          Estado de sincronización con Manychat API
+          Estado de sincronización con el chatbot API
         </CardDescription>
       </CardHeader>
 
@@ -117,7 +117,7 @@ export function ManychatSyncPanel({ leadId, onSyncComplete }: ManychatSyncPanelP
         {/* Estado general */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <p className="text-xs text-gray-500">Manychat ID</p>
+            <p className="text-xs text-gray-500">Chatbot ID</p>
             {leadData?.manychatId ? (
               <p className="text-sm font-mono bg-gray-50 px-2 py-1 rounded">
                 {leadData.manychatId}
@@ -223,7 +223,7 @@ export function ManychatSyncPanel({ leadId, onSyncComplete }: ManychatSyncPanelP
           </ManychatBadge>
           {isSynced && leadData?.manychatId && (
             <p className="text-xs text-gray-500 mt-2">
-              Este lead está vinculado como subscriber en Manychat
+              Este lead está vinculado como subscriber en el chatbot
             </p>
           )}
         </div>

@@ -80,7 +80,7 @@ export function ManychatMetrics({ className }: ManychatMetricsProps) {
           <CardContent>
             <div className="text-2xl font-bold">{totalSubscribers}</div>
             <p className="text-xs text-muted-foreground">
-              Total en Manychat
+              Total en el chatbot
             </p>
           </CardContent>
         </Card>
@@ -152,7 +152,7 @@ export function ManychatMetrics({ className }: ManychatMetricsProps) {
               <Badge variant="outline">{activeFlows.length}</Badge>
             </div>
             <CardDescription>
-              Flujos configurados en Manychat
+              Flujos configurados en el chatbot
             </CardDescription>
           </CardHeader>
           <CardContent>

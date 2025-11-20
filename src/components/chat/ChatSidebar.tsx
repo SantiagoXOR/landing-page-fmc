@@ -45,7 +45,7 @@ export function ChatSidebar({
   const [note, setNote] = useState('')
   const [selectedUser, setSelectedUser] = useState('')
   
-  // Hook de sincronización de Manychat
+  // Hook de sincronización del chatbot
   const {
     isSynced,
     syncNow,
@@ -133,14 +133,14 @@ export function ChatSidebar({
         </CardContent>
       </Card>
 
-      {/* Manychat Info */}
+      {/* Chatbot Info */}
       {conversation.lead?.id && (
         <Card className="border-blue-200 bg-blue-50/30">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-semibold text-blue-900 uppercase tracking-wider flex items-center gap-2">
                 <Bot className="w-4 h-4" />
-                Manychat
+                Chatbot
               </CardTitle>
               {conversation.lead?.manychatId && (
                 <Button
@@ -175,10 +175,10 @@ export function ChatSidebar({
               )}
             </div>
 
-            {/* Manychat ID */}
+            {/* Chatbot ID */}
             {conversation.lead?.manychatId && (
               <div>
-                <span className="text-xs text-gray-500">Manychat ID</span>
+                <span className="text-xs text-gray-500">Chatbot ID</span>
                 <p className="text-xs font-mono bg-white px-2 py-1 rounded mt-1">
                   {conversation.lead.manychatId}
                 </p>

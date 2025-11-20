@@ -190,15 +190,15 @@ export function ChatList({
               <p className="text-xs sm:text-sm text-gray-500 max-w-sm mb-3">
                 {searchTerm || filter !== 'all'
                   ? 'Intenta ajustar los filtros o la búsqueda'
-                  : 'Sincroniza con Manychat para ver las conversaciones de tus leads. Los mensajes llegarán automáticamente vía webhooks cuando haya actividad.'}
+                  : 'Sincroniza con el chatbot para ver las conversaciones de tus leads. Los mensajes llegarán automáticamente vía webhooks cuando haya actividad.'}
               </p>
               {!searchTerm && filter === 'all' && (
                 <div className="flex flex-col gap-2 text-xs text-gray-400">
                   <p>💡 Tip: Verifica que:</p>
                   <ul className="text-left list-disc list-inside space-y-1">
-                    <li>Los leads tengan manychatId o teléfono válido</li>
-                    <li>Los webhooks estén configurados en Manychat</li>
-                    <li>Haya actividad reciente en Manychat</li>
+                    <li>Los leads tengan chatbot ID o teléfono válido</li>
+                    <li>Los webhooks estén configurados en el chatbot</li>
+                    <li>Haya actividad reciente en el chatbot</li>
                   </ul>
                 </div>
               )}

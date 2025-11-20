@@ -53,7 +53,7 @@ export default function FlowsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        title="Flujos de Manychat"
+        title="Flujos del Chatbot"
         subtitle="Visualiza y gestiona los flujos automáticos configurados"
         showDateFilter={false}
         showExportButton={false}
@@ -86,7 +86,7 @@ export default function FlowsPage() {
                   Flujos Disponibles
                 </CardTitle>
                 <CardDescription>
-                  Flujos configurados en tu cuenta de Manychat
+                  Flujos configurados en tu cuenta del chatbot
                 </CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={fetchFlows}>
@@ -170,7 +170,7 @@ export default function FlowsPage() {
                           className="flex items-center justify-center gap-2"
                         >
                           <ExternalLink className="w-3 h-3" />
-                          Editar en Manychat
+                          Editar en el Chatbot
                         </a>
                       </Button>
                     </CardContent>
@@ -184,7 +184,7 @@ export default function FlowsPage() {
                   No hay flujos configurados
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Crea flujos automáticos en Manychat para aparecer aquí
+                  Crea flujos automáticos en el chatbot para aparecer aquí
                 </p>
                 <Button variant="outline" asChild>
                   <a
@@ -194,7 +194,7 @@ export default function FlowsPage() {
                     className="flex items-center gap-2"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    Ir a Manychat
+                    Ir al Chatbot
                   </a>
                 </Button>
               </div>

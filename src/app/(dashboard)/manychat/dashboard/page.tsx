@@ -12,8 +12,8 @@ export default function ManychatDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        title="Dashboard de Manychat"
-        subtitle="Métricas y estadísticas de la integración con Manychat"
+        title="Dashboard del Chatbot"
+        subtitle="Métricas y estadísticas de la integración con el chatbot"
         showDateFilter={false}
         showExportButton={false}
         showNewButton={false}
@@ -40,7 +40,7 @@ export default function ManychatDashboardPage() {
               </div>
               <div>
                 <CardTitle className="text-xl text-purple-900">
-                  Integración Híbrida Manychat
+                  Integración Híbrida del Chatbot
                 </CardTitle>
                 <CardDescription className="text-purple-700">
                   Flujos automáticos + Gestión manual desde el CRM
@@ -57,7 +57,7 @@ export default function ManychatDashboardPage() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-2"
                 >
-                  Abrir Manychat
+                  Abrir Chatbot
                   <ExternalLink className="w-4 h-4" />
                 </a>
               </Button>
@@ -99,7 +99,7 @@ export default function ManychatDashboardPage() {
                 <ul className="space-y-1 text-gray-600">
                   <li>• Usa el tab "Tags" en detalle de lead</li>
                   <li>• Agrega/remueve tags fácilmente</li>
-                  <li>• Sincronización automática con Manychat</li>
+                  <li>• Sincronización automática con el chatbot</li>
                 </ul>
               </div>
 

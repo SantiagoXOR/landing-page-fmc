@@ -74,7 +74,7 @@ export function TagPill({
             {pill}
           </TooltipTrigger>
           <TooltipContent>
-            <p className="text-xs">Tag de Manychat: {tag}</p>
+            <p className="text-xs">Tag del chatbot: {tag}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

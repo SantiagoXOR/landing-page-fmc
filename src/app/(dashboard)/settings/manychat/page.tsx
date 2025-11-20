@@ -43,7 +43,7 @@ export default function ManychatSettingsPage() {
     try {
       setLoading(true)
       
-      // Verificar estado de Manychat
+      // Verificar estado del chatbot
       const healthResponse = await fetch('/api/manychat/health')
       const healthData = await healthResponse.json()
       
@@ -83,8 +83,8 @@ export default function ManychatSettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        title="Configuración de Manychat"
-        subtitle="Gestiona la integración con Manychat API"
+        title="Configuración del Chatbot"
+        subtitle="Gestiona la integración con el chatbot API"
         showDateFilter={false}
         showExportButton={false}
         showNewButton={false}
@@ -124,7 +124,7 @@ export default function ManychatSettingsPage() {
                   API Key
                 </CardTitle>
                 <CardDescription>
-                  Configuración de la clave de API de Manychat
+                  Configuración de la clave de API del chatbot
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -156,7 +156,7 @@ export default function ManychatSettingsPage() {
                 <div className="border-t pt-4">
                   <h4 className="font-medium text-sm mb-2">Cómo obtener tu API Key:</h4>
                   <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                    <li>Ve a Manychat → Settings → API</li>
+                    <li>Ve al chatbot → Settings → API</li>
                     <li>Haz clic en "Generate your API Key"</li>
                     <li>Copia la key (empieza con MCAPIKey-)</li>
                     <li>Agrégala a tu archivo .env.local</li>
@@ -189,7 +189,7 @@ export default function ManychatSettingsPage() {
                         className="flex items-center gap-2 text-xs"
                       >
                         <ExternalLink className="w-3 h-3" />
-                        Ver guía oficial de Manychat
+                        Ver guía oficial del chatbot
                       </a>
                     </Button>
                   </div>
@@ -207,7 +207,7 @@ export default function ManychatSettingsPage() {
                   Configuración de Webhook
                 </CardTitle>
                 <CardDescription>
-                  URL de webhook para recibir eventos de Manychat
+                  URL de webhook para recibir eventos del chatbot
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -230,7 +230,7 @@ export default function ManychatSettingsPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Usa esta URL en la configuración de webhooks de Manychat
+                    Usa esta URL en la configuración de webhooks del chatbot
                   </p>
                 </div>
 
@@ -258,12 +258,12 @@ export default function ManychatSettingsPage() {
 
                 {/* Instrucciones */}
                 <div className="border-t pt-4">
-                  <h4 className="font-medium text-sm mb-2">Configurar en Manychat:</h4>
+                  <h4 className="font-medium text-sm mb-2">Configurar en el chatbot:</h4>
                   <div className="text-sm text-gray-600 space-y-3">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
-                      <p className="font-medium text-yellow-900 mb-2">⚠️ Manychat NO tiene webhooks directos</p>
+                      <p className="font-medium text-yellow-900 mb-2">⚠️ El chatbot NO tiene webhooks directos</p>
                       <p className="text-yellow-800 text-xs mb-2">
-                        Manychat no ofrece webhooks salientes configurables. Debes usar <strong>Flows (Automatizaciones)</strong> con acciones <strong>HTTP Request</strong>.
+                        El chatbot no ofrece webhooks salientes configurables. Debes usar <strong>Flows (Automatizaciones)</strong> con acciones <strong>HTTP Request</strong>.
                       </p>
                       <a 
                         href="/docs/CONFIGURAR-WEBHOOK-MANYCHAT-PASO-A-PASO.md"
@@ -307,7 +307,7 @@ export default function ManychatSettingsPage() {
                   Mapeo de Campos
                 </CardTitle>
                 <CardDescription>
-                  Mapeo automático entre CRM y Manychat
+                  Mapeo automático entre CRM y el chatbot
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -347,7 +347,7 @@ export default function ManychatSettingsPage() {
 
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    ℹ️ El mapeo es automático. Los cambios en el CRM se sincronizan a Manychat
+                    ℹ️ El mapeo es automático. Los cambios en el CRM se sincronizan al chatbot
                     y viceversa según la configuración de webhooks.
                   </p>
                 </div>
@@ -364,7 +364,7 @@ export default function ManychatSettingsPage() {
                   Documentación
                 </CardTitle>
                 <CardDescription>
-                  Guías y recursos para la integración de Manychat
+                  Guías y recursos para la integración del chatbot
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -400,7 +400,7 @@ export default function ManychatSettingsPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <span>API de Manychat (Oficial)</span>
+                    <span>API del Chatbot (Oficial)</span>
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 </Button>
@@ -415,7 +415,7 @@ export default function ManychatSettingsPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <span>Centro de Ayuda de Manychat</span>
+                    <span>Centro de Ayuda del Chatbot</span>
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 </Button>
@@ -460,14 +460,14 @@ export default function ManychatSettingsPage() {
                 <ul className="text-gray-600 ml-4 mt-1 space-y-0.5">
                   <li>• Verifica que la URL sea accesible públicamente</li>
                   <li>• Confirma que el webhook secret coincida</li>
-                  <li>• Revisa los logs en Manychat Settings → API → Webhooks</li>
+                  <li>• Revisa los logs en el chatbot Settings → API → Webhooks</li>
                 </ul>
               </div>
 
               <div>
                 <p className="font-medium text-gray-900">❓ Error al enviar mensajes</p>
                 <ul className="text-gray-600 ml-4 mt-1 space-y-0.5">
-                  <li>• Verifica que el subscriber exista en Manychat</li>
+                  <li>• Verifica que el subscriber exista en el chatbot</li>
                   <li>• Confirma que el teléfono esté en formato E.164 (+51...)</li>
                   <li>• Revisa que la API Key sea válida</li>
                 </ul>
@@ -477,8 +477,8 @@ export default function ManychatSettingsPage() {
                 <p className="font-medium text-gray-900">❓ Tags no se sincronizan</p>
                 <ul className="text-gray-600 ml-4 mt-1 space-y-0.5">
                   <li>• Los tags son case-sensitive</li>
-                  <li>• Verifica que el tag exista en Manychat</li>
-                  <li>• Revisa logs de sincronización en ManychatSync</li>
+                  <li>• Verifica que el tag exista en el chatbot</li>
+                  <li>• Revisa logs de sincronización en el chatbot</li>
                 </ul>
               </div>
             </div>

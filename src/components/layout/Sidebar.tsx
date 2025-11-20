@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils"
 import {
   Home,
   MessageSquare,
-  Layers,
   Bot,
   Tag,
   Users,
@@ -54,11 +53,6 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     href: "/chats",
     icon: MessageSquare,
     badge: "18" // TODO: hacer dinámico desde API
-  },
-  {
-    name: "Conexiones",
-    href: "/conexiones",
-    icon: Layers
   },
   
   // Separador - Entrenamiento
@@ -114,9 +108,9 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     icon: BarChart3
   },
   
-  // Separador - Manychat
+  // Separador - Chatbot
   {
-    name: "Manychat",
+    name: "Chatbot",
     href: "#",
     icon: null,
     isHeader: true

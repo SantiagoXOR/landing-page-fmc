@@ -102,7 +102,7 @@ export default function BroadcastsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        title="Broadcasts de Manychat"
+        title="Broadcasts del Chatbot"
         subtitle="Gestiona los envíos masivos de mensajes"
         showDateFilter={false}
         showExportButton={false}

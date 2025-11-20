@@ -59,21 +59,23 @@ export class TagsService {
     tag?: string
     page?: number
     limit?: number
+    fechaDesde?: string
+    fechaHasta?: string
   } = {}): Promise<TagsResponse> {
-    const { tag, page = 1, limit = 50 } = options
+    const { tag, page = 1, limit = 50, fechaDesde, fechaHasta } = options
     
     try {
       if (!supabase.client) {
         throw new Error('Base de datos no disponible')
       }
 
-      // Usar cache para consultas frecuentes
-      const cacheKey = `tags:leads:${JSON.stringify(options)}`
+      // Usar cache para consultas frecuentes (sin incluir fecha en cache si no hay filtro)
+      const cacheKey = `tags:leads:${JSON.stringify({ tag, page, limit, fechaDesde, fechaHasta })}`
       
       return await cacheService.getOrSet(
         cacheKey,
         async () => {
-          return await this.fetchLeadsByTags(tag, page, limit)
+          return await this.fetchLeadsByTags(tag, page, limit, fechaDesde, fechaHasta)
         },
         {
           ttl: 300, // 5 minutos
@@ -92,17 +94,33 @@ export class TagsService {
   private async fetchLeadsByTags(
     filterTag?: string,
     page: number = 1,
-    limit: number = 50
+    limit: number = 50,
+    fechaDesde?: string,
+    fechaHasta?: string
   ): Promise<TagsResponse> {
     if (!supabase.client) {
       throw new Error('Base de datos no disponible')
     }
 
-    // Obtener todos los leads con tags
-    const { data: leads, error } = await supabase.client
+    // Construir query con filtros de fecha
+    let query = supabase.client
       .from('Lead')
-      .select('id, nombre, telefono, email, tags')
+      .select('id, nombre, telefono, email, tags, createdAt')
       .order('createdAt', { ascending: false })
+
+    // Aplicar filtros de fecha si existen
+    if (fechaDesde) {
+      query = query.gte('createdAt', fechaDesde)
+    }
+    if (fechaHasta) {
+      // Agregar un día completo para incluir el día hasta
+      const fechaHastaCompleta = new Date(fechaHasta)
+      fechaHastaCompleta.setHours(23, 59, 59, 999)
+      query = query.lte('createdAt', fechaHastaCompleta.toISOString())
+    }
+
+    // Obtener todos los leads con tags
+    const { data: leads, error } = await query
 
     if (error) {
       throw error

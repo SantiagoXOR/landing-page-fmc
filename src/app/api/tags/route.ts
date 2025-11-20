@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
     const tag = searchParams.get('tag') || undefined
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
+    const fechaDesde = searchParams.get('fechaDesde') || undefined
+    const fechaHasta = searchParams.get('fechaHasta') || undefined
 
     // Validar parámetros
     if (page < 1) {
@@ -48,10 +50,10 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    if (limit < 1 || limit > 100) {
+    if (limit < 1 || limit > 10000) {
       return NextResponse.json({ 
         error: 'Bad Request',
-        message: 'El parámetro limit debe estar entre 1 y 100'
+        message: 'El parámetro limit debe estar entre 1 y 10000'
       }, { status: 400 })
     }
 
@@ -59,7 +61,9 @@ export async function GET(request: NextRequest) {
     const result = await tagsService.getLeadsByTags({
       tag,
       page,
-      limit
+      limit,
+      fechaDesde,
+      fechaHasta
     })
 
     logger.info('Tags obtenidos exitosamente', {

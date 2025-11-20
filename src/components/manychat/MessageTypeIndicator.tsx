@@ -42,7 +42,7 @@ export function MessageTypeIndicator({
     if (messageType === 'template') {
       parts.push('Mensaje enviado usando template de WhatsApp')
     } else {
-      parts.push('Mensaje enviado automáticamente por Manychat')
+      parts.push('Mensaje enviado automáticamente por el chatbot')
     }
     
     if (flowName) {

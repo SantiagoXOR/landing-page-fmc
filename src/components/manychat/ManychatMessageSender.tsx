@@ -74,7 +74,7 @@ export default function ManychatMessageSender({
     setSuccess(null)
 
     try {
-      // Enviar mensaje vía API de WhatsApp (que internamente usa Manychat si está configurado)
+      // Enviar mensaje vía API de WhatsApp (que internamente usa el chatbot si está configurado)
       const response = await fetch('/api/whatsapp/send-message', {
         method: 'POST',
         headers: {
@@ -101,7 +101,7 @@ export default function ManychatMessageSender({
       
       addToast({
         title: 'Mensaje enviado',
-        description: `Mensaje enviado a ${telefono} ${isManychatConfigured ? 'vía Manychat' : ''}`,
+        description: `Mensaje enviado a ${telefono} ${isManychatConfigured ? 'vía chatbot' : ''}`,
         type: 'success',
       })
 
@@ -141,7 +141,7 @@ export default function ManychatMessageSender({
           </div>
           {isManychatConfigured && (
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-              Manychat
+              Chatbot
             </Badge>
           )}
         </div>
@@ -149,7 +149,7 @@ export default function ManychatMessageSender({
           Enviar mensaje a {telefono}
           {!isSynced && isManychatConfigured && (
             <span className="block text-yellow-600 text-xs mt-1">
-              ⚠️ Lead no sincronizado con Manychat. Se sincronizará al enviar.
+              ⚠️ Lead no sincronizado con el chatbot. Se sincronizará al enviar.
             </span>
           )}
         </CardDescription>
@@ -303,12 +303,12 @@ export default function ManychatMessageSender({
             <Badge variant="outline" className={cn(
               isManychatConfigured ? 'text-blue-600 border-blue-200' : 'text-gray-600'
             )}>
-              {isManychatConfigured ? 'Manychat API' : 'WhatsApp Business API'}
+              {isManychatConfigured ? 'Chatbot API' : 'WhatsApp Business API'}
             </Badge>
           </div>
           {isManychatConfigured && isSynced && (
             <p className="text-xs text-gray-500 mt-2">
-              ✓ Contacto sincronizado con Manychat
+              ✓ Contacto sincronizado con el chatbot
             </p>
           )}
         </div>

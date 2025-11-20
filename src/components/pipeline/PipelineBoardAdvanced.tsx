@@ -47,6 +47,14 @@ export function PipelineBoardAdvanced({
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
+  // Log para debugging
+  console.log('PipelineBoardAdvanced render:', {
+    stagesCount: stages.length,
+    leadsCount: leads.length,
+    stageIds: stages.map(s => s.id),
+    leadStageIds: leads.map(l => l.stageId)
+  })
+
   // Hook para drag & drop
   const {
     activeId,
@@ -70,16 +78,21 @@ export function PipelineBoardAdvanced({
       // Aquí se podría enviar a analytics o logging
     }
   })
+  
+  // Log leads agrupados por etapa
+  console.log('Leads by stage:', leadsByStage())
 
   // Filtrar leads según búsqueda
   const filteredLeadsByStage = useCallback(() => {
+    const leadsByStageData = leadsByStage() // Llamar a la función para obtener los datos
+    
     if (!searchTerm && selectedFilters.length === 0) {
-      return leadsByStage
+      return leadsByStageData
     }
 
     const filtered: Record<string, PipelineLead[]> = {}
     
-    Object.entries(leadsByStage).forEach(([stageId, stageLeads]) => {
+    Object.entries(leadsByStageData).forEach(([stageId, stageLeads]) => {
       filtered[stageId] = stageLeads.filter(lead => {
         // Filtro de búsqueda
         if (searchTerm) {

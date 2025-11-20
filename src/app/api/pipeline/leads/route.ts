@@ -290,9 +290,16 @@ export async function GET(request: NextRequest) {
       leadsWithoutPipeline: leadsWithoutPipelineCount,
       leadsByEstado,
       leadsByStage,
-      pipelineStageMapping: Object.entries(pipelineStageToStageId)
+      pipelineStageMapping: Object.entries(pipelineStageToStageId),
+      sampleLeads: pipelineLeads.slice(0, 3).map(l => ({
+        id: l.id,
+        nombre: l.nombre,
+        stageId: l.stageId,
+        estado: l.estado
+      }))
     })
 
+    // Devolver los leads del pipeline
     return NextResponse.json(pipelineLeads)
 
   } catch (error: any) {

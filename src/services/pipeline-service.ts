@@ -45,6 +45,10 @@ export class PipelineService {
       }
       
       const data = await response.json()
+      // Manejar tanto formato { stages: [...] } como array directo
+      if (Array.isArray(data)) {
+        return data
+      }
       return data.stages || []
     } catch (error) {
       console.error('Error fetching stages:', error)

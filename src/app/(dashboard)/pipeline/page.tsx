@@ -53,6 +53,13 @@ function PipelinePage() {
         pipelineService.getLeads()
       ])
 
+      console.log('Pipeline data loaded:', {
+        stagesCount: stagesData?.length || 0,
+        leadsCount: leadsData?.length || 0,
+        stages: stagesData?.map(s => ({ id: s.id, name: s.name })),
+        leadsSample: leadsData?.slice(0, 3).map(l => ({ id: l.id, nombre: l.nombre, stageId: l.stageId }))
+      })
+
       // Validar que existan stages
       if (!stagesData || stagesData.length === 0) {
         // Crear stages por defecto si no existen
@@ -69,6 +76,11 @@ function PipelinePage() {
 
       setStages(stagesData)
       setLeads(leadsData)
+      
+      console.log('Pipeline state updated:', {
+        stagesSet: stagesData.length,
+        leadsSet: leadsData.length
+      })
 
       // Cargar métricas
       try {

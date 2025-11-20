@@ -250,10 +250,12 @@ export async function GET(request: NextRequest) {
     // En una implementación real, estas vendrían de la base de datos
     logger.info('Pipeline stages requested', {
       userId: session.user.id,
-      userName: session.user.name
+      userName: session.user.name,
+      stagesCount: defaultStages.length
     })
 
-    return NextResponse.json(defaultStages)
+    // Devolver en formato esperado por el servicio
+    return NextResponse.json({ stages: defaultStages })
 
   } catch (error: any) {
     logger.error('Error getting pipeline stages', {

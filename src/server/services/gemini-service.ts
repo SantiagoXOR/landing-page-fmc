@@ -102,8 +102,8 @@ export class GeminiService {
 
       // Obtener el modelo
       // Usar generateContent directamente en lugar de startChat para mejor compatibilidad
-      // Intentar con gemini-1.5-flash primero (más común y rápido)
-      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      // Usar gemini-2.0-flash que está disponible en v1beta según la documentación
+      const model = this.genAI!.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
       // Construir el historial de conversación
       // Las instrucciones del asistente se usan como system prompt
@@ -233,8 +233,8 @@ export class GeminiService {
             assistantId 
           })
           
-          // Probar con modelos alternativos
-          const alternativeModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+          // Probar con modelos alternativos (gemini-2.0-flash debería funcionar, pero por si acaso)
+          const alternativeModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
           let success = false
           
           for (const altModelName of alternativeModels) {

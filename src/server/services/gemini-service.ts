@@ -102,8 +102,8 @@ export class GeminiService {
 
       // Obtener el modelo
       // Usar generateContent directamente en lugar de startChat para mejor compatibilidad
-      // Intentar con modelos disponibles - el SDK manejará el error si el modelo no está disponible
-      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
+      // Intentar con gemini-1.5-flash primero (más común y rápido)
+      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
       // Construir el historial de conversación
       // Las instrucciones del asistente se usan como system prompt
@@ -208,18 +208,71 @@ export class GeminiService {
       })
 
       // Generar respuesta usando generateContent directamente
-      const result = await model.generateContent({
-        contents: contents,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        }
-      })
+      // Manejar errores de modelo no disponible y probar con otros modelos
+      let result
+      let response
+      let text
       
-      const response = await result.response
-      const text = response.text()
+      try {
+        result = await model.generateContent({
+          contents: contents,
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          }
+        })
+        response = await result.response
+        text = response.text()
+      } catch (error: any) {
+        // Si el error es que el modelo no está disponible, intentar con otros modelos
+        if (error.message && error.message.includes('404 Not Found') && error.message.includes('models/')) {
+          logger.warn('Model not available, trying alternative models', { 
+            error: error.message,
+            assistantId 
+          })
+          
+          // Probar con modelos alternativos
+          const alternativeModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+          let success = false
+          
+          for (const altModelName of alternativeModels) {
+            try {
+              const altModel = this.genAI!.getGenerativeModel({ model: altModelName })
+              logger.info(`Trying alternative model: ${altModelName}`, { assistantId })
+              
+              result = await altModel.generateContent({
+                contents: contents,
+                generationConfig: {
+                  temperature: 0.7,
+                  topK: 40,
+                  topP: 0.95,
+                  maxOutputTokens: 1024,
+                }
+              })
+              response = await result.response
+              text = response.text()
+              success = true
+              logger.info(`Successfully used alternative model: ${altModelName}`, { assistantId })
+              break
+            } catch (altError: any) {
+              logger.warn(`Alternative model ${altModelName} also failed`, { 
+                error: altError.message,
+                assistantId 
+              })
+              continue
+            }
+          }
+          
+          if (!success) {
+            throw new Error(`No available Gemini models found. Last error: ${error.message}`)
+          }
+        } else {
+          // Si es otro tipo de error, propagarlo
+          throw error
+        }
+      }
 
       logger.info('Gemini chat response received', {
         assistantId,

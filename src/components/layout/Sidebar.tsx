@@ -13,7 +13,6 @@ import {
   MessageSquare,
   Layers,
   Bot,
-  Sparkles,
   Tag,
   Users,
   TrendingUp,
@@ -73,11 +72,6 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     name: "Asistentes",
     href: "/asistentes",
     icon: Bot
-  },
-  {
-    name: "Testing",
-    href: "/testing",
-    icon: Sparkles
   },
   
   // Separador - CRM

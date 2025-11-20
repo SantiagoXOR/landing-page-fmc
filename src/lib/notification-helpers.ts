@@ -1,5 +1,5 @@
 import { broadcastNotification, sendNotificationToUser } from '@/server/websocket-server'
-import { broadcastSSENotification, sendSSENotification } from '@/app/api/notifications/stream/route'
+import { broadcastSSENotification } from '@/lib/sse-notifications'
 import { RealtimeNotification } from '@/lib/realtime-notifications'
 import { logger } from '@/lib/logger'
 

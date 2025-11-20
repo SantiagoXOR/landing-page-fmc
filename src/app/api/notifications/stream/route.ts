@@ -3,85 +3,10 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { RealtimeNotification } from '@/lib/realtime-notifications'
+import { registerSSEClient, unregisterSSEClient, updateSSEClientActivity } from '@/lib/sse-notifications'
 
 // Forzar renderizado dinámico
 export const dynamic = 'force-dynamic'
-
-// Almacenar clientes SSE conectados
-interface SSEClient {
-  userId: string
-  controller: ReadableStreamDefaultController
-  lastActivity: number
-}
-
-const sseClients = new Map<string, SSEClient>()
-
-// Limpiar clientes inactivos cada 30 segundos
-setInterval(() => {
-  const now = Date.now()
-  const timeout = 120000 // 2 minutos de inactividad
-  
-  for (const [id, client] of sseClients.entries()) {
-    if (now - client.lastActivity > timeout) {
-      try {
-        client.controller.close()
-      } catch (error) {
-        // El stream ya está cerrado
-      }
-      sseClients.delete(id)
-      logger.info('SSE client disconnected (timeout)', { userId: client.userId })
-    }
-  }
-}, 30000)
-
-// Función para enviar notificación a un cliente SSE
-export function sendSSENotification(userId: string, notification: RealtimeNotification) {
-  let sent = false
-  
-  for (const [id, client] of sseClients.entries()) {
-    if (client.userId === userId) {
-      try {
-        const data = JSON.stringify(notification)
-        client.controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`))
-        client.lastActivity = Date.now()
-        sent = true
-      } catch (error) {
-        logger.warn('Error sending SSE notification, removing client', { userId, error })
-        sseClients.delete(id)
-      }
-    }
-  }
-  
-  return sent
-}
-
-// Función para broadcast a todos los clientes
-export function broadcastSSENotification(notification: RealtimeNotification, excludeUserId?: string) {
-  let sentCount = 0
-  
-  for (const [id, client] of sseClients.entries()) {
-    if (excludeUserId && client.userId === excludeUserId) {
-      continue
-    }
-    
-    // Si la notificación tiene userId, solo enviar a ese usuario
-    if (notification.userId && client.userId !== notification.userId) {
-      continue
-    }
-    
-    try {
-      const data = JSON.stringify(notification)
-      client.controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`))
-      client.lastActivity = Date.now()
-      sentCount++
-    } catch (error) {
-      logger.warn('Error broadcasting SSE notification, removing client', { userId: client.userId, error })
-      sseClients.delete(id)
-    }
-  }
-  
-  return sentCount
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,11 +26,7 @@ export async function GET(request: NextRequest) {
     const stream = new ReadableStream({
       start(controller) {
         // Guardar cliente
-        sseClients.set(clientId, {
-          userId,
-          controller,
-          lastActivity: Date.now()
-        })
+        registerSSEClient(clientId, userId, controller)
 
         // Enviar mensaje inicial de conexión
         const welcomeNotification: RealtimeNotification = {
@@ -130,14 +51,11 @@ export async function GET(request: NextRequest) {
         const heartbeatInterval = setInterval(() => {
           try {
             controller.enqueue(new TextEncoder().encode(`: heartbeat\n\n`))
-            const client = sseClients.get(clientId)
-            if (client) {
-              client.lastActivity = Date.now()
-            }
+            updateSSEClientActivity(clientId)
           } catch (error) {
             // Cliente desconectado
             clearInterval(heartbeatInterval)
-            sseClients.delete(clientId)
+            unregisterSSEClient(clientId)
             logger.info('SSE client disconnected', { userId, clientId })
           }
         }, 30000)
@@ -145,7 +63,7 @@ export async function GET(request: NextRequest) {
         // Limpiar cuando el cliente se desconecta
         request.signal.addEventListener('abort', () => {
           clearInterval(heartbeatInterval)
-          sseClients.delete(clientId)
+          unregisterSSEClient(clientId)
           logger.info('SSE client disconnected (abort)', { userId, clientId })
           try {
             controller.close()
@@ -156,7 +74,7 @@ export async function GET(request: NextRequest) {
       },
       
       cancel() {
-        sseClients.delete(clientId)
+        unregisterSSEClient(clientId)
         logger.info('SSE stream cancelled', { userId, clientId })
       }
     })

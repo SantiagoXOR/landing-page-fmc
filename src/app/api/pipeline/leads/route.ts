@@ -40,9 +40,17 @@ function getProbabilityForStage(stageId: string): number {
 // para que aparezcan en el pipeline. Si un lead no tiene estado o tiene un estado
 // no mapeado, se asignará a la etapa 'nuevo' por defecto.
 function mapLeadToPipelineLead(lead: any, lastEvent: any = null, assignedTo?: string): PipelineLead {
+  // Normalizar el estado (trim espacios y convertir a mayúsculas para consistencia)
+  const estadoNormalizado = lead.estado ? String(lead.estado).trim().toUpperCase() : 'NUEVO'
+  
   // Mapear el estado del lead a un stageId del pipeline
   // Si el estado no está en el mapeo, usar 'nuevo' como defecto
-  const stageId = estadoToStageId[lead.estado] || 'nuevo'
+  const stageId = estadoToStageId[estadoNormalizado] || 'nuevo'
+  
+  // Log para debugging si el estado no está mapeado
+  if (!estadoToStageId[estadoNormalizado] && lead.estado) {
+    console.warn(`Estado no mapeado encontrado: "${lead.estado}" (normalizado: "${estadoNormalizado}") - Asignado a etapa "nuevo"`)
+  }
   const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
   
   // Usar el evento más reciente pasado como parámetro, o la fecha de creación del lead
@@ -119,8 +127,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
 
     // Construir filtros para la consulta de leads
+    // Para el pipeline, necesitamos obtener todos los leads sin límite estricto
     const filters: any = {
-      limit: 100, // Límite razonable para el pipeline
+      limit: 1000, // Límite aumentado para incluir todos los leads del pipeline
       offset: 0
     }
 
@@ -176,16 +185,31 @@ export async function GET(request: NextRequest) {
       pipelineLeads = pipelineLeads.filter(lead => lead.assignedTo === assignedTo)
     }
 
+    // Agrupar leads por estado original y stageId para debugging
+    const leadsByEstado = leads.reduce((acc, lead) => {
+      const estado = lead.estado || 'SIN_ESTADO'
+      acc[estado] = (acc[estado] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const leadsByStage = pipelineLeads.reduce((acc, lead) => {
+      acc[lead.stageId] = (acc[lead.stageId] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
     logger.info('Pipeline leads requested', {
       userId: session.user.id,
       userName: session.user.name,
       filters: { stageId, priority, assignedTo, search },
       resultCount: pipelineLeads.length,
       totalLeads: total,
-      leadsByStage: pipelineLeads.reduce((acc, lead) => {
-        acc[lead.stageId] = (acc[lead.stageId] || 0) + 1
+      leadsByEstado,
+      leadsByStage,
+      estadoMapping: Object.entries(estadoToStageId).reduce((acc, [estado, stageId]) => {
+        if (!acc[stageId]) acc[stageId] = []
+        acc[stageId].push(estado)
         return acc
-      }, {} as Record<string, number>)
+      }, {} as Record<string, string[]>)
     })
 
     return NextResponse.json(pipelineLeads)

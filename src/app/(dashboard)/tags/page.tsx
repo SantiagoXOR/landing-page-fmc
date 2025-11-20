@@ -405,7 +405,7 @@ export default function SmartTagsPage() {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              tags: JSON.stringify(updatedTags)
+              tags: updatedTags
             })
           })
 

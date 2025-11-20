@@ -334,6 +334,7 @@ export const CacheInvalidation = {
   // Invalidar cuando se crea/actualiza/elimina un lead
   onLeadChange: () => {
     cacheService.invalidateByTag('leads')
+    cacheService.invalidateByTag('tags')
     cacheService.invalidateByTag('stats')
     cacheService.invalidateByTag('dashboard')
   },

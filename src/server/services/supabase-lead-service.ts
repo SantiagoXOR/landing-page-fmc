@@ -447,6 +447,22 @@ export class SupabaseLeadService {
         Object.entries(updates).filter(([_, value]) => value !== null && value !== undefined && value !== '')
       )
 
+      // Si hay tags, asegurarse de que sean un string JSON
+      if (cleanUpdates.tags) {
+        if (typeof cleanUpdates.tags === 'string') {
+          // Ya es un string, verificar que sea JSON válido
+          try {
+            JSON.parse(cleanUpdates.tags)
+          } catch {
+            // Si no es JSON válido, convertirlo
+            cleanUpdates.tags = JSON.stringify([cleanUpdates.tags])
+          }
+        } else if (Array.isArray(cleanUpdates.tags)) {
+          // Convertir array a JSON string
+          cleanUpdates.tags = JSON.stringify(cleanUpdates.tags)
+        }
+      }
+
       const dataWithTimestamp = {
         ...cleanUpdates,
         updatedAt: new Date().toISOString()
@@ -464,6 +480,13 @@ export class SupabaseLeadService {
       const lead = Array.isArray(result) ? result[0] : result
 
       logger.info('Lead updated successfully', { leadId: id })
+
+      // Invalidar cache relacionado con leads y tags
+      CacheInvalidation.onLeadChange()
+      if (cleanUpdates.tags) {
+        cacheService.invalidateByTag('tags')
+      }
+
       return lead
 
     } catch (error: any) {

@@ -245,6 +245,20 @@ export const LeadUpdateSchema = z.object({
   notas: z.string()
     .max(1000, 'Notas no pueden exceder 1000 caracteres')
     .optional(),
+
+  tags: z.union([
+    z.string().transform((val) => {
+      // Si ya es un string JSON válido, retornarlo
+      try {
+        JSON.parse(val)
+        return val
+      } catch {
+        // Si no es JSON válido, intentar convertirlo
+        return JSON.stringify([val])
+      }
+    }),
+    z.array(z.string()).transform((val) => JSON.stringify(val))
+  ]).optional(),
 })
 
 // Schemas para validaciones de parámetros de rutas

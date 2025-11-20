@@ -21,6 +21,19 @@ export interface ChatResponse {
   }
 }
 
+export interface LeadInfo {
+  nombre?: string
+  cuil?: string
+  zona?: string
+  trabajo_actual?: string
+  banco?: string
+  producto?: string
+  telefono?: string
+  email?: string
+  ingresos?: number
+  monto?: number
+}
+
 export class GeminiService {
   private static instance: GeminiService | null = null
   private genAI: GoogleGenerativeAI | null = null
@@ -77,7 +90,8 @@ export class GeminiService {
    */
   async chat(
     assistantId: string,
-    messages: ChatMessage[]
+    messages: ChatMessage[],
+    leadInfo?: LeadInfo
   ): Promise<ChatResponse> {
     try {
       if (!this.isReady()) {
@@ -107,7 +121,15 @@ export class GeminiService {
 
       // Construir el historial de conversación
       // Las instrucciones del asistente se usan como system prompt
-      const systemInstruction = assistant.instrucciones || 'Eres un asistente virtual útil y amigable.'
+      let systemInstruction = assistant.instrucciones || 'Eres un asistente virtual útil y amigable.'
+      
+      // Agregar información del lead si está disponible
+      if (leadInfo) {
+        const leadDataSection = this.buildLeadInfoSection(leadInfo)
+        if (leadDataSection) {
+          systemInstruction = `${systemInstruction}\n\n---\n\nINFORMACIÓN DEL CLIENTE DISPONIBLE:\n${leadDataSection}\n\nIMPORTANTE: Usa esta información cuando esté disponible. Si el cliente ya proporcionó esta información, NO vuelvas a preguntarla.`
+        }
+      }
 
       // Preparar el historial de mensajes
       // Gemini requiere pares user-model alternados y que comience con 'user'
@@ -299,6 +321,46 @@ export class GeminiService {
       })
       throw error
     }
+  }
+
+  /**
+   * Construir sección de información del lead para incluir en las instrucciones
+   */
+  private buildLeadInfoSection(leadInfo: LeadInfo): string {
+    const sections: string[] = []
+    
+    if (leadInfo.nombre) {
+      sections.push(`- Nombre: ${leadInfo.nombre}`)
+    }
+    if (leadInfo.cuil) {
+      sections.push(`- CUIL: ${leadInfo.cuil}`)
+    }
+    if (leadInfo.zona) {
+      sections.push(`- Ciudad/Zona: ${leadInfo.zona}`)
+    }
+    if (leadInfo.trabajo_actual) {
+      sections.push(`- Trabajo actual: ${leadInfo.trabajo_actual}`)
+    }
+    if (leadInfo.banco) {
+      sections.push(`- Banco donde cobra: ${leadInfo.banco}`)
+    }
+    if (leadInfo.producto) {
+      sections.push(`- Producto de interés: ${leadInfo.producto}`)
+    }
+    if (leadInfo.telefono) {
+      sections.push(`- Teléfono: ${leadInfo.telefono}`)
+    }
+    if (leadInfo.email) {
+      sections.push(`- Email: ${leadInfo.email}`)
+    }
+    if (leadInfo.ingresos) {
+      sections.push(`- Ingresos: $${leadInfo.ingresos.toLocaleString()}`)
+    }
+    if (leadInfo.monto) {
+      sections.push(`- Monto solicitado: $${leadInfo.monto.toLocaleString()}`)
+    }
+    
+    return sections.length > 0 ? sections.join('\n') : ''
   }
 
   /**

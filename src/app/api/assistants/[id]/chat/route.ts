@@ -10,7 +10,20 @@ const ChatRequestSchema = z.object({
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant', 'system']),
     content: z.string().min(1)
-  })).min(1)
+  })).min(1),
+  leadId: z.string().optional(), // ID del lead para obtener información del usuario
+  leadData: z.object({
+    nombre: z.string().optional(),
+    cuil: z.string().optional(),
+    zona: z.string().optional(),
+    trabajo_actual: z.string().optional(),
+    banco: z.string().optional(),
+    producto: z.string().optional(),
+    telefono: z.string().optional(),
+    email: z.string().optional(),
+    ingresos: z.number().optional(),
+    monto: z.number().optional()
+  }).optional() // Datos del lead directamente (opcional)
 })
 
 export async function POST(
@@ -27,7 +40,7 @@ export async function POST(
     checkPermission(session.user.role, 'settings:read')
 
     const body = await request.json()
-    const { messages } = ChatRequestSchema.parse(body)
+    const { messages, leadId, leadData } = ChatRequestSchema.parse(body)
 
     // Convertir mensajes al formato esperado por Gemini
     const chatMessages: ChatMessage[] = messages.map(msg => ({
@@ -35,8 +48,22 @@ export async function POST(
       content: msg.content
     }))
 
-    // Enviar mensaje al asistente usando Gemini
-    const response = await geminiService.chat(params.id, chatMessages)
+    // Obtener información del lead si se proporciona leadId
+    let leadInfo = leadData
+    if (leadId && !leadInfo) {
+      try {
+        const { supabase } = await import('@/lib/db')
+        const leads = await supabase.request(`/Lead?id=eq.${leadId}&select=nombre,cuil,zona,trabajo_actual,banco,producto,telefono,email,ingresos,monto&limit=1`)
+        if (leads && Array.isArray(leads) && leads.length > 0) {
+          leadInfo = leads[0]
+        }
+      } catch (error) {
+        logger.warn('Error fetching lead data', { error, leadId })
+      }
+    }
+
+    // Enviar mensaje al asistente usando Gemini con información del lead
+    const response = await geminiService.chat(params.id, chatMessages, leadInfo)
 
     logger.info('Chat message processed', {
       assistantId: params.id,

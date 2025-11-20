@@ -93,37 +93,86 @@ export async function PATCH(
               logger.warn(`No se pudo sincronizar lead ${params.id} con ManyChat después de actualización`)
             }
           })
-          .catch((error) => {
+          .catch((error: any) => {
             logger.error(`Error sincronizando lead ${params.id} con ManyChat`, {
-              error: error.message
+              error: error?.message || String(error)
             })
           })
       } catch (error: any) {
         // Error silencioso, no afecta la actualización del lead
         logger.error(`Error iniciando sincronización automática para lead ${params.id}`, {
-          error: error.message
+          error: error?.message || String(error)
         })
       }
     }
 
-    return NextResponse.json(lead)
+    // Asegurar que el lead sea serializable a JSON
+    // Convertir cualquier Date object a string ISO y manejar valores no serializables
+    try {
+      const serializableLead = JSON.parse(JSON.stringify(lead, (key, value) => {
+        // Convertir Date objects a ISO string
+        if (value instanceof Date) {
+          return value.toISOString()
+        }
+        // Manejar undefined y funciones
+        if (value === undefined || typeof value === 'function') {
+          return null
+        }
+        return value
+      }))
+      return NextResponse.json(serializableLead)
+    } catch (serializationError: any) {
+      // Si falla la serialización, crear un objeto limpio con solo los campos básicos
+      logger.warn('Error serializando lead, retornando objeto limpio', {
+        leadId: params.id,
+        error: serializationError?.message
+      })
+      
+      const cleanLead = {
+        id: lead?.id,
+        nombre: lead?.nombre,
+        telefono: lead?.telefono,
+        email: lead?.email,
+        estado: lead?.estado,
+        createdAt: lead?.createdAt instanceof Date ? lead.createdAt.toISOString() : lead?.createdAt,
+        updatedAt: lead?.updatedAt instanceof Date ? lead.updatedAt.toISOString() : lead?.updatedAt
+      }
+      
+      return NextResponse.json(cleanLead)
+    }
 
   } catch (error: any) {
-    logger.error('Error in PATCH /api/leads/[id]', { error: error.message, leadId: params.id })
+    // Asegurar que el error sea serializable
+    const errorMessage = error?.message || String(error) || 'Unknown error'
+    const errorName = error?.name || 'Error'
+    const errorCode = error?.code
     
-    if (error.name === 'ZodError') {
-      return NextResponse.json({ error: 'Invalid data', details: error.errors }, { status: 400 })
+    logger.error('Error in PATCH /api/leads/[id]', { 
+      error: errorMessage,
+      errorName,
+      errorCode,
+      leadId: params.id 
+    })
+    
+    if (errorName === 'ZodError') {
+      return NextResponse.json({ 
+        error: 'Invalid data', 
+        details: Array.isArray(error.errors) ? error.errors : [] 
+      }, { status: 400 })
     }
     
-    if (error.message.includes('Insufficient permissions')) {
+    if (errorMessage.includes('Insufficient permissions')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    if (error.code === 'P2025') {
+    if (errorCode === 'P2025') {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      message: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    }, { status: 500 })
   }
 }
 

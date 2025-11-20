@@ -31,18 +31,51 @@ class Logger {
   }
 
   private sanitize(data: any): any {
-    if (typeof data !== 'object' || data === null) {
+    if (data === null || data === undefined) {
       return data
     }
 
-    const sanitized = { ...data }
+    // Manejar tipos primitivos
+    if (typeof data !== 'object') {
+      return data
+    }
+
+    // Manejar Date objects
+    if (data instanceof Date) {
+      return data.toISOString()
+    }
+
+    // Manejar arrays
+    if (Array.isArray(data)) {
+      return data.map(item => this.sanitize(item))
+    }
+
+    // Manejar Error objects
+    if (data instanceof Error) {
+      return {
+        message: data.message,
+        name: data.name,
+        stack: data.stack
+      }
+    }
+
+    // Manejar objetos planos
+    const sanitized: any = {}
     
-    // Remover campos sensibles
-    const sensitiveFields = ['password', 'hash', 'secret', 'token', 'key']
-    
-    for (const field of sensitiveFields) {
-      if (field in sanitized) {
-        sanitized[field] = '[REDACTED]'
+    for (const [key, value] of Object.entries(data)) {
+      // Remover campos sensibles
+      const sensitiveFields = ['password', 'hash', 'secret', 'token', 'key']
+      if (sensitiveFields.includes(key.toLowerCase())) {
+        sanitized[key] = '[REDACTED]'
+        continue
+      }
+
+      // Sanitizar recursivamente
+      try {
+        sanitized[key] = this.sanitize(value)
+      } catch (e) {
+        // Si no se puede serializar, convertir a string
+        sanitized[key] = String(value)
       }
     }
 

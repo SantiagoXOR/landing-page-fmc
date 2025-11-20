@@ -108,7 +108,7 @@ export class GeminiService {
       const systemInstruction = assistant.instrucciones || 'Eres un asistente virtual útil y amigable.'
 
       // Preparar el historial de mensajes
-      // Gemini requiere pares user-model alternados
+      // Gemini requiere pares user-model alternados y que comience con 'user'
       const filteredMessages = messages.filter(msg => msg.role !== 'system')
       const lastMessage = filteredMessages[filteredMessages.length - 1]
       
@@ -117,15 +117,69 @@ export class GeminiService {
       }
 
       // Construir historial (todos excepto el último mensaje)
-      const historyMessages = filteredMessages.slice(0, -1)
-      const history = historyMessages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
-      }))
+      let historyMessages = filteredMessages.slice(0, -1)
+      
+      logger.info('Building chat history', {
+        assistantId,
+        totalMessages: messages.length,
+        historyMessagesCount: historyMessages.length,
+        historyMessagesRoles: historyMessages.map(m => m.role)
+      })
+      
+      // Si el historial comienza con un mensaje del asistente, eliminarlo
+      // porque Gemini requiere que el historial comience con 'user'
+      // Eliminar todos los mensajes del asistente al inicio hasta encontrar el primer usuario
+      while (historyMessages.length > 0 && historyMessages[0].role !== 'user') {
+        historyMessages = historyMessages.slice(1)
+      }
+      
+      // Construir historial en formato Gemini con pares alternados user-model
+      const history: Array<{ role: 'user' | 'model', parts: Array<{ text: string }> }> = []
+      
+      if (historyMessages.length > 0 && historyMessages[0].role === 'user') {
+        for (let i = 0; i < historyMessages.length; i++) {
+          const msg = historyMessages[i]
+          const role = msg.role === 'user' ? 'user' : 'model'
+          
+          // Verificar que siga el patrón alternado
+          const expectedRole = i % 2 === 0 ? 'user' : 'model'
+          if (role === expectedRole) {
+            history.push({
+              role: role,
+              parts: [{ text: msg.content }]
+            })
+          } else {
+            // Si rompe el patrón, detener aquí
+            logger.warn('History pattern broken', {
+              index: i,
+              expectedRole,
+              actualRole: role,
+              messageRole: msg.role
+            })
+            break
+          }
+        }
+      }
 
-      // Crear el chat con historial
-      const chat = model.startChat({
-        history: history,
+      logger.info('Final chat history', {
+        assistantId,
+        historyLength: history.length,
+        historyRoles: history.map(h => h.role),
+        willIncludeHistory: history.length > 0 && history[0].role === 'user'
+      })
+
+      // Validación final: asegurar que el historial nunca comience con 'model'
+      // Si por alguna razón el historial comienza con 'model', no incluirlo
+      if (history.length > 0 && history[0].role !== 'user') {
+        logger.warn('History starts with model role, discarding history', {
+          assistantId,
+          firstRole: history[0].role
+        })
+        history.length = 0 // Limpiar el historial
+      }
+
+      // Crear el chat con historial (solo si hay historial válido que comience con usuario)
+      const chatConfig: any = {
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -133,7 +187,22 @@ export class GeminiService {
           maxOutputTokens: 1024,
         },
         systemInstruction: systemInstruction
-      })
+      }
+      
+      // Solo agregar historial si hay mensajes válidos y comienza con usuario
+      // IMPORTANTE: Gemini requiere que el historial comience con 'user', nunca con 'model'
+      if (history.length > 0 && history[0].role === 'user') {
+        chatConfig.history = history
+        logger.info('Including chat history', {
+          assistantId,
+          historyLength: history.length
+        })
+      } else {
+        // Si no hay historial válido, no incluir historial (chat nuevo)
+        logger.info('Starting new chat without history', { assistantId })
+      }
+      
+      const chat = model.startChat(chatConfig)
 
       // Enviar el mensaje y obtener respuesta
       const result = await chat.sendMessage(lastMessage.content)

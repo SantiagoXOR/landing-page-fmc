@@ -100,8 +100,9 @@ export class GeminiService {
         throw new Error(`El asistente "${assistant.nombre}" está inactivo`)
       }
 
-      // Obtener el modelo (usando gemini-pro por defecto)
-      const model = this.genAI!.getGenerativeModel({ model: 'gemini-pro' })
+      // Obtener el modelo (usando gemini-1.5-flash o gemini-pro)
+      // gemini-1.5-flash es más reciente y tiene mejor soporte para systemInstruction
+      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
       // Construir el historial de conversación
       // Las instrucciones del asistente se usan como system prompt
@@ -179,6 +180,7 @@ export class GeminiService {
       }
 
       // Crear el chat con historial (solo si hay historial válido que comience con usuario)
+      // systemInstruction debe ser un objeto Content según la API de Gemini
       const chatConfig: any = {
         generationConfig: {
           temperature: 0.7,
@@ -186,7 +188,9 @@ export class GeminiService {
           topP: 0.95,
           maxOutputTokens: 1024,
         },
-        systemInstruction: systemInstruction
+        systemInstruction: {
+          parts: [{ text: systemInstruction }]
+        }
       }
       
       // Solo agregar historial si hay mensajes válidos y comienza con usuario

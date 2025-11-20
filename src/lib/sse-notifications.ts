@@ -15,7 +15,7 @@ setInterval(() => {
   const now = Date.now()
   const timeout = 120000 // 2 minutos de inactividad
   
-  for (const [id, client] of sseClients.entries()) {
+  Array.from(sseClients.entries()).forEach(([id, client]) => {
     if (now - client.lastActivity > timeout) {
       try {
         client.controller.close()
@@ -25,14 +25,14 @@ setInterval(() => {
       sseClients.delete(id)
       logger.info('SSE client disconnected (timeout)', { userId: client.userId })
     }
-  }
+  })
 }, 30000)
 
 // Función para enviar notificación a un cliente SSE
 export function sendSSENotification(userId: string, notification: RealtimeNotification) {
   let sent = false
   
-  for (const [id, client] of sseClients.entries()) {
+  Array.from(sseClients.entries()).forEach(([id, client]) => {
     if (client.userId === userId) {
       try {
         const data = JSON.stringify(notification)
@@ -44,7 +44,7 @@ export function sendSSENotification(userId: string, notification: RealtimeNotifi
         sseClients.delete(id)
       }
     }
-  }
+  })
   
   return sent
 }
@@ -53,14 +53,14 @@ export function sendSSENotification(userId: string, notification: RealtimeNotifi
 export function broadcastSSENotification(notification: RealtimeNotification, excludeUserId?: string) {
   let sentCount = 0
   
-  for (const [id, client] of sseClients.entries()) {
+  Array.from(sseClients.entries()).forEach(([id, client]) => {
     if (excludeUserId && client.userId === excludeUserId) {
-      continue
+      return
     }
     
     // Si la notificación tiene userId, solo enviar a ese usuario
     if (notification.userId && client.userId !== notification.userId) {
-      continue
+      return
     }
     
     try {
@@ -72,7 +72,7 @@ export function broadcastSSENotification(notification: RealtimeNotification, exc
       logger.warn('Error broadcasting SSE notification, removing client', { userId: client.userId, error })
       sseClients.delete(id)
     }
-  }
+  })
   
   return sentCount
 }

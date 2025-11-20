@@ -356,7 +356,7 @@ export class SupabaseStorageService {
       if (error) throw error
 
       // Obtener información de los leads para los documentos encontrados
-      const leadIds = [...new Set((data || []).map((doc: any) => doc.lead_id))]
+      const leadIds = Array.from(new Set((data || []).map((doc: any) => doc.lead_id)))
       const leadsMap: Record<string, any> = {}
 
       if (leadIds.length > 0 && supabase.client) {

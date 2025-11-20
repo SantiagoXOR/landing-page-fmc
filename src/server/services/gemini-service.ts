@@ -100,8 +100,10 @@ export class GeminiService {
         throw new Error(`El asistente "${assistant.nombre}" está inactivo`)
       }
 
-      // Obtener el modelo (usando gemini-pro que está disponible en v1beta)
-      const model = this.genAI!.getGenerativeModel({ model: 'gemini-pro' })
+      // Obtener el modelo
+      // Intentar con gemini-1.5-pro que debería estar disponible en v1beta
+      // Si falla, podemos probar otros modelos disponibles
+      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-pro' })
 
       // Construir el historial de conversación
       // Las instrucciones del asistente se usan como system prompt
@@ -257,7 +259,7 @@ export class GeminiService {
         }
       }
 
-      const model = this.genAI!.getGenerativeModel({ model: 'gemini-pro' })
+      const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-pro' })
 
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],

@@ -69,14 +69,11 @@ export function AssistantPlayroom({ assistantId, assistantName, onClose }: Assis
 
     try {
       // Preparar historial de mensajes para la API
-      // Filtrar mensajes del sistema y asegurar que el último sea del usuario
       const allMessages = [...messages, userMessage]
-      const messageHistory = allMessages
-        .filter(msg => msg.role !== 'system') // Filtrar mensajes del sistema
-        .map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }))
+      const messageHistory = allMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
 
       const response = await fetch(`/api/assistants/${assistantId}/chat`, {
         method: 'POST',

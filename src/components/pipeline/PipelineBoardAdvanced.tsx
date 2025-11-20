@@ -80,11 +80,11 @@ export function PipelineBoardAdvanced({
   })
   
   // Log leads agrupados por etapa
-  console.log('Leads by stage:', leadsByStage())
+  console.log('Leads by stage:', leadsByStage)
 
   // Filtrar leads según búsqueda
   const filteredLeadsByStage = useCallback(() => {
-    const leadsByStageData = leadsByStage() // Llamar a la función para obtener los datos
+    const leadsByStageData = leadsByStage // leadsByStage ya es un objeto, no una función
     
     if (!searchTerm && selectedFilters.length === 0) {
       return leadsByStageData

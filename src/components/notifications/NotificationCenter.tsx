@@ -5,6 +5,7 @@ import { Bell, BellRing, BellOff, Check, CheckCheck, Trash2, X, Wifi, WifiOff } 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 // import { ScrollArea } from '@/components/ui/scroll-area' // Not available
 // import { Separator } from '@/components/ui/separator' // Not available
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
@@ -68,9 +69,6 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     }
   }, [])
 
-  const handleToggle = () => {
-    setIsOpen(!isOpen)
-  }
 
   const handleNotificationClick = (notification: RealtimeNotification) => {
     if (!notification.read) {
@@ -153,42 +151,38 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   }
 
   return (
-    <div className={`relative ${className}`}>
-      {/* Botón de notificaciones */}
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleToggle}
-              className="relative p-2"
-              disabled={!notificationsEnabled && !isOpen}
-            >
-              {getBellIcon()}
-              
-              {/* Badge de contador */}
-              {unreadCount > 0 && notificationsEnabled && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                >
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Badge>
-              )}
-              
-              {/* Indicador de conexión */}
-              {notificationsEnabled && (
-                <div className="absolute -bottom-1 -right-1">
-                  {isConnected ? (
-                    <Wifi className="h-3 w-3 text-green-500" />
-                  ) : (
+          <PopoverTrigger asChild>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="relative p-2"
+                disabled={!notificationsEnabled && !isOpen}
+              >
+                {getBellIcon()}
+                
+                {/* Badge de contador */}
+                {unreadCount > 0 && notificationsEnabled && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Badge>
+                )}
+                
+                {/* Indicador de conexión - Solo mostrar si hay problemas de conexión */}
+                {notificationsEnabled && !isConnected && (
+                  <div className="absolute -bottom-1 -right-1" title="Sin conexión - Las notificaciones pueden no funcionar correctamente">
                     <WifiOff className="h-3 w-3 text-red-500" />
-                  )}
-                </div>
-              )}
-            </Button>
-          </TooltipTrigger>
+                  </div>
+                )}
+              </Button>
+            </TooltipTrigger>
+          </PopoverTrigger>
           <TooltipContent>
             <p>{getTooltipText()}</p>
           </TooltipContent>
@@ -196,16 +190,12 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
       </TooltipProvider>
 
       {/* Panel de notificaciones */}
-      {isOpen && (
-        <>
-          {/* Overlay */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          
-          {/* Panel */}
-          <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-lg border z-50">
+      <PopoverContent 
+        align="end" 
+        side="bottom"
+        className="w-96 max-w-[calc(100vw-2rem)] p-0"
+        onClick={(e) => e.stopPropagation()}
+      >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center space-x-2">
@@ -215,7 +205,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
               
               <div className="flex items-center space-x-1">
                 {/* Estado de conexión */}
-                <div className="flex items-center space-x-1 text-xs text-gray-500">
+                <div className="flex items-center space-x-1 text-xs text-gray-500" title={!notificationsEnabled ? 'Notificaciones desactivadas' : isConnected ? 'Conectado al servidor de notificaciones' : 'Sin conexión - Las notificaciones pueden no llegar en tiempo real'}>
                   {!notificationsEnabled ? (
                     <>
                       <BellOff className="h-3 w-3 text-gray-400" />
@@ -229,7 +219,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
                   ) : (
                     <>
                       <WifiOff className="h-3 w-3 text-red-500" />
-                      <span>Desconectado</span>
+                      <span>Sin conexión</span>
                     </>
                   )}
                 </div>
@@ -273,7 +263,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
             </div>
 
             {/* Lista de notificaciones */}
-            <div className="h-96 overflow-y-auto">
+            <div className="max-h-96 overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-gray-500">
                   <Bell className="h-8 w-8 mb-2 opacity-50" />
@@ -351,10 +341,8 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
                 </div>
               )}
             </div>
-          </div>
-        </>
-      )}
-    </div>
+          </PopoverContent>
+    </Popover>
   )
 }
 

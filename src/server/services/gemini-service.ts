@@ -206,28 +206,41 @@ export class GeminiService {
       // Construir el contenido completo con historial e instrucciones
       const contents: Array<{ role: 'user' | 'model', parts: Array<{ text: string }> }> = []
       
-      // Agregar historial si existe
-      if (history.length > 0 && history[0].role === 'user') {
+      // SIEMPRE incluir las instrucciones al inicio para asegurar que el modelo siga el flujo correcto
+      // Esto es crítico porque sin las instrucciones, el modelo puede desviarse del flujo
+      if (history.length === 0) {
+        // Sin historial: incluir instrucciones en el primer mensaje
+        const userMessageWithInstructions = `Instrucciones del sistema:\n${systemInstruction}\n\n---\n\nUsuario: ${lastMessage.content}`
+        contents.push({
+          role: 'user',
+          parts: [{ text: userMessageWithInstructions }]
+        })
+        logger.info('Including system instructions in first user message (no history)', { assistantId })
+      } else {
+        // Con historial: incluir instrucciones al inicio ANTES del historial
+        // Esto refuerza el comportamiento correcto incluso cuando hay conversación previa
+        const instructionMessage = `[INSTRUCCIONES DEL SISTEMA - SEGUIR ESTE FLUJO EXACTO]\n\n${systemInstruction}\n\n[FIN DE INSTRUCCIONES]\n\n---\n\nAhora continúa la conversación siguiendo EXACTAMENTE estas instrucciones.`
+        contents.push({
+          role: 'user',
+          parts: [{ text: instructionMessage }]
+        })
+        // Agregar una respuesta del modelo para mantener el formato alternado user-model
+        contents.push({
+          role: 'model',
+          parts: [{ text: 'Entendido. Seguiré el flujo exacto especificado en las instrucciones del sistema.' }]
+        })
+        // Agregar historial después de las instrucciones
         contents.push(...history)
-        logger.info('Including chat history', {
+        logger.info('Including system instructions before history to reinforce correct flow', { 
           assistantId,
-          historyLength: history.length
+          historyLength: history.length 
+        })
+        // Agregar el mensaje actual del usuario
+        contents.push({
+          role: 'user',
+          parts: [{ text: lastMessage.content }]
         })
       }
-      
-      // Preparar el mensaje del usuario con instrucciones del sistema si es el primer mensaje
-      let userMessage = lastMessage.content
-      if (history.length === 0) {
-        // Incluir instrucciones del sistema en el primer mensaje cuando no hay historial
-        userMessage = `Instrucciones del sistema:\n${systemInstruction}\n\n---\n\nUsuario: ${lastMessage.content}`
-        logger.info('Including system instructions in first user message', { assistantId })
-      }
-      
-      // Agregar el mensaje del usuario
-      contents.push({
-        role: 'user',
-        parts: [{ text: userMessage }]
-      })
 
       // Generar respuesta usando generateContent directamente
       // Manejar errores de modelo no disponible y probar con otros modelos
@@ -239,7 +252,7 @@ export class GeminiService {
         result = await model.generateContent({
           contents: contents,
           generationConfig: {
-            temperature: 0.7,
+            temperature: 0.3, // Reducida para seguir mejor las instrucciones exactas
             topK: 40,
             topP: 0.95,
             maxOutputTokens: 1024,
@@ -267,7 +280,7 @@ export class GeminiService {
               result = await altModel.generateContent({
                 contents: contents,
                 generationConfig: {
-                  temperature: 0.7,
+                  temperature: 0.3, // Reducida para seguir mejor las instrucciones exactas
                   topK: 40,
                   topP: 0.95,
                   maxOutputTokens: 1024,

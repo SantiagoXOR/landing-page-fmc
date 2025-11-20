@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bot, Send, X, Loader2 } from 'lucide-react'
+import { Bot, Send, X, Loader2, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -126,6 +126,21 @@ export function AssistantPlayroom({ assistantId, assistantName, onClose }: Assis
     }
   }
 
+  const handleClearChat = () => {
+    // Resetear a solo el mensaje inicial del asistente
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: `¡Hola! Soy ${assistantName}. ¿En qué puedo ayudarte hoy?`,
+        timestamp: new Date()
+      }
+    ])
+    setError(null)
+    setInputMessage('')
+    inputRef.current?.focus()
+  }
+
   const formatTime = (date: Date) => {
     return format(date, 'HH:mm', { locale: es })
   }
@@ -142,14 +157,26 @@ export function AssistantPlayroom({ assistantId, assistantName, onClose }: Assis
             <p className="text-sm text-gray-500">Playroom de pruebas</p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-8 w-8 p-0"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearChat}
+            className="h-8 px-3 text-sm"
+            title="Nueva conversación"
+          >
+            <RotateCcw className="h-4 w-4 mr-1" />
+            Limpiar
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">

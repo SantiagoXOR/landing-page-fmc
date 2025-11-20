@@ -23,6 +23,7 @@ interface Lead {
   telefono: string
   email?: string
   dni?: string
+  cuil?: string
   ingresos?: number
   zona?: string
   producto?: string
@@ -31,12 +32,15 @@ interface Lead {
   utmSource?: string
   estado: string
   agencia?: string
+  banco?: string
+  trabajo_actual?: string
   notas?: string
   createdAt: string
   updatedAt: string
   events: Event[]
   tags?: string | string[]
   manychatId?: string
+  customFields?: string | Record<string, any>
 }
 
 interface Event {
@@ -143,6 +147,32 @@ export default function LeadDetailPage() {
     }
   }
 
+  // Parsear customFields si existen
+  let customFields: Record<string, any> = {}
+  if (lead.customFields) {
+    try {
+      customFields = typeof lead.customFields === 'string' 
+        ? JSON.parse(lead.customFields) 
+        : lead.customFields
+    } catch (e) {
+      customFields = {}
+    }
+  }
+
+  // Campos que ya están mapeados en el schema y no necesitan mostrarse en customFields
+  const mappedFields = new Set([
+    'dni', 'cuil', 'ingresos', 'zona', 'producto', 'monto', 
+    'origen', 'estado', 'agencia', 'banco', 'trabajo_actual'
+  ])
+
+  // Filtrar solo los campos personalizados que NO están mapeados
+  const additionalCustomFields = Object.entries(customFields)
+    .filter(([key]) => !mappedFields.has(key) && customFields[key] !== null && customFields[key] !== undefined && customFields[key] !== '')
+    .reduce((acc, [key, value]) => {
+      acc[key] = value
+      return acc
+    }, {} as Record<string, any>)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -221,6 +251,24 @@ export default function LeadDetailPage() {
                   <label className="text-sm font-medium text-gray-500">Zona</label>
                   <p className="text-sm">{lead.zona || 'No especificada'}</p>
                 </div>
+                {lead.cuil && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">CUIL/CUIT</label>
+                    <p className="text-sm">{lead.cuil}</p>
+                  </div>
+                )}
+                {lead.banco && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Banco</label>
+                    <p className="text-sm">{lead.banco}</p>
+                  </div>
+                )}
+                {lead.trabajo_actual && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Trabajo Actual</label>
+                    <p className="text-sm">{lead.trabajo_actual}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -260,6 +308,32 @@ export default function LeadDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Campos personalizados adicionales de ManyChat */}
+          {Object.keys(additionalCustomFields).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="w-5 h-5" />
+                  Campos Personalizados de ManyChat
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(additionalCustomFields).map(([key, value]) => (
+                    <div key={key}>
+                      <label className="text-sm font-medium text-gray-500 capitalize">
+                        {key.replace(/_/g, ' ')}
+                      </label>
+                      <p className="text-sm">
+                        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Timeline de eventos */}
           <Card>

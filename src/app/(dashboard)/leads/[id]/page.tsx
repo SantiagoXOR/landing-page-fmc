@@ -158,7 +158,7 @@ export default function LeadDetailPage() {
         <div className="flex items-center gap-2">
           {lead.manychatId && (
             <ManychatBadge variant="success" size="md">
-              Sincronizado con Manychat
+              Sincronizado con el chatbot
             </ManychatBadge>
           )}
           {!lead.manychatId && isSynced === false && (

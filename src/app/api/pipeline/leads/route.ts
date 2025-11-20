@@ -5,20 +5,6 @@ import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { PipelineLead } from '@/types/pipeline'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
-import { PrismaClient } from '@prisma/client'
-
-// Singleton pattern para PrismaClient en Next.js serverless
-// Evita crear múltiples conexiones y fugas de recursos
-// IMPORTANTE: Guardar en globalThis en TODOS los entornos (incluyendo producción)
-// para evitar crear múltiples conexiones en serverless
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
-
-const prisma = globalForPrisma.prisma ?? new PrismaClient()
-
-// Guardar en globalThis en todos los entornos para evitar múltiples conexiones en serverless
-globalForPrisma.prisma = prisma
 
 // Mapeo de estados de leads a etapas del pipeline
 const estadoToStageId: Record<string, string> = {
@@ -153,95 +139,18 @@ export async function GET(request: NextRequest) {
     const { leads, total } = await supabaseLeadService.getLeads(filters)
 
     // Obtener el evento más reciente por cada lead para calcular lastActivity
-    // Usar una query por lead para asegurar que obtenemos el evento más reciente de cada uno
-    // en lugar de los 1000 eventos más recientes globalmente
-    // Filtrar undefined para cumplir con el tipo string[] requerido por Prisma
+    // Filtrar undefined para cumplir con el tipo string[] requerido
     const leadIds = leads.map(l => l.id).filter((id): id is string => id !== undefined)
-    const eventsMap = new Map<string, any>()
     
-    if (leadIds.length > 0) {
-      // Obtener el evento más reciente para cada lead usando DISTINCT ON (PostgreSQL)
-      // Esto asegura que cada lead tenga su evento más reciente, incluso si tiene muchos eventos antiguos
-      // Nota: DISTINCT ON requiere que la columna en DISTINCT ON sea la primera en ORDER BY
-      try {
-        const latestEvents = await prisma.$queryRaw<Array<{
-          leadId: string
-          id: string
-          tipo: string
-          payload: string | null
-          createdAt: Date
-        }>>`
-          SELECT DISTINCT ON (e."leadId") 
-            e."leadId",
-            e.id,
-            e.tipo,
-            e.payload,
-            e."createdAt"
-          FROM "Event" e
-          WHERE e."leadId" = ANY(${leadIds}::text[])
-          ORDER BY e."leadId", e."createdAt" DESC
-        `
-        
-        latestEvents.forEach(event => {
-          eventsMap.set(event.leadId, event)
-        })
-      } catch (error: any) {
-        // Fallback: si la query con DISTINCT ON falla (por ejemplo, nombres de columnas diferentes),
-        // obtener todos los eventos y filtrar en memoria
-        logger.warn('Error using DISTINCT ON query, falling back to in-memory filtering', {
-          error: error.message,
-          leadCount: leadIds.length
-        })
-        
-        const allEvents = await prisma.event.findMany({
-          where: {
-            leadId: { in: leadIds }
-          },
-          orderBy: { createdAt: 'desc' }
-        })
-        
-        // Agrupar por leadId y tomar el más reciente de cada grupo
-        const eventsByLead = new Map<string, any>()
-        allEvents.forEach(event => {
-          if (event.leadId && !eventsByLead.has(event.leadId)) {
-            eventsByLead.set(event.leadId, event)
-          }
-        })
-        
-        eventsByLead.forEach((event, leadId) => {
-          eventsMap.set(leadId, event)
-        })
-      }
-    }
+    // Obtener el evento más reciente para cada lead usando Supabase REST API
+    // Esto asegura que cada lead tenga su evento más reciente, incluso si tiene muchos eventos antiguos
+    const eventsMap = leadIds.length > 0 
+      ? await supabaseLeadService.getLatestEventsByLeadIds(leadIds)
+      : new Map<string, any>()
 
     // Obtener asignaciones de leads (assignedTo) desde lead_pipeline
-    // Nota: lead_pipeline puede no existir para todos los leads, así que usamos LEFT JOIN
-    let assignmentMap = new Map<string, string>()
-    
-    if (leadIds.length > 0) {
-      try {
-        // Intentar obtener asignaciones desde lead_pipeline si existe
-        // Los IDs son CUID strings, no UUIDs, así que usamos TEXT/VARCHAR
-        const leadAssignments = await prisma.$queryRaw<Array<{ lead_id: string, assigned_to: string | null }>>`
-          SELECT lead_id, assigned_to 
-          FROM lead_pipeline 
-          WHERE lead_id = ANY(${leadIds}::text[])
-          AND assigned_to IS NOT NULL
-        `
-        
-        leadAssignments.forEach(assignment => {
-          if (assignment.assigned_to) {
-            assignmentMap.set(assignment.lead_id, assignment.assigned_to)
-          }
-        })
-      } catch (error: any) {
-        // Si la tabla lead_pipeline no existe o hay un error, simplemente continuar sin asignaciones
-        logger.warn('Could not fetch lead assignments from lead_pipeline', {
-          error: error.message,
-          leadCount: leadIds.length
-        })
-      }
-    }
+    // Nota: lead_pipeline puede no existir para todos los leads, el método maneja errores gracefully
+    const assignmentMap = await supabaseLeadService.getLeadAssignments(leadIds)
 
     // Mapear leads a PipelineLead usando el evento más reciente de cada lead
     // Filtrar leads sin id para evitar errores de tipo

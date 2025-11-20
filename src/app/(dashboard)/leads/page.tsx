@@ -789,9 +789,9 @@ function LeadsPage() {
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        {/* Indicador de sincronización con Manychat */}
+                        {/* Indicador de sincronización con el chatbot */}
                         {lead.manychatId && (
-                          <div className="flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded" title="Sincronizado con Manychat">
+                          <div className="flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded" title="Sincronizado con el chatbot">
                             <CheckCircle2 className="w-3 h-3 text-green-600" />
                             <span className="text-xs text-green-700">MC</span>
                           </div>

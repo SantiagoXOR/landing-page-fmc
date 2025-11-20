@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { cacheService, CacheStrategies } from '@/lib/cache-service'
+import { ManychatService } from './manychat-service'
 
 export interface TagLead {
   id: string
@@ -78,7 +79,7 @@ export class TagsService {
           return await this.fetchLeadsByTags(tag, page, limit, fechaDesde, fechaHasta)
         },
         {
-          ttl: 300, // 5 minutos
+          ttl: 60, // 1 minuto (tags pueden cambiar frecuentemente en Manychat)
           tags: ['tags', 'leads']
         }
       )
@@ -160,15 +161,51 @@ export class TagsService {
       }
     }
 
-    // Convertir map a array de TagGroup
-    const tagGroups: TagGroup[] = Array.from(tagMap.entries())
-      .map(([name, leads]) => ({
-        name,
-        count: leads.length,
-        leads: filterTag && filterTag !== name ? [] : leads.slice((page - 1) * limit, page * limit)
-      }))
+    // Obtener todos los tags de Manychat
+    let manychatTags: string[] = []
+    try {
+      const manychatTagsData = await ManychatService.getTags()
+      manychatTags = manychatTagsData.map(tag => tag.name)
+      logger.info('Tags obtenidos de Manychat', { count: manychatTags.length })
+    } catch (error: any) {
+      logger.warn('Error obteniendo tags de Manychat, usando solo tags de leads', { error: error.message })
+      // Si falla, continuar solo con los tags de los leads
+    }
+
+    // Combinar tags de Manychat con tags de leads (sin duplicados)
+    const allTagNames = new Set<string>()
+    manychatTags.forEach(tag => allTagNames.add(tag))
+    Array.from(tagMap.keys()).forEach(tag => allTagNames.add(tag))
+
+    // Convertir map a array de TagGroup, incluyendo todos los tags de Manychat
+    const tagGroups: TagGroup[] = Array.from(allTagNames)
+      .map((tagName) => {
+        const leadsForTag = tagMap.get(tagName) || []
+        
+        // Si hay un filtro de tag específico, solo mostrar ese tag con paginación
+        if (filterTag && filterTag !== tagName) {
+          return {
+            name: tagName,
+            count: leadsForTag.length,
+            leads: []
+          }
+        }
+        
+        // Aplicar paginación solo si no hay filtro o si es el tag filtrado
+        return {
+          name: tagName,
+          count: leadsForTag.length,
+          leads: leadsForTag.slice((page - 1) * limit, page * limit)
+        }
+      })
       .filter(group => !filterTag || group.name === filterTag)
-      .sort((a, b) => b.count - a.count) // Ordenar por cantidad descendente
+      .sort((a, b) => {
+        // Ordenar primero por cantidad descendente, luego alfabéticamente
+        if (b.count !== a.count) {
+          return b.count - a.count
+        }
+        return a.name.localeCompare(b.name)
+      })
 
     // Aplicar paginación a leads sin tags solo si no hay filtro de tag
     const withoutTagsLeads = filterTag 
@@ -203,7 +240,7 @@ export class TagsService {
           return await this.fetchTagStats()
         },
         {
-          ttl: 600, // 10 minutos
+          ttl: 60, // 1 minuto (tags pueden cambiar frecuentemente en Manychat)
           tags: ['tags', 'stats']
         }
       )
@@ -221,6 +258,16 @@ export class TagsService {
       throw new Error('Base de datos no disponible')
     }
 
+    // Obtener todos los tags de Manychat
+    let manychatTags: string[] = []
+    try {
+      const manychatTagsData = await ManychatService.getTags()
+      manychatTags = manychatTagsData.map(tag => tag.name)
+      logger.info('Tags obtenidos de Manychat para estadísticas', { count: manychatTags.length })
+    } catch (error: any) {
+      logger.warn('Error obteniendo tags de Manychat para estadísticas', { error: error.message })
+    }
+
     const { data: leads, error } = await supabase.client
       .from('Lead')
       .select('tags')
@@ -229,24 +276,33 @@ export class TagsService {
       throw error
     }
 
-    if (!leads || leads.length === 0) {
-      return []
-    }
-
-    // Contar tags
+    // Contar tags en leads
     const tagCounts = new Map<string, number>()
 
-    for (const lead of leads) {
-      const tags = this.parseTags(lead.tags)
-      for (const tagName of tags) {
-        tagCounts.set(tagName, (tagCounts.get(tagName) || 0) + 1)
+    // Inicializar todos los tags de Manychat con count 0
+    manychatTags.forEach(tag => {
+      tagCounts.set(tag, 0)
+    })
+
+    // Contar tags en leads
+    if (leads && leads.length > 0) {
+      for (const lead of leads) {
+        const tags = this.parseTags(lead.tags)
+        for (const tagName of tags) {
+          tagCounts.set(tagName, (tagCounts.get(tagName) || 0) + 1)
+        }
       }
     }
 
-    // Convertir a array y ordenar por cantidad descendente
+    // Convertir a array y ordenar por cantidad descendente, luego alfabéticamente
     return Array.from(tagCounts.entries())
       .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => {
+        if (b.count !== a.count) {
+          return b.count - a.count
+        }
+        return a.name.localeCompare(b.name)
+      })
   }
 
   /**

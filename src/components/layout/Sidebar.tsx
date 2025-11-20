@@ -15,7 +15,6 @@ import {
   Tag,
   Users,
   TrendingUp,
-  Zap,
   FileText,
   BarChart3,
   Settings,
@@ -92,11 +91,6 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     icon: TrendingUp
   },
   {
-    name: "Automatizaciones",
-    href: "/automation",
-    icon: Zap
-  },
-  {
     name: "Documentos",
     href: "/documents",
     icon: FileText,
@@ -121,21 +115,6 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     icon: Bot
   },
   {
-    name: "Sincronización",
-    href: "/manychat/sync",
-    icon: RefreshCw
-  },
-  {
-    name: "Broadcasts",
-    href: "/manychat/broadcasts",
-    icon: Radio
-  },
-  {
-    name: "Flujos",
-    href: "/manychat/flows",
-    icon: Workflow
-  },
-  {
     name: "Configuración",
     href: "/settings/manychat",
     icon: Settings
@@ -152,23 +131,6 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     name: "Settings",
     href: "/settings",
     icon: Settings
-  },
-  {
-    name: "Admin",
-    href: "/admin",
-    icon: Shield,
-    children: [
-      {
-        name: "Usuarios",
-        href: "/admin/users",
-        icon: Users
-      },
-      {
-        name: "Roles y Permisos",
-        href: "/admin/roles",
-        icon: Shield
-      }
-    ]
   }
 ]
 

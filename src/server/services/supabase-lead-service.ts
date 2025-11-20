@@ -511,6 +511,100 @@ export class SupabaseLeadService {
       throw error
     }
   }
+
+  /**
+   * Obtiene el evento más reciente para cada lead especificado
+   * Equivalente a DISTINCT ON en PostgreSQL pero usando Supabase REST API
+   */
+  async getLatestEventsByLeadIds(leadIds: string[]): Promise<Map<string, any>> {
+    const eventsMap = new Map<string, any>()
+    
+    if (leadIds.length === 0) {
+      return eventsMap
+    }
+
+    try {
+      // Construir filtro para obtener eventos de múltiples leads
+      // Usar operador 'in' de Supabase para múltiples valores
+      // Obtener todos los eventos para estos leads, ordenados por leadId y createdAt descendente
+      const response = await this.makeRequest(
+        `Event?leadId=in.(${leadIds.join(',')})&select=id,leadId,tipo,payload,createdAt&order=leadId.asc,createdAt.desc`
+      )
+      
+      const allEvents = await response.json()
+      
+      if (!Array.isArray(allEvents)) {
+        logger.warn('getLatestEventsByLeadIds: response is not an array', { response: allEvents })
+        return eventsMap
+      }
+
+      // Agrupar por leadId y tomar el primero de cada grupo (el más reciente debido al ordenamiento)
+      const eventsByLead = new Map<string, any>()
+      allEvents.forEach((event: any) => {
+        if (event.leadId && !eventsByLead.has(event.leadId)) {
+          eventsByLead.set(event.leadId, {
+            leadId: event.leadId,
+            id: event.id,
+            tipo: event.tipo,
+            payload: event.payload ? (typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload) : null,
+            createdAt: event.createdAt
+          })
+        }
+      })
+
+      return eventsByLead
+
+    } catch (error: any) {
+      logger.error('Error getting latest events by lead IDs', {
+        error: error.message,
+        leadCount: leadIds.length
+      })
+      // Retornar mapa vacío en caso de error para que el código continúe funcionando
+      return eventsMap
+    }
+  }
+
+  /**
+   * Obtiene asignaciones de leads desde la tabla lead_pipeline
+   * Maneja errores gracefully si la tabla no existe
+   */
+  async getLeadAssignments(leadIds: string[]): Promise<Map<string, string>> {
+    const assignmentMap = new Map<string, string>()
+    
+    if (leadIds.length === 0) {
+      return assignmentMap
+    }
+
+    try {
+      // Construir filtro para obtener asignaciones de múltiples leads
+      const response = await this.makeRequest(
+        `lead_pipeline?lead_id=in.(${leadIds.join(',')})&select=lead_id,assigned_to&assigned_to=not.is.null`
+      )
+      
+      const assignments = await response.json()
+      
+      if (!Array.isArray(assignments)) {
+        logger.warn('getLeadAssignments: response is not an array', { response: assignments })
+        return assignmentMap
+      }
+
+      assignments.forEach((assignment: any) => {
+        if (assignment.lead_id && assignment.assigned_to) {
+          assignmentMap.set(assignment.lead_id, assignment.assigned_to)
+        }
+      })
+
+      return assignmentMap
+
+    } catch (error: any) {
+      // Si la tabla no existe o hay un error, simplemente retornar mapa vacío
+      logger.warn('Could not fetch lead assignments from lead_pipeline', {
+        error: error.message,
+        leadCount: leadIds.length
+      })
+      return assignmentMap
+    }
+  }
 }
 
 // Instancia singleton

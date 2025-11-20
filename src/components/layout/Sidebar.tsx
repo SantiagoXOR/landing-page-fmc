@@ -40,7 +40,7 @@ interface NavigationItem {
 }
 
 // Función para crear la navegación con contadores dinámicos
-const createNavigation = (leadsCount: number): NavigationItem[] => [
+const createNavigation = (leadsCount: number, chatsCount: number): NavigationItem[] => [
   // Sección Principal
   {
     name: "Inicio",
@@ -51,7 +51,7 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     name: "Chats",
     href: "/chats",
     icon: MessageSquare,
-    badge: "18" // TODO: hacer dinámico desde API
+    badge: chatsCount > 0 ? chatsCount.toLocaleString() : undefined
   },
   
   // Separador - Entrenamiento
@@ -86,7 +86,7 @@ const createNavigation = (leadsCount: number): NavigationItem[] => [
     badge: leadsCount.toLocaleString()
   },
   {
-    name: "Pipeline",
+    name: "Ventas",
     href: "/pipeline",
     icon: TrendingUp
   },
@@ -152,6 +152,7 @@ export function Sidebar({
   const [internalIsOpen, setInternalIsOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [leadsCount, setLeadsCount] = useState(0)
+  const [chatsCount, setChatsCount] = useState(0)
   const pathname = usePathname()
   const { data: session } = useSession()
   
@@ -175,22 +176,24 @@ export function Sidebar({
     }
   }
 
-  // Obtener contador de leads dinámicamente
+  // Obtener contadores dinámicamente
   useEffect(() => {
-    const fetchLeadsCount = async () => {
+    const fetchCounts = async () => {
       try {
         const response = await fetch('/api/dashboard/metrics')
         if (response.ok) {
           const data = await response.json()
           setLeadsCount(data.totalLeads || 0)
+          setChatsCount(data.totalConversations || 0)
         }
       } catch (error) {
-        console.error('Error fetching leads count:', error)
+        console.error('Error fetching counts:', error)
         setLeadsCount(0)
+        setChatsCount(0)
       }
     }
 
-    fetchLeadsCount()
+    fetchCounts()
   }, [])
 
   const toggleExpanded = (itemName: string) => {
@@ -201,8 +204,36 @@ export function Sidebar({
     )
   }
 
+  // Obtener todos los hrefs de navegación para verificar conflictos
+  const navigation = createNavigation(leadsCount, chatsCount)
+  const allHrefs = navigation
+    .filter(item => !item.isHeader)
+    .map(item => item.href)
+    .sort((a, b) => b.length - a.length) // Ordenar por longitud descendente (más específicos primero)
+  
+  // Función mejorada que verifica si hay un href más específico que también coincide
   const isActive = (href: string) => {
-    return pathname === href || pathname.startsWith(href + "/")
+    // Coincidencia exacta siempre es activa
+    if (pathname === href) {
+      return true
+    }
+    
+    // Verificar si el pathname empieza con este href
+    if (!pathname.startsWith(href + "/")) {
+      return false
+    }
+    
+    // Si hay un href más específico (más largo) que también coincide, este no debería estar activo
+    // Por ejemplo: si pathname es "/settings/manychat" y href es "/settings",
+    // pero hay otro href "/settings/manychat" que también coincide, entonces "/settings" no debería estar activo
+    const moreSpecificHref = allHrefs.find(h => 
+      h !== href && 
+      h.startsWith(href + "/") && 
+      pathname.startsWith(h + "/")
+    )
+    
+    // Solo está activo si no hay un href más específico que también coincide
+    return !moreSpecificHref
   }
 
   return (
@@ -232,7 +263,7 @@ export function Sidebar({
 
           {/* Navigation */}
           <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-            {createNavigation(leadsCount).map((item, index) => {
+            {navigation.map((item, index) => {
               const active = isActive(item.href)
               const expanded = expandedItems.includes(item.name)
               
@@ -368,26 +399,29 @@ export function Sidebar({
 export function useNavigation() {
   const pathname = usePathname()
   const [leadsCount, setLeadsCount] = useState(0)
+  const [chatsCount, setChatsCount] = useState(0)
 
-  // Obtener contador de leads para el hook
+  // Obtener contadores para el hook
   useEffect(() => {
-    const fetchLeadsCount = async () => {
+    const fetchCounts = async () => {
       try {
         const response = await fetch('/api/dashboard/metrics')
         if (response.ok) {
           const data = await response.json()
           setLeadsCount(data.totalLeads || 0)
+          setChatsCount(data.totalConversations || 0)
         }
       } catch (error) {
-        console.error('Error fetching leads count:', error)
+        console.error('Error fetching counts:', error)
         setLeadsCount(0)
+        setChatsCount(0)
       }
     }
 
-    fetchLeadsCount()
+    fetchCounts()
   }, [])
 
-  const navigation = createNavigation(leadsCount)
+  const navigation = createNavigation(leadsCount, chatsCount)
 
   const getCurrentPage = () => {
     const currentItem = navigation.find(item =>

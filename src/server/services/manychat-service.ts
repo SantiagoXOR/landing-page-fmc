@@ -647,6 +647,7 @@ export class ManychatService {
 
   /**
    * Agregar tag a un subscriber
+   * Nota: Manychat requiere tag_id, no tag_name, por lo que primero buscamos el ID del tag
    */
   static async addTagToSubscriber(subscriberId: number | string, tagName: string): Promise<boolean> {
     // Convertir a string para evitar problemas con números muy grandes
@@ -657,66 +658,145 @@ export class ManychatService {
       logger.warn('Intento de agregar tag vacío', { subscriberId: subscriberIdStr })
       return false
     }
-    
-    const response = await this.executeWithRateLimit(() =>
-      this.makeRequest({
-        method: 'POST',
-        endpoint: `/fb/subscriber/addTag`,
-        body: {
-          subscriber_id: subscriberIdStr,
-          tag_name: tagName.trim(),
-        },
-      })
-    )
 
-    if (response.status === 'error') {
-      logger.error('Error agregando tag a subscriber', {
+    const trimmedTagName = tagName.trim()
+
+    try {
+      // Obtener todos los tags de Manychat para buscar el ID
+      const allTags = await this.getTags()
+      const tag = allTags.find(t => t.name === trimmedTagName)
+
+      if (!tag) {
+        logger.warn(`Tag "${trimmedTagName}" no encontrado en Manychat`, {
+          subscriberId: subscriberIdStr,
+          availableTags: allTags.slice(0, 5).map(t => t.name) // Log primeros 5 para referencia
+        })
+        return false
+      }
+
+      // Usar el endpoint addTagById con el tag_id encontrado
+      const response = await this.executeWithRateLimit(() =>
+        this.makeRequest({
+          method: 'POST',
+          endpoint: `/fb/subscriber/addTagById`,
+          body: {
+            subscriber_id: subscriberIdStr,
+            tag_id: tag.id,
+          },
+        })
+      )
+
+      if (response.status === 'error') {
+        logger.error('Error agregando tag a subscriber', {
+          subscriberId: subscriberIdStr,
+          tagName: trimmedTagName,
+          tagId: tag.id,
+          error: response.error,
+          details: response.details
+        })
+        return false
+      }
+
+      return response.status === 'success'
+    } catch (error: any) {
+      logger.error('Error obteniendo tags de Manychat para agregar tag', {
         subscriberId: subscriberIdStr,
-        tagName,
-        error: response.error,
-        details: response.details
+        tagName: trimmedTagName,
+        error: error.message
       })
       return false
     }
-
-    return response.status === 'success'
   }
 
   /**
    * Remover tag de un subscriber
+   * Nota: Manychat requiere tag_id, no tag_name, por lo que primero buscamos el ID del tag
    */
   static async removeTagFromSubscriber(subscriberId: number | string, tagName: string): Promise<boolean> {
+    // Convertir a string para evitar problemas con números muy grandes
+    const subscriberIdStr = String(subscriberId)
+    
+    // Validar que el tag name no esté vacío
+    if (!tagName || tagName.trim() === '') {
+      logger.warn('Intento de remover tag vacío', { subscriberId: subscriberIdStr })
+      return false
+    }
+
+    const trimmedTagName = tagName.trim()
+
+    try {
+      // Obtener todos los tags de Manychat para buscar el ID
+      const allTags = await this.getTags()
+      const tag = allTags.find(t => t.name === trimmedTagName)
+
+      if (!tag) {
+        logger.warn(`Tag "${trimmedTagName}" no encontrado en Manychat para remover`, {
+          subscriberId: subscriberIdStr
+        })
+        return false
+      }
+
+      // Usar el endpoint removeTagById con el tag_id encontrado
+      const response = await this.executeWithRateLimit(() =>
+        this.makeRequest({
+          method: 'POST',
+          endpoint: `/fb/subscriber/removeTagById`,
+          body: {
+            subscriber_id: subscriberIdStr,
+            tag_id: tag.id,
+          },
+        })
+      )
+
+      if (response.status === 'error') {
+        logger.error('Error removiendo tag de subscriber', {
+          subscriberId: subscriberIdStr,
+          tagName: trimmedTagName,
+          tagId: tag.id,
+          error: response.error,
+          details: response.details
+        })
+        return false
+      }
+
+      return response.status === 'success'
+    } catch (error: any) {
+      logger.error('Error obteniendo tags de Manychat para remover tag', {
+        subscriberId: subscriberIdStr,
+        tagName: trimmedTagName,
+        error: error.message
+      })
+      return false
+    }
+  }
+
+  /**
+   * Agregar tag por ID
+   */
+  static async addTagByIdToSubscriber(subscriberId: number | string, tagId: number): Promise<boolean> {
     // Convertir a string para evitar problemas con números muy grandes
     const subscriberIdStr = String(subscriberId)
     
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest({
         method: 'POST',
-        endpoint: `/fb/subscriber/removeTag`,
-        body: {
-          subscriber_id: subscriberIdStr,
-          tag_name: tagName,
-        },
-      })
-    )
-
-    return response.status === 'success'
-  }
-
-  /**
-   * Agregar tag por ID
-   */
-  static async addTagByIdToSubscriber(subscriberId: number, tagId: number): Promise<boolean> {
-    const response = await this.executeWithRateLimit(() =>
-      this.makeRequest({
-        method: 'POST',
         endpoint: `/fb/subscriber/addTagById`,
         body: {
-          subscriber_id: subscriberId,
+          subscriber_id: subscriberIdStr,
           tag_id: tagId,
         },
       })
     )
+
+    if (response.status === 'error') {
+      logger.error('Error agregando tag por ID a subscriber', {
+        subscriberId: subscriberIdStr,
+        tagId,
+        error: response.error,
+        details: response.details
+      })
+      return false
+    }
 
     return response.status === 'success'
   }

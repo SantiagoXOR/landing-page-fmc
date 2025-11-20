@@ -265,28 +265,15 @@ function PipelinePage() {
         </Card>
       </div>
 
-      {/* Explicación del Pipeline */}
+      {/* Explicación del Pipeline - Minimalista */}
       <Card className="bg-blue-50 border-blue-200">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0">
-              <BarChart3 className="h-8 w-8 text-blue-600" />
-            </div>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <BarChart3 className="h-5 w-5 text-blue-600 flex-shrink-0" />
             <div className="flex-1">
-              <h3 className="font-semibold text-blue-900 mb-2">¿Qué es un Pipeline de Ventas?</h3>
-              <p className="text-sm text-blue-800 mb-3">
-                Un pipeline de ventas es un sistema visual que organiza tus contactos (leads) en diferentes etapas del proceso de ventas. 
-                Te permite ver en qué etapa está cada contacto y gestionar todo el proceso desde el primer contacto hasta el cierre de la venta.
-              </p>
-              <div className="text-sm text-blue-800 space-y-1">
-                <p className="font-medium mb-2">Cómo funciona:</p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>Los contactos se organizan en <strong>etapas</strong> que representan diferentes fases del proceso de ventas</li>
-                  <li>Puedes <strong>arrastrar y soltar</strong> los contactos entre etapas para avanzar en el proceso</li>
-                  <li>Cada etapa muestra cuántos contactos tiene y el valor total de las oportunidades</li>
-                  <li>El sistema te ayuda a identificar dónde están tus contactos y qué acciones necesitas tomar</li>
-                </ul>
-              </div>
+              <span className="text-sm text-blue-900 font-medium">
+                <strong>Etapas</strong> • <strong>Arrastrar y soltar</strong> • <strong>Gestión visual</strong> • <strong>Seguimiento de ventas</strong>
+              </span>
             </div>
           </div>
         </CardContent>

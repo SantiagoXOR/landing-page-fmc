@@ -32,7 +32,7 @@ export interface DocumentMetadata {
 
 export class SupabaseStorageService {
   private static readonly BUCKET_NAME = 'documents'
-  private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+  private static readonly MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 
   /**
    * Inicializar bucket si no existe

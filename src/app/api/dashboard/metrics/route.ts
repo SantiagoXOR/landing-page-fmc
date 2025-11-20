@@ -91,6 +91,7 @@ function getEmptyMetrics() {
     conversionRate: 0,
     leadsThisWeek: 0,
     leadsThisMonth: 0,
+    totalConversations: 0,
     leadsByStatus: {} as Record<string, number>,
     recentLeads: [],
     trendData: Array.from({ length: 7 }, (_, i) => {
@@ -102,6 +103,47 @@ function getEmptyMetrics() {
         conversions: 0
       }
     })
+  }
+}
+
+/**
+ * Obtiene el conteo total de conversaciones desde Supabase
+ */
+async function getConversationsCount(): Promise<number> {
+  try {
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return 0
+    }
+
+    const url = `${SUPABASE_URL}/rest/v1/conversations?select=id&limit=1`
+    
+    const response = await fetch(url, {
+      headers: {
+        'apikey': SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'count=exact'
+      }
+    })
+
+    if (response.ok) {
+      const contentRange = response.headers.get('content-range')
+      if (contentRange) {
+        // El formato es "0-0/123" donde 123 es el total
+        const match = contentRange.match(/\/(\d+)$/)
+        if (match) {
+          return parseInt(match[1], 10)
+        }
+      }
+      // Si no hay content-range, intentar obtener el total desde el body
+      const data = await response.json()
+      return Array.isArray(data) ? data.length : 0
+    }
+    
+    return 0
+  } catch (error) {
+    console.error('Error fetching conversations count:', error)
+    return 0
   }
 }
 
@@ -175,6 +217,16 @@ export async function GET(request: NextRequest) {
         ...getEmptyMetrics(),
         warning: `No se pudo conectar a Supabase: ${supabaseError.message}`
       })
+    }
+
+    // Obtener conteo de conversaciones
+    let totalConversations = 0
+    try {
+      totalConversations = await getConversationsCount()
+    } catch (error: any) {
+      console.error('Error obteniendo conteo de conversaciones:', error)
+      // Continuar con 0 si falla, no es crítico
+      totalConversations = 0
     }
 
     // Filtrar leads por rango de fechas si se proporcionan
@@ -292,6 +344,7 @@ export async function GET(request: NextRequest) {
       conversionRate,
       leadsThisWeek,
       leadsThisMonth,
+      totalConversations,
       leadsByStatus,
       recentLeads,
       trendData

@@ -162,6 +162,16 @@ export default function DocumentsPage() {
   }
 
   const handleFileSelected = (file: File) => {
+    // Validar tamaño del archivo antes de mostrar el diálogo
+    const MAX_SIZE = 4.5 * 1024 * 1024 // 4.5MB (límite de Vercel)
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
+    
+    if (file.size > MAX_SIZE) {
+      setUploadError(`El archivo es demasiado grande (${fileSizeMB}MB). El límite máximo es 4.5MB. Por favor, comprime el archivo o usa un archivo más pequeño.`)
+      setSelectedFile(null)
+      return
+    }
+    
     setSelectedFile(file)
     setShowUploadDialog(true)
     setUploadError(null)
@@ -218,8 +228,18 @@ export default function DocumentsPage() {
         setFileDescription('')
         setUploadError(null)
       } else {
-        const error = await response.json()
-        setUploadError(error.message || 'Error al subir el archivo')
+        const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }))
+        
+        // Manejar error 413 específicamente
+        if (response.status === 413) {
+          const fileSizeMB = selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : '0'
+          setUploadError(
+            errorData.message || 
+            `El archivo es demasiado grande (${fileSizeMB}MB). El límite máximo es 4.5MB para subida directa. Por favor, comprime el archivo o usa un archivo más pequeño.`
+          )
+        } else {
+          setUploadError(errorData.message || 'Error al subir el archivo')
+        }
       }
     } catch (error) {
       console.error('Error uploading file:', error)
@@ -367,7 +387,7 @@ export default function DocumentsPage() {
             {isDragging ? "Suelta el archivo aquí" : "Arrastra un archivo o haz click para seleccionar"}
           </p>
           <p className="text-sm text-gray-500">
-            PDF, JPG, PNG, DOC, XLS hasta 10MB
+            PDF, JPG, PNG, DOC, XLS hasta 100MB
           </p>
         </div>
 

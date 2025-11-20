@@ -78,6 +78,9 @@ export function NotificationSettings() {
     try {
       localStorage.setItem('notification-preferences', JSON.stringify(preferences))
       
+      // Emitir evento personalizado para notificar a otros componentes
+      window.dispatchEvent(new Event('notification-preferences-changed'))
+      
       // If realtime notifications were disabled, disconnect
       if (!preferences.realtime.enabled && connectionStatus === 'connected') {
         disconnect()
@@ -115,6 +118,10 @@ export function NotificationSettings() {
   }
 
   const getConnectionStatusBadge = () => {
+    if (!preferences.realtime.enabled) {
+      return <Badge variant="outline" className="bg-gray-100 text-gray-600"><BellOff className="w-3 h-3 mr-1" />Desactivadas</Badge>
+    }
+    
     switch (connectionStatus) {
       case 'connected':
         return <Badge variant="default" className="bg-green-500"><Wifi className="w-3 h-3 mr-1" />Conectado</Badge>
@@ -122,8 +129,29 @@ export function NotificationSettings() {
         return <Badge variant="secondary"><Settings className="w-3 h-3 mr-1 animate-spin" />Conectando...</Badge>
       case 'disconnected':
         return <Badge variant="destructive"><WifiOff className="w-3 h-3 mr-1" />Desconectado</Badge>
+      case 'error':
+        return <Badge variant="destructive"><WifiOff className="w-3 h-3 mr-1" />Error de conexión</Badge>
       default:
         return <Badge variant="outline">Desconocido</Badge>
+    }
+  }
+
+  const getStatusDescription = () => {
+    if (!preferences.realtime.enabled) {
+      return 'Las notificaciones en tiempo real están desactivadas. Actívalas para recibir actualizaciones instantáneas.'
+    }
+    
+    switch (connectionStatus) {
+      case 'connected':
+        return 'Conectado correctamente. Recibirás notificaciones en tiempo real.'
+      case 'connecting':
+        return 'Estableciendo conexión...'
+      case 'disconnected':
+        return 'Desconectado. Las notificaciones no están disponibles en este momento.'
+      case 'error':
+        return 'Error al conectar. Por favor, intenta recargar la página.'
+      default:
+        return 'Estado desconocido.'
     }
   }
 
@@ -134,11 +162,15 @@ export function NotificationSettings() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5" />
+                {preferences.realtime.enabled ? (
+                  <Bell className="w-5 h-5" />
+                ) : (
+                  <BellOff className="w-5 h-5 text-gray-400" />
+                )}
                 Configuración de Notificaciones
               </CardTitle>
               <CardDescription>
-                Personaliza cómo y cuándo recibir notificaciones del sistema
+                {getStatusDescription()}
               </CardDescription>
             </div>
             {getConnectionStatusBadge()}
@@ -151,13 +183,31 @@ export function NotificationSettings() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label htmlFor="realtime-enabled" className="flex flex-col space-y-1">
-                  <span>Habilitar notificaciones en tiempo real</span>
-                  <span className="text-sm text-muted-foreground">Recibe actualizaciones instantáneas</span>
+                  <span className="flex items-center gap-2">
+                    {preferences.realtime.enabled ? (
+                      <Bell className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <BellOff className="w-4 h-4 text-gray-400" />
+                    )}
+                    Habilitar notificaciones en tiempo real
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {preferences.realtime.enabled 
+                      ? 'Recibes actualizaciones instantáneas del sistema'
+                      : 'Activa para recibir notificaciones en tiempo real'}
+                  </span>
                 </Label>
                 <Switch
                   id="realtime-enabled"
                   checked={preferences.realtime.enabled}
-                  onCheckedChange={(checked) => updatePreference('realtime', 'enabled', checked)}
+                  onCheckedChange={(checked) => {
+                    updatePreference('realtime', 'enabled', checked)
+                    // Si se desactiva, también desactivar sonido y desktop
+                    if (!checked) {
+                      updatePreference('realtime', 'sound', false)
+                      updatePreference('realtime', 'desktop', false)
+                    }
+                  }}
                 />
               </div>
               

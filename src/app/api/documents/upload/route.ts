@@ -4,9 +4,19 @@ import { authOptions } from '@/lib/auth'
 import { SupabaseStorageService, DocumentCategory } from '@/lib/supabase-storage'
 import { checkUserPermission } from '@/lib/rbac'
 
+// Configurar para manejar archivos grandes
+export const maxDuration = 300 // 5 minutos para archivos grandes
+export const runtime = 'nodejs' // Usar Node.js runtime para mejor soporte de archivos grandes
+
+// Límite de Vercel para body (4.5MB), pero intentaremos manejar archivos más grandes
+const VERCEL_BODY_LIMIT = 4.5 * 1024 * 1024 // 4.5MB
+
 /**
  * POST /api/documents/upload
  * Subir un documento
+ * 
+ * Nota: Para archivos > 4.5MB, Vercel tiene limitaciones.
+ * En ese caso, se recomienda usar upload directo a Supabase Storage.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +58,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Advertir sobre límite de Vercel para archivos grandes
+    if (file.size > VERCEL_BODY_LIMIT) {
+      return NextResponse.json({
+        error: 'File too large for direct upload',
+        message: `El archivo es demasiado grande (${(file.size / 1024 / 1024).toFixed(2)}MB). El límite para subida directa es ${(VERCEL_BODY_LIMIT / 1024 / 1024).toFixed(1)}MB. Por favor, usa la opción de subida directa a Supabase Storage.`,
+        fileSize: file.size,
+        maxSize: VERCEL_BODY_LIMIT,
+        requiresDirectUpload: true
+      }, { status: 413 })
+    }
+
     // Inicializar bucket si es necesario
     await SupabaseStorageService.initializeBucket()
 
@@ -76,16 +97,27 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Documents API] Error uploading file:', error)
     
-    if (error instanceof Error && error.message.includes('File size exceeds')) {
-      return NextResponse.json({
-        error: 'File too large',
-        message: error.message
-      }, { status: 413 })
+    if (error instanceof Error) {
+      if (error.message.includes('File size exceeds')) {
+        return NextResponse.json({
+          error: 'File too large',
+          message: error.message
+        }, { status: 413 })
+      }
+      
+      // Manejar errores de Vercel body size limit
+      if (error.message.includes('413') || error.message.includes('Payload Too Large')) {
+        return NextResponse.json({
+          error: 'File too large',
+          message: 'El archivo es demasiado grande para subir directamente. Por favor, usa la opción de subida directa a Supabase Storage.',
+          requiresDirectUpload: true
+        }, { status: 413 })
+      }
     }
 
     return NextResponse.json({ 
       error: 'Failed to upload document',
-      message: 'Error al subir el documento'
+      message: error instanceof Error ? error.message : 'Error al subir el documento'
     }, { status: 500 })
   }
 }

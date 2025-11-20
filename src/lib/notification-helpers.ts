@@ -1,4 +1,5 @@
 import { broadcastNotification, sendNotificationToUser } from '@/server/websocket-server'
+import { broadcastSSENotification, sendSSENotification } from '@/app/api/notifications/stream/route'
 import { RealtimeNotification } from '@/lib/realtime-notifications'
 import { logger } from '@/lib/logger'
 
@@ -42,7 +43,20 @@ export function notifyLeadCreated(lead: LeadData, createdByUserId?: string) {
     }
   }
 
-  broadcastNotification(notification, createdByUserId)
+  // Enviar notificación completa con id y timestamp
+  const fullNotification: RealtimeNotification = {
+    ...notification,
+    id: Math.random().toString(36).substring(2, 11),
+    timestamp: new Date()
+  }
+
+  // Intentar WebSocket primero, luego SSE como fallback
+  try {
+    broadcastNotification(notification, createdByUserId)
+  } catch (error) {
+    logger.warn('WebSocket no disponible, usando SSE', { error })
+    broadcastSSENotification(fullNotification, createdByUserId)
+  }
   
   logger.info('📢 Notificación enviada: Lead creado', {
     leadId: lead.id,

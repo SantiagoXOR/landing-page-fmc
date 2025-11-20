@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Bell, BellRing, Check, CheckCheck, Trash2, X, Wifi, WifiOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Bell, BellRing, BellOff, Check, CheckCheck, Trash2, X, Wifi, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 // import { ScrollArea } from '@/components/ui/scroll-area' // Not available
 // import { Separator } from '@/components/ui/separator' // Not available
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
@@ -17,6 +18,7 @@ interface NotificationCenterProps {
 
 export function NotificationCenter({ className }: NotificationCenterProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const {
     notifications,
     isConnected,
@@ -28,6 +30,43 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     autoShowToast: false, // No mostrar toast aquí para evitar duplicados
     maxNotifications: 100
   })
+
+  // Cargar preferencias de notificaciones
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('notification-preferences')
+      if (saved) {
+        const preferences = JSON.parse(saved)
+        setNotificationsEnabled(preferences.realtime?.enabled !== false)
+      }
+    } catch (error) {
+      console.warn('Error loading notification preferences:', error)
+    }
+  }, [])
+
+  // Escuchar cambios en localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const saved = localStorage.getItem('notification-preferences')
+        if (saved) {
+          const preferences = JSON.parse(saved)
+          setNotificationsEnabled(preferences.realtime?.enabled !== false)
+        }
+      } catch (error) {
+        console.warn('Error loading notification preferences:', error)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    // También escuchar eventos personalizados para cambios en la misma pestaña
+    window.addEventListener('notification-preferences-changed', handleStorageChange)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('notification-preferences-changed', handleStorageChange)
+    }
+  }, [])
 
   const handleToggle = () => {
     setIsOpen(!isOpen)
@@ -88,40 +127,73 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     }
   }
 
+  // Determinar qué icono mostrar
+  const getBellIcon = () => {
+    if (!notificationsEnabled) {
+      return <BellOff className="h-5 w-5 text-gray-400" />
+    }
+    if (unreadCount > 0) {
+      return <BellRing className="h-5 w-5" />
+    }
+    return <Bell className="h-5 w-5" />
+  }
+
+  // Determinar el tooltip según el estado
+  const getTooltipText = () => {
+    if (!notificationsEnabled) {
+      return 'Notificaciones desactivadas'
+    }
+    if (!isConnected) {
+      return 'Desconectado - Las notificaciones no están disponibles'
+    }
+    if (unreadCount > 0) {
+      return `${unreadCount} notificación${unreadCount > 1 ? 'es' : ''} sin leer`
+    }
+    return 'Notificaciones'
+  }
+
   return (
     <div className={`relative ${className}`}>
       {/* Botón de notificaciones */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleToggle}
-        className="relative p-2"
-      >
-        {unreadCount > 0 ? (
-          <BellRing className="h-5 w-5" />
-        ) : (
-          <Bell className="h-5 w-5" />
-        )}
-        
-        {/* Badge de contador */}
-        {unreadCount > 0 && (
-          <Badge 
-            variant="destructive" 
-            className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-          >
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Badge>
-        )}
-        
-        {/* Indicador de conexión */}
-        <div className="absolute -bottom-1 -right-1">
-          {isConnected ? (
-            <Wifi className="h-3 w-3 text-green-500" />
-          ) : (
-            <WifiOff className="h-3 w-3 text-red-500" />
-          )}
-        </div>
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggle}
+              className="relative p-2"
+              disabled={!notificationsEnabled && !isOpen}
+            >
+              {getBellIcon()}
+              
+              {/* Badge de contador */}
+              {unreadCount > 0 && notificationsEnabled && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Badge>
+              )}
+              
+              {/* Indicador de conexión */}
+              {notificationsEnabled && (
+                <div className="absolute -bottom-1 -right-1">
+                  {isConnected ? (
+                    <Wifi className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <WifiOff className="h-3 w-3 text-red-500" />
+                  )}
+                </div>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{getTooltipText()}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       {/* Panel de notificaciones */}
       {isOpen && (
@@ -144,7 +216,12 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
               <div className="flex items-center space-x-1">
                 {/* Estado de conexión */}
                 <div className="flex items-center space-x-1 text-xs text-gray-500">
-                  {isConnected ? (
+                  {!notificationsEnabled ? (
+                    <>
+                      <BellOff className="h-3 w-3 text-gray-400" />
+                      <span>Desactivadas</span>
+                    </>
+                  ) : isConnected ? (
                     <>
                       <Wifi className="h-3 w-3 text-green-500" />
                       <span>Conectado</span>

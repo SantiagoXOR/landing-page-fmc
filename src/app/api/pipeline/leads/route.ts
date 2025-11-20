@@ -36,7 +36,12 @@ function getProbabilityForStage(stageId: string): number {
 }
 
 // Función para mapear lead a PipelineLead
+// IMPORTANTE: Los leads deben tener un estado válido (NUEVO, CONTACTADO, etc.) 
+// para que aparezcan en el pipeline. Si un lead no tiene estado o tiene un estado
+// no mapeado, se asignará a la etapa 'nuevo' por defecto.
 function mapLeadToPipelineLead(lead: any, lastEvent: any = null, assignedTo?: string): PipelineLead {
+  // Mapear el estado del lead a un stageId del pipeline
+  // Si el estado no está en el mapeo, usar 'nuevo' como defecto
   const stageId = estadoToStageId[lead.estado] || 'nuevo'
   const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
   
@@ -176,7 +181,11 @@ export async function GET(request: NextRequest) {
       userName: session.user.name,
       filters: { stageId, priority, assignedTo, search },
       resultCount: pipelineLeads.length,
-      totalLeads: total
+      totalLeads: total,
+      leadsByStage: pipelineLeads.reduce((acc, lead) => {
+        acc[lead.stageId] = (acc[lead.stageId] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
     })
 
     return NextResponse.json(pipelineLeads)

@@ -3,7 +3,8 @@
 import * as React from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Calendar as CalendarIcon, ChevronDown } from 'lucide-react'
+import { Calendar as CalendarIcon } from 'lucide-react'
+import { DateRange as ReactDayPickerDateRange } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -20,10 +21,7 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
-export type DateRange = {
-  from: Date | undefined
-  to: Date | undefined
-}
+export type DateRange = ReactDayPickerDateRange
 
 export type DatePreset = 'today' | 'thisWeek' | 'last30Days' | 'custom'
 
@@ -134,12 +132,16 @@ export function DateRangePicker({
     }
   }
 
-  const handleCustomDateChange = (range: DateRange | undefined) => {
+  const handleCustomDateChange = (range: ReactDayPickerDateRange | undefined) => {
     if (range) {
-      setDateRange(range)
+      const newRange: DateRange = {
+        from: range.from,
+        to: range.to,
+      }
+      setDateRange(newRange)
       if (range.from && range.to) {
         setIsCustomOpen(false)
-        onChange?.(range)
+        onChange?.(newRange)
       }
     }
   }

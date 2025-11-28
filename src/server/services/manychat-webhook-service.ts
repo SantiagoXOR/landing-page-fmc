@@ -456,7 +456,9 @@ export class ManychatWebhookService {
         messageType: message.type,
         platformMsgId: message.platform_msg_id || message.id,
         contentLength: content.length,
-        hasMedia: !!mediaUrl
+        hasMedia: !!mediaUrl,
+        contentPreview: content.substring(0, 100),
+        sentAt: sentAt
       })
 
       return newMessage.id

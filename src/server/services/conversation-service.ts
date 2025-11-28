@@ -84,8 +84,7 @@ export class ConversationService {
         .from('conversations')
         .select(`
           *,
-          lead:Lead(id, nombre, telefono, email),
-          assigned_user:auth.users!conversations_assigned_to_fkey(id)
+          lead:Lead(id, nombre, telefono, email)
         `)
         .eq('id', id)
         .single()

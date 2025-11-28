@@ -289,17 +289,29 @@ export async function POST(request: NextRequest) {
           text: body.last_input_text,
           timestamp: body.last_interaction ? new Date(body.last_interaction).getTime() / 1000 : Date.now() / 1000,
           direction: 'inbound',
-          // Generar platform_msg_id único que incluya el contenido para evitar duplicados
+          // Generar platform_msg_id único que incluya hash del contenido completo
           platform_msg_id: (() => {
-            const contentHash = body.last_input_text.substring(0, 30)
+            const messageText = body.last_input_text || ''
+            // Crear hash robusto del contenido completo
+            let contentHash = 0
+            for (let i = 0; i < messageText.length; i++) {
+              const char = messageText.charCodeAt(i)
+              contentHash = ((contentHash << 5) - contentHash) + char
+              contentHash = contentHash & contentHash
+            }
+            const hashString = Math.abs(contentHash).toString(36).padStart(8, '0').substring(0, 8)
+            
+            const contentPreview = messageText.substring(0, 15)
               .replace(/\s+/g, '_')
-              .replace(/[^a-zA-Z0-9_]/g, '')
+              .replace(/[^a-zA-Z0-9_ñáéíóúüÑÁÉÍÓÚÜ]/g, '')
               .toLowerCase() || 'msg'
+            
             const timestampMs = body.last_interaction 
               ? new Date(body.last_interaction).getTime() 
               : Date.now()
-            const random = Math.random().toString(36).substring(2, 8)
-            return `manychat_${body.id}_${timestampMs}_${contentHash}_${random}`
+            const highPrecisionTime = `${timestampMs}_${Math.floor(performance.now() * 1000) % 1000000}`
+            const random = Math.random().toString(36).substring(2, 10)
+            return `manychat_${body.id}_hash${hashString}_${contentPreview}_${highPrecisionTime}_${random}`
           })()
         } : undefined,
         timestamp: body.last_interaction ? new Date(body.last_interaction).getTime() / 1000 : Date.now() / 1000,
@@ -474,36 +486,51 @@ export async function POST(request: NextRequest) {
         normalizedMessage = normalizeMessage(rawMessage)
         
         // Asegurar que el mensaje normalizado tenga un platform_msg_id único
+        // La función normalizeMessage ya debería haber generado un ID con hash del contenido,
+        // pero verificamos y mejoramos si es necesario
         if (normalizedMessage) {
-          // Si ya tiene platform_msg_id pero no incluye contenido, mejorarlo
           const messageText = normalizedMessage.text || normalizedMessage.caption || ''
-          if (messageText && normalizedMessage.platform_msg_id) {
-            // Mejorar el ID existente agregando hash del contenido
-            const contentHash = messageText.substring(0, 30)
+          
+          // Verificar si el platform_msg_id ya incluye un hash (empieza con "_hash")
+          const hasContentHash = normalizedMessage.platform_msg_id?.includes('_hash')
+          
+          if (messageText && !hasContentHash) {
+            // El ID no incluye hash del contenido, mejorarlo
+            let contentHash = 0
+            for (let i = 0; i < messageText.length; i++) {
+              const char = messageText.charCodeAt(i)
+              contentHash = ((contentHash << 5) - contentHash) + char
+              contentHash = contentHash & contentHash
+            }
+            const hashString = Math.abs(contentHash).toString(36).padStart(8, '0').substring(0, 8)
+            
+            const contentPreview = messageText.substring(0, 15)
               .replace(/\s+/g, '_')
-              .replace(/[^a-zA-Z0-9_]/g, '')
-              .toLowerCase()
+              .replace(/[^a-zA-Z0-9_ñáéíóúüÑÁÉÍÓÚÜ]/g, '')
+              .toLowerCase() || 'msg'
+            
             const timestampMs = Math.floor((normalizedMessage.timestamp || Date.now() / 1000) * 1000)
-            const random = Math.random().toString(36).substring(2, 8)
-            normalizedMessage.platform_msg_id = `${normalizedMessage.platform_msg_id}_${timestampMs}_${contentHash}_${random}`
-            logger.info('🔧 Mejorado platform_msg_id con contenido para evitar duplicados', {
+            const highPrecisionTime = `${timestampMs}_${Math.floor(performance.now() * 1000) % 1000000}`
+            const random = Math.random().toString(36).substring(2, 10)
+            
+            const baseId = normalizedMessage.platform_msg_id || `msg_${timestampMs}`
+            normalizedMessage.platform_msg_id = `${baseId}_hash${hashString}_${contentPreview}_${highPrecisionTime}_${random}`
+            
+            logger.info('🔧 Mejorado platform_msg_id con hash de contenido completo', {
               generatedId: normalizedMessage.platform_msg_id,
               subscriberId: normalizedBody.subscriber_id || body.id,
-              contentPreview: messageText.substring(0, 50)
+              contentPreview: messageText.substring(0, 50),
+              hashString
             })
           } else if (!normalizedMessage.platform_msg_id) {
-            // Generar un ID único basado en contenido, timestamp y subscriber
-            const contentHash = (messageText || 'msg').substring(0, 30)
-              .replace(/\s+/g, '_')
-              .replace(/[^a-zA-Z0-9_]/g, '')
-              .toLowerCase()
-            const timestampMs = Math.floor((normalizedMessage.timestamp || Date.now() / 1000) * 1000)
-            const random = Math.random().toString(36).substring(2, 8)
-            normalizedMessage.platform_msg_id = `manychat_${normalizedBody.subscriber_id || body.id}_${timestampMs}_${contentHash}_${random}`
-            logger.info('🔧 Generado platform_msg_id único para mensaje sin ID', {
+            // No hay ID ni contenido, generar uno básico
+            const timestampMs = Date.now()
+            const highPrecisionTime = `${timestampMs}_${Math.floor(performance.now() * 1000) % 1000000}`
+            const random = Math.random().toString(36).substring(2, 12)
+            normalizedMessage.platform_msg_id = `manychat_${normalizedBody.subscriber_id || body.id}_${highPrecisionTime}_${random}`
+            logger.info('🔧 Generado platform_msg_id básico para mensaje sin ID ni contenido', {
               generatedId: normalizedMessage.platform_msg_id,
-              subscriberId: normalizedBody.subscriber_id || body.id,
-              contentPreview: messageText.substring(0, 50)
+              subscriberId: normalizedBody.subscriber_id || body.id
             })
           }
         }
@@ -663,26 +690,39 @@ function normalizeMessage(message: any): ManychatWebhookMessage | undefined {
   // sean detectados como duplicados cuando ManyChat envía el mismo message.id
   let platformMsgId = message.platform_msg_id || message.id || message.message_id || message.mid
   
-  // Si el mensaje tiene contenido, crear un ID único basado en contenido + timestamp
+  // Generar platform_msg_id único que SIEMPRE incluya un hash del contenido completo
   // Esto asegura que mensajes diferentes ("Hola" vs "Dónde esto?") tengan IDs diferentes
-  if (messageText && platformMsgId) {
-    // Si ya hay un ID, agregarle un hash del contenido para hacerlo único
-    const contentHash = messageText.substring(0, 30)
+  // incluso si ManyChat envía el mismo message.id o llegan en el mismo segundo
+  if (messageText) {
+    // Crear un hash robusto del contenido completo usando algoritmo simple
+    let contentHash = 0
+    for (let i = 0; i < messageText.length; i++) {
+      const char = messageText.charCodeAt(i)
+      contentHash = ((contentHash << 5) - contentHash) + char
+      contentHash = contentHash & contentHash // Convertir a 32bit entero
+    }
+    const hashString = Math.abs(contentHash).toString(36).padStart(8, '0').substring(0, 8)
+    
+    // Incluir también una versión limpia del contenido para debugging
+    const contentPreview = messageText.substring(0, 15)
       .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_]/g, '')
-      .toLowerCase()
-    const timestampMs = Math.floor(messageTimestamp * 1000)
-    const random = Math.random().toString(36).substring(2, 8)
-    platformMsgId = `${platformMsgId}_${timestampMs}_${contentHash}_${random}`
-  } else if (!platformMsgId) {
-    // Si no hay ID, generar uno completo basado en contenido
-    const contentHash = messageText.substring(0, 30)
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_]/g, '')
+      .replace(/[^a-zA-Z0-9_ñáéíóúüÑÁÉÍÓÚÜ]/g, '')
       .toLowerCase() || 'msg'
+    
     const timestampMs = Math.floor(messageTimestamp * 1000)
-    const random = Math.random().toString(36).substring(2, 8)
-    platformMsgId = `manychat_${timestampMs}_${contentHash}_${random}`
+    // Usar Date.now() con precisión de microsegundos para mensajes que llegan casi simultáneos
+    const highPrecisionTime = `${Date.now()}_${Math.floor(performance.now() * 1000) % 1000000}`
+    const random = Math.random().toString(36).substring(2, 10)
+    
+    // SIEMPRE incluir el hash del contenido en el ID para garantizar unicidad
+    const baseId = platformMsgId || `msg_${timestampMs}`
+    platformMsgId = `${baseId}_hash${hashString}_${contentPreview}_${highPrecisionTime}_${random}`
+  } else if (!platformMsgId) {
+    // Si no hay contenido, generar ID basado en timestamp de alta precisión y random
+    const timestampMs = Date.now()
+    const highPrecisionTime = `${timestampMs}_${Math.floor(performance.now() * 1000) % 1000000}`
+    const random = Math.random().toString(36).substring(2, 12)
+    platformMsgId = `manychat_${highPrecisionTime}_${random}`
   }
 
   return {

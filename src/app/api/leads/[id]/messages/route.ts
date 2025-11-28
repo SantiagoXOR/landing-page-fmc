@@ -28,13 +28,40 @@ export async function GET(
 
     // Transformar mensajes al formato esperado por el frontend
     const formattedMessages = messages.map((msg: any) => {
-      // Asegurar que siempre tengamos una fecha válida
-      const sentAt = msg.sent_at || msg.created_at
-      const createdAt = sentAt || new Date().toISOString()
+      // Función helper para convertir cualquier formato de fecha a ISO string
+      const toISOString = (dateValue: any): string => {
+        if (!dateValue) return new Date().toISOString()
+        
+        // Si ya es un string ISO válido
+        if (typeof dateValue === 'string') {
+          const parsed = new Date(dateValue)
+          if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString()
+          }
+        }
+        
+        // Si es un objeto Date
+        if (dateValue instanceof Date) {
+          if (!isNaN(dateValue.getTime())) {
+            return dateValue.toISOString()
+          }
+        }
+        
+        // Si es un timestamp
+        if (typeof dateValue === 'number') {
+          const parsed = new Date(dateValue)
+          if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString()
+          }
+        }
+        
+        // Fallback: fecha actual
+        return new Date().toISOString()
+      }
       
-      // Validar que la fecha sea válida
-      const validDate = new Date(createdAt)
-      const finalDate = isNaN(validDate.getTime()) ? new Date().toISOString() : createdAt
+      // Obtener la mejor fecha disponible
+      const sentAt = msg.sent_at || msg.created_at
+      const createdAt = toISOString(sentAt || msg.created_at)
       
       return {
         id: msg.id,
@@ -43,10 +70,10 @@ export async function GET(
           mensaje: msg.content || '',
           messageId: msg.platform_msg_id || msg.id,
           messageType: msg.message_type || 'text',
-          sentAt: finalDate,
+          sentAt: createdAt,
           ...(msg.metadata && typeof msg.metadata === 'object' ? msg.metadata : {})
         },
-        createdAt: finalDate
+        createdAt: createdAt
       }
     })
 

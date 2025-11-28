@@ -178,31 +178,46 @@ export default function WhatsAppHistory({ leadId, telefono }: WhatsAppHistoryPro
           </div>
         ) : (
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.tipo === 'whatsapp_out' ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.tipo === 'whatsapp_out'
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
-                >
-                  {/* Header del mensaje */}
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center space-x-1">
-                      {getMessageIcon(message.tipo)}
-                      {getMessageBadge(message.tipo)}
-                    </div>
-                    <div className="flex items-center text-xs opacity-75">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {formatMessageTime(message.createdAt)}
-                    </div>
-                  </div>
+            {messages.map((message) => {
+              // Validar que el mensaje tenga todos los campos necesarios
+              if (!message || !message.id || !message.createdAt) {
+                console.warn('Mensaje inválido encontrado:', message)
+                return null
+              }
+              
+              try {
+                // Validar que la fecha sea parseable antes de renderizar
+                const testDate = new Date(message.createdAt)
+                if (isNaN(testDate.getTime())) {
+                  console.warn('Fecha inválida en mensaje:', message.id, message.createdAt)
+                  return null
+                }
+                
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex ${
+                      message.tipo === 'whatsapp_out' ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <div
+                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        message.tipo === 'whatsapp_out'
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-100 text-gray-900'
+                      }`}
+                    >
+                      {/* Header del mensaje */}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-1">
+                          {getMessageIcon(message.tipo)}
+                          {getMessageBadge(message.tipo)}
+                        </div>
+                        <div className="flex items-center text-xs opacity-75">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {formatMessageTime(message.createdAt)}
+                        </div>
+                      </div>
 
                   {/* Contenido del mensaje */}
                   <div className="text-sm">
@@ -235,9 +250,14 @@ export default function WhatsAppHistory({ leadId, telefono }: WhatsAppHistoryPro
                       ID: {message.payload.messageId.substring(0, 8)}...
                     </div>
                   )}
-                </div>
-              </div>
-            ))}
+                    </div>
+                  </div>
+                )
+              } catch (err) {
+                console.error('Error renderizando mensaje:', message?.id, err)
+                return null
+              }
+            }).filter(Boolean)}
           </div>
         )}
 

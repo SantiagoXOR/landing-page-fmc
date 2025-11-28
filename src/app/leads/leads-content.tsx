@@ -214,7 +214,7 @@ export default function LeadsContent() {
                         {lead.zona && ` • ${lead.zona}`}
                       </div>
                       <div className="mt-1 text-xs text-gray-400">
-                        {formatDate(new Date(lead.createdAt))}
+                        {formatDate(lead.createdAt)}
                       </div>
                     </div>
                   </div>

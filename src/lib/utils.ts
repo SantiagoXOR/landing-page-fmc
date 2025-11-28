@@ -31,14 +31,32 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('es-AR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+export function formatDate(date: Date | string | null | undefined): string {
+  // Si no hay fecha, retornar mensaje por defecto
+  if (!date) {
+    return 'Fecha no disponible'
+  }
+  
+  // Convertir a Date si es string
+  const dateObj = date instanceof Date ? date : new Date(date)
+  
+  // Validar que la fecha sea válida
+  if (isNaN(dateObj.getTime())) {
+    return 'Fecha inválida'
+  }
+  
+  try {
+    return new Intl.DateTimeFormat('es-AR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(dateObj)
+  } catch (error) {
+    console.error('Error formateando fecha:', error, date)
+    return 'Fecha inválida'
+  }
 }
 
 // WhatsApp configuration

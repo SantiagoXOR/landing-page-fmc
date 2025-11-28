@@ -219,7 +219,7 @@ export default function LeadDetailContent({ leadId }: LeadDetailContentProps) {
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">{event.tipo}</p>
-                        <p className="text-xs text-gray-500">{formatDate(new Date(event.createdAt))}</p>
+                        <p className="text-xs text-gray-500">{formatDate(event.createdAt)}</p>
                       </div>
                       {event.payload && (
                         <pre className="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">
@@ -286,10 +286,10 @@ export default function LeadDetailContent({ leadId }: LeadDetailContentProps) {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div>
-                <span className="font-medium">Creado:</span> {formatDate(new Date(lead.createdAt))}
+                <span className="font-medium">Creado:</span> {formatDate(lead.createdAt)}
               </div>
               <div>
-                <span className="font-medium">Actualizado:</span> {formatDate(new Date(lead.updatedAt))}
+                <span className="font-medium">Actualizado:</span> {formatDate(lead.updatedAt)}
               </div>
               <div>
                 <span className="font-medium">ID:</span> {lead.id}

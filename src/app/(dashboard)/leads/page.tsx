@@ -693,7 +693,7 @@ function LeadsPage() {
                           )}
 
                           <div className="text-xs text-gray-400">
-                            📅 {formatDate(new Date(lead.createdAt))}
+                            📅 {formatDate(lead.createdAt)}
                           </div>
 
                           {/* Tags de Manychat */}

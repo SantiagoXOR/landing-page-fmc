@@ -39,14 +39,15 @@ export default function WhatsAppHistory({ leadId, telefono }: WhatsAppHistoryPro
   const fetchMessages = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/leads/${leadId}/events?tipo=whatsapp`)
+      // Usar el nuevo endpoint de mensajes de conversaciones
+      const response = await fetch(`/api/leads/${leadId}/messages?platform=whatsapp`)
       
       if (!response.ok) {
         throw new Error('Error al cargar mensajes')
       }
       
       const data = await response.json()
-      setMessages(data.events || [])
+      setMessages(data.messages || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {

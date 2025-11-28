@@ -324,4 +324,49 @@ export class ConversationService {
       throw new Error('Failed to update conversation activity')
     }
   }
+
+  /**
+   * Obtener mensajes de una conversación por leadId y plataforma
+   */
+  static async getMessagesByLeadId(leadId: string, platform: string = 'whatsapp') {
+    try {
+      if (!supabase.client) {
+        throw new Error('Database connection error')
+      }
+
+      // Primero buscar la conversación del lead
+      const { data: conversation, error: conversationError } = await supabase.client
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', leadId)
+        .eq('platform', platform)
+        .single()
+
+      if (conversationError) {
+        if (conversationError.code === 'PGRST116') {
+          // No hay conversación, retornar array vacío
+          return []
+        }
+        throw conversationError
+      }
+
+      if (!conversation) {
+        return []
+      }
+
+      // Obtener mensajes de la conversación
+      const { data: messages, error: messagesError } = await supabase.client
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .order('sent_at', { ascending: true })
+
+      if (messagesError) throw messagesError
+
+      return messages || []
+    } catch (error) {
+      console.error('Error fetching messages by leadId:', error)
+      throw new Error('Failed to fetch messages')
+    }
+  }
 }

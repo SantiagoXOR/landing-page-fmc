@@ -353,18 +353,64 @@ export class ManychatWebhookService {
       }
 
       // Verificar si el mensaje ya existe (por platform_msg_id)
-      if (message.platform_msg_id || message.id) {
-        const msgId = message.platform_msg_id || message.id
-        const { data: existingMessage } = await supabase.client
+      // Esto previene duplicados cuando ManyChat envía el mismo mensaje múltiples veces
+      if (message.platform_msg_id) {
+        const msgId = message.platform_msg_id
+        const { data: existingMessage, error: queryError } = await supabase.client
           .from('messages')
-          .select('id')
+          .select('id, sent_at, content, platform_msg_id')
           .eq('platform_msg_id', msgId)
           .single()
 
         if (existingMessage) {
-          logger.debug('Mensaje duplicado ignorado', { messageId: msgId })
-          return existingMessage.id
+          // Verificar también que el contenido sea el mismo para evitar falsos positivos
+          const existingContent = existingMessage.content || ''
+          const newContent = content.trim()
+          
+          // Si el contenido es diferente, no es un duplicado, es un mensaje diferente
+          // Guardar el nuevo mensaje con un ID único
+          if (existingContent.trim() !== newContent && newContent.length > 0) {
+            logger.info('⚠️ Mensaje con mismo platform_msg_id pero contenido diferente, generando nuevo ID', {
+              existingPlatformMsgId: msgId,
+              existingContent: existingContent.substring(0, 50),
+              newContent: newContent.substring(0, 50),
+              conversationId
+            })
+            // Generar un nuevo ID único para este mensaje
+            const timestampMs = Date.now()
+            const contentHash = newContent.substring(0, 20).replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()
+            const random = Math.random().toString(36).substring(2, 8)
+            message.platform_msg_id = `${msgId}_diff_${timestampMs}_${contentHash}_${random}`
+            logger.info('✅ Nuevo platform_msg_id generado para mensaje diferente', {
+              newPlatformMsgId: message.platform_msg_id
+            })
+          } else {
+            // Es un duplicado real
+            logger.info('🔄 Mensaje duplicado detectado y ignorado', {
+              messageId: msgId,
+              existingMessageId: existingMessage.id,
+              sentAt: existingMessage.sent_at,
+              contentPreview: existingMessage.content?.substring(0, 50),
+              conversationId
+            })
+            return existingMessage.id
+          }
         }
+
+        // Si hay error pero no es "no encontrado", loguearlo
+        if (queryError && queryError.code !== 'PGRST116') {
+          logger.warn('Error verificando mensaje duplicado', {
+            error: queryError.message,
+            errorCode: queryError.code,
+            messageId: msgId
+          })
+        }
+      } else {
+        logger.warn('⚠️ Mensaje sin platform_msg_id, no se puede verificar duplicados', {
+          messageType: message.type,
+          hasText: !!message.text,
+          conversationId
+        })
       }
 
       // Crear mensaje

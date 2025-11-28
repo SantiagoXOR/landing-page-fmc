@@ -289,7 +289,18 @@ export async function POST(request: NextRequest) {
           text: body.last_input_text,
           timestamp: body.last_interaction ? new Date(body.last_interaction).getTime() / 1000 : Date.now() / 1000,
           direction: 'inbound',
-          platform_msg_id: `manychat_${body.id}_${Date.now()}`
+          // Generar platform_msg_id único que incluya el contenido para evitar duplicados
+          platform_msg_id: (() => {
+            const contentHash = body.last_input_text.substring(0, 30)
+              .replace(/\s+/g, '_')
+              .replace(/[^a-zA-Z0-9_]/g, '')
+              .toLowerCase() || 'msg'
+            const timestampMs = body.last_interaction 
+              ? new Date(body.last_interaction).getTime() 
+              : Date.now()
+            const random = Math.random().toString(36).substring(2, 8)
+            return `manychat_${body.id}_${timestampMs}_${contentHash}_${random}`
+          })()
         } : undefined,
         timestamp: body.last_interaction ? new Date(body.last_interaction).getTime() / 1000 : Date.now() / 1000,
         created_at: body.subscribed || body.last_interaction
@@ -409,15 +420,100 @@ export async function POST(request: NextRequest) {
     }
 
     if (eventType === 'message_received' || eventType === 'message_sent') {
-      logger.info('📨 Evento de mensaje detectado', {
-        eventType,
-        subscriberId: normalizedBody.subscriber_id || body.id,
-        hasMessage: !!normalizedBody.message,
-        messageType: normalizedBody.message?.type,
-        hasText: !!normalizedBody.message?.text,
-        phone: normalizedBody.subscriber?.phone || normalizedBody.subscriber?.whatsapp_phone || body.phone || body.whatsapp_phone || 'sin teléfono',
-        payload: JSON.stringify(body).substring(0, 500) // Primeros 500 caracteres para debug
-      })
+      // Validar que el mensaje tenga la estructura correcta
+      const message = normalizedBody.message || body.message
+      if (!message) {
+        logger.warn('⚠️ Evento de mensaje sin datos de mensaje', {
+          eventType,
+          subscriberId: normalizedBody.subscriber_id || body.id,
+          bodyKeys: Object.keys(body)
+        })
+        // No es un error crítico, puede ser un evento de actualización sin mensaje
+      } else {
+        // Validar que el mensaje tenga un ID único
+        const messageId = message.id || message.message_id || message.mid || message.platform_msg_id
+        if (!messageId) {
+          logger.warn('⚠️ Mensaje sin ID único, se generará uno automáticamente', {
+            eventType,
+            subscriberId: normalizedBody.subscriber_id || body.id,
+            messageType: message.type,
+            hasText: !!message.text
+          })
+        }
+
+        logger.info('📨 Evento de mensaje detectado', {
+          eventType,
+          subscriberId: normalizedBody.subscriber_id || body.id,
+          hasMessage: !!normalizedBody.message,
+          messageType: normalizedBody.message?.type,
+          hasText: !!normalizedBody.message?.text,
+          messageId: messageId || 'sin ID',
+          phone: normalizedBody.subscriber?.phone || normalizedBody.subscriber?.whatsapp_phone || body.phone || body.whatsapp_phone || 'sin teléfono',
+          payload: JSON.stringify(body).substring(0, 500) // Primeros 500 caracteres para debug
+        })
+      }
+    }
+
+    // Validar mensaje antes de normalizar (para eventos message_received/message_sent)
+    let normalizedMessage: ManychatWebhookMessage | undefined = undefined
+    if (eventType === 'message_received' || eventType === 'message_sent') {
+      const rawMessage = normalizedBody.message || body.message
+      if (rawMessage) {
+        // Validar que tenga al menos un identificador o contenido
+        const hasId = !!(rawMessage.id || rawMessage.message_id || rawMessage.mid || rawMessage.platform_msg_id)
+        const hasContent = !!(rawMessage.text || rawMessage.caption || rawMessage.url)
+        
+        if (!hasId && !hasContent) {
+          logger.warn('⚠️ Mensaje sin ID ni contenido, puede ser un mensaje vacío', {
+            eventType,
+            subscriberId: normalizedBody.subscriber_id || body.id,
+            messageKeys: Object.keys(rawMessage)
+          })
+        }
+        
+        normalizedMessage = normalizeMessage(rawMessage)
+        
+        // Asegurar que el mensaje normalizado tenga un platform_msg_id único
+        if (normalizedMessage) {
+          // Si ya tiene platform_msg_id pero no incluye contenido, mejorarlo
+          const messageText = normalizedMessage.text || normalizedMessage.caption || ''
+          if (messageText && normalizedMessage.platform_msg_id) {
+            // Mejorar el ID existente agregando hash del contenido
+            const contentHash = messageText.substring(0, 30)
+              .replace(/\s+/g, '_')
+              .replace(/[^a-zA-Z0-9_]/g, '')
+              .toLowerCase()
+            const timestampMs = Math.floor((normalizedMessage.timestamp || Date.now() / 1000) * 1000)
+            const random = Math.random().toString(36).substring(2, 8)
+            normalizedMessage.platform_msg_id = `${normalizedMessage.platform_msg_id}_${timestampMs}_${contentHash}_${random}`
+            logger.info('🔧 Mejorado platform_msg_id con contenido para evitar duplicados', {
+              generatedId: normalizedMessage.platform_msg_id,
+              subscriberId: normalizedBody.subscriber_id || body.id,
+              contentPreview: messageText.substring(0, 50)
+            })
+          } else if (!normalizedMessage.platform_msg_id) {
+            // Generar un ID único basado en contenido, timestamp y subscriber
+            const contentHash = (messageText || 'msg').substring(0, 30)
+              .replace(/\s+/g, '_')
+              .replace(/[^a-zA-Z0-9_]/g, '')
+              .toLowerCase()
+            const timestampMs = Math.floor((normalizedMessage.timestamp || Date.now() / 1000) * 1000)
+            const random = Math.random().toString(36).substring(2, 8)
+            normalizedMessage.platform_msg_id = `manychat_${normalizedBody.subscriber_id || body.id}_${timestampMs}_${contentHash}_${random}`
+            logger.info('🔧 Generado platform_msg_id único para mensaje sin ID', {
+              generatedId: normalizedMessage.platform_msg_id,
+              subscriberId: normalizedBody.subscriber_id || body.id,
+              contentPreview: messageText.substring(0, 50)
+            })
+          }
+        }
+      } else {
+        logger.warn('⚠️ Evento de mensaje sin objeto message', {
+          eventType,
+          subscriberId: normalizedBody.subscriber_id || body.id,
+          hasLastInputText: !!body.last_input_text
+        })
+      }
     }
 
     // Normalizar el evento a nuestro formato (usar normalizedBody después de la transformación)
@@ -425,7 +521,7 @@ export async function POST(request: NextRequest) {
       event_type: eventType,
       subscriber_id: normalizedBody.subscriber_id,
       subscriber: normalizedBody.subscriber || (normalizedBody.subscriber_id ? undefined : normalizedBody.subscriber),
-      message: normalizeMessage(normalizedBody.message),
+      message: normalizedMessage || normalizeMessage(normalizedBody.message),
       tag: normalizedBody.tag,
       custom_field: normalizedCustomField,
       flow: normalizedBody.flow,
@@ -559,10 +655,40 @@ function normalizeMessage(message: any): ManychatWebhookMessage | undefined {
 
   // Manychat puede enviar el mensaje en diferentes formatos
   // Normalizamos a nuestro formato estándar
+  const messageId = message.id || message.message_id || message.mid || String(Date.now())
+  const messageText = message.text || message.body || message.caption || ''
+  const messageTimestamp = message.timestamp || message.created_time || Date.now() / 1000
+  
+  // Generar platform_msg_id único que incluya contenido para evitar que mensajes diferentes
+  // sean detectados como duplicados cuando ManyChat envía el mismo message.id
+  let platformMsgId = message.platform_msg_id || message.id || message.message_id || message.mid
+  
+  // Si el mensaje tiene contenido, crear un ID único basado en contenido + timestamp
+  // Esto asegura que mensajes diferentes ("Hola" vs "Dónde esto?") tengan IDs diferentes
+  if (messageText && platformMsgId) {
+    // Si ya hay un ID, agregarle un hash del contenido para hacerlo único
+    const contentHash = messageText.substring(0, 30)
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_]/g, '')
+      .toLowerCase()
+    const timestampMs = Math.floor(messageTimestamp * 1000)
+    const random = Math.random().toString(36).substring(2, 8)
+    platformMsgId = `${platformMsgId}_${timestampMs}_${contentHash}_${random}`
+  } else if (!platformMsgId) {
+    // Si no hay ID, generar uno completo basado en contenido
+    const contentHash = messageText.substring(0, 30)
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_]/g, '')
+      .toLowerCase() || 'msg'
+    const timestampMs = Math.floor(messageTimestamp * 1000)
+    const random = Math.random().toString(36).substring(2, 8)
+    platformMsgId = `manychat_${timestampMs}_${contentHash}_${random}`
+  }
+
   return {
-    id: message.id || message.message_id || message.mid || String(Date.now()),
+    id: messageId,
     type: message.type || 'text',
-    text: message.text || message.body,
+    text: messageText,
     url: message.url || message.media_url,
     caption: message.caption,
     filename: message.filename,
@@ -570,8 +696,8 @@ function normalizeMessage(message: any): ManychatWebhookMessage | undefined {
     longitude: message.longitude || message.location?.lng,
     template_name: message.template_name || message.template?.name,
     interactive: message.interactive,
-    timestamp: message.timestamp || message.created_time || Date.now() / 1000,
+    timestamp: messageTimestamp,
     direction: message.direction,
-    platform_msg_id: message.platform_msg_id || message.id || message.message_id || message.mid
+    platform_msg_id: platformMsgId
   }
 }

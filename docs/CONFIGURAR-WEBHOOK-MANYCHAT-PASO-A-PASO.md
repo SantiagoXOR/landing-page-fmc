@@ -10,13 +10,51 @@ Vamos a crear flows en Manychat que envíen HTTP requests a nuestro webhook cuan
 
 ---
 
-## 📋 Paso 1: Crear Flow para Mensajes Recibidos
+## 🎯 Captura de Mensajes: Full Contact Data vs Message Received
+
+### ⚠️ Problema con "Full Contact Data"
+
+Cuando ManyChat envía el **"Full Contact Data"** al finalizar una automatización, **solo incluye el último mensaje** (`last_input_text`). Esto significa que:
+- ❌ Solo se captura el **último mensaje** de la conversación
+- ❌ Se **pierde todo el historial** de mensajes intermedios
+- ❌ No se pueden ver las respuestas anteriores del usuario
+
+### ✅ Solución: Trigger "Message Received"
+
+Para capturar **todos los mensajes en tiempo real**, debes crear un Flow con el trigger **"Message Received"** que se dispare **cada vez que llega un mensaje**.
+
+**Ventajas:**
+- ✅ Captura **todos los mensajes** individualmente
+- ✅ Se guardan en tiempo real, no solo al final
+- ✅ Permite ver el historial completo de la conversación
+- ✅ Cada mensaje tiene su ID único para evitar duplicados
+
+### 📚 Guía Detallada
+
+Para configurar la captura de mensajes en tiempo real, consulta la guía completa:
+- **[Configurar Flow para Mensajes en Tiempo Real](CONFIGURAR-FLOW-MENSAJES-TIEMPO-REAL.md)**
+
+### 🔄 Compatibilidad
+
+Puedes tener **ambos configurados**:
+- **Flow con "Message Received"**: Para capturar todos los mensajes en tiempo real
+- **Flow con "Full Contact Data"**: Para actualizar datos del contacto al finalizar automatizaciones
+
+---
+
+## 📋 Paso 1: Crear Flow para Mensajes Recibidos (Tiempo Real)
+
+---
+
+## 📋 Paso 1: Crear Flow para Mensajes Recibidos (Tiempo Real)
+
+> **💡 Nota**: Este flow captura **cada mensaje individual** en tiempo real. Si solo necesitas actualizar datos al finalizar una automatización, ve al [Paso 3](#-paso-3-crear-flow-para-nuevos-subscribers).
 
 ### 1.1. Crear Nuevo Flow
 
 1. En Manychat, ve a **Automatizaciones** (Automation) en el menú principal
 2. Haz clic en **"Nuevo Flow"** o **"Create Flow"**
-3. Dale un nombre: `"Enviar mensajes al CRM"` o `"Webhook CRM - Mensajes"`
+3. Dale un nombre: `"Webhook CRM - Mensajes en Tiempo Real"` o `"Capturar Mensajes Individuales"`
 
 ### 1.2. Configurar Trigger
 
@@ -53,27 +91,36 @@ POST
 ```json
 {
   "event_type": "message_received",
-  "subscriber_id": "{{subscriber.id}}",
+  "subscriber_id": {{subscriber.id}},
   "subscriber": {
-    "id": "{{subscriber.id}}",
+    "id": {{subscriber.id}},
+    "key": "{{subscriber.key}}",
     "first_name": "{{subscriber.first_name}}",
     "last_name": "{{subscriber.last_name}}",
     "phone": "{{subscriber.phone}}",
     "whatsapp_phone": "{{subscriber.whatsapp_phone}}",
+    "email": "{{subscriber.email}}",
     "custom_fields": {{subscriber.custom_fields}},
-    "tags": {{subscriber.tags}}
+    "tags": {{subscriber.tags}},
+    "subscribed": "{{subscriber.subscribed}}",
+    "last_interaction": "{{subscriber.last_interaction}}"
   },
   "message": {
     "id": "{{message.id}}",
-    "type": "text",
+    "type": "{{message.type}}",
     "text": "{{message.text}}",
-    "timestamp": "{{message.timestamp}}",
+    "timestamp": {{message.timestamp}},
     "direction": "inbound",
     "platform_msg_id": "{{message.id}}"
   },
-  "timestamp": "{{current_timestamp}}"
+  "timestamp": {{current_timestamp}}
 }
 ```
+
+**⚠️ Importante**: 
+- Este flow se dispara **cada vez que llega un mensaje**, capturando todos los mensajes en tiempo real
+- El `{{message.id}}` es crucial para evitar duplicados
+- Si ManyChat tiene la opción "Add Full Contact Data", puedes usarla pero **debes agregar el objeto `message` manualmente** porque "Full Contact Data" no incluye el mensaje actual
 
 ### 1.4. Guardar y Activar
 
@@ -382,6 +429,52 @@ Cuando configures el Body del HTTP Request, puedes usar estas variables:
 2. **Requiere crear flows**: Debes crear un flow para cada tipo de evento
 3. **Depende de triggers**: Los flows solo se activan cuando ocurre el trigger configurado
 4. **Rate limiting**: Manychat puede tener límites en la cantidad de HTTP requests
+
+---
+
+## 📊 Comparación: Full Contact Data vs Message Received
+
+### Full Contact Data (Al finalizar automatización)
+
+**Cuándo usar:**
+- Para actualizar datos del contacto al finalizar una automatización
+- Cuando solo necesitas el último mensaje
+- Para sincronizar custom fields y tags
+
+**Ventajas:**
+- Se envía una sola vez al final
+- Incluye todos los datos del contacto
+- Menos llamadas HTTP
+
+**Desventajas:**
+- ❌ Solo incluye el último mensaje (`last_input_text`)
+- ❌ No captura el historial completo de mensajes
+- ❌ Se pierden mensajes intermedios
+
+### Message Received Trigger (Tiempo real)
+
+**Cuándo usar:**
+- Para capturar todos los mensajes de la conversación
+- Cuando necesitas ver el historial completo
+- Para análisis de conversaciones
+
+**Ventajas:**
+- ✅ Captura todos los mensajes individualmente
+- ✅ Se guardan en tiempo real
+- ✅ Permite ver el historial completo
+
+**Desventajas:**
+- Genera más llamadas HTTP (una por mensaje)
+- Requiere configuración adicional del Flow
+
+### Recomendación
+
+**Usa ambos:**
+1. **Flow con "Message Received"**: Para capturar todos los mensajes en tiempo real
+2. **Flow con "Full Contact Data"**: Para actualizar datos del contacto al finalizar automatizaciones
+
+Para más detalles sobre cómo configurar la captura de mensajes en tiempo real, consulta:
+- **[Guía Completa: Configurar Flow para Mensajes en Tiempo Real](CONFIGURAR-FLOW-MENSAJES-TIEMPO-REAL.md)**
 
 ---
 

@@ -69,3 +69,4 @@ El favicon SVG funcionará en navegadores modernos mientras se generan los archi
 
 
 
+

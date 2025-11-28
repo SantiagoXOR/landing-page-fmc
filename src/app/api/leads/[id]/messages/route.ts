@@ -27,23 +27,45 @@ export async function GET(
     const messages = await ConversationService.getMessagesByLeadId(leadId, platform)
 
     // Transformar mensajes al formato esperado por el frontend
-    const formattedMessages = messages.map((msg: any) => ({
-      id: msg.id,
-      tipo: msg.direction === 'inbound' ? 'whatsapp_in' : 'whatsapp_out',
-      payload: {
-        mensaje: msg.content,
-        messageId: msg.platform_msg_id,
-        messageType: msg.message_type,
-        sentAt: msg.sent_at,
-        ...(msg.metadata && typeof msg.metadata === 'object' ? msg.metadata : {})
-      },
-      createdAt: msg.sent_at || msg.created_at
-    }))
+    const formattedMessages = messages.map((msg: any) => {
+      // Asegurar que siempre tengamos una fecha válida
+      const sentAt = msg.sent_at || msg.created_at
+      const createdAt = sentAt || new Date().toISOString()
+      
+      // Validar que la fecha sea válida
+      const validDate = new Date(createdAt)
+      const finalDate = isNaN(validDate.getTime()) ? new Date().toISOString() : createdAt
+      
+      return {
+        id: msg.id,
+        tipo: msg.direction === 'inbound' ? 'whatsapp_in' : 'whatsapp_out',
+        payload: {
+          mensaje: msg.content || '',
+          messageId: msg.platform_msg_id || msg.id,
+          messageType: msg.message_type || 'text',
+          sentAt: finalDate,
+          ...(msg.metadata && typeof msg.metadata === 'object' ? msg.metadata : {})
+        },
+        createdAt: finalDate
+      }
+    })
 
-    // Ordenar por fecha (más recientes primero)
-    const sortedMessages = formattedMessages.sort((a: any, b: any) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
+    // Ordenar por fecha (más recientes primero) con validación
+    const sortedMessages = formattedMessages.sort((a: any, b: any) => {
+      try {
+        const dateA = new Date(a.createdAt)
+        const dateB = new Date(b.createdAt)
+        
+        // Si alguna fecha es inválida, ponerla al final
+        if (isNaN(dateA.getTime())) return 1
+        if (isNaN(dateB.getTime())) return -1
+        
+        return dateB.getTime() - dateA.getTime()
+      } catch (error) {
+        console.error('Error sorting messages:', error)
+        return 0
+      }
+    })
 
     logger.info('Messages retrieved for lead', {
       leadId,
@@ -60,7 +82,9 @@ export async function GET(
   } catch (error: any) {
     logger.error('Error retrieving lead messages', {
       error: error.message,
-      leadId: params.id
+      errorStack: error.stack,
+      leadId: params.id,
+      platform
     })
 
     if (error.message.includes('Insufficient permissions')) {
@@ -68,7 +92,8 @@ export async function GET(
     }
 
     return NextResponse.json({ 
-      error: 'Error interno del servidor' 
+      error: 'Error interno del servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 })
   }
 }

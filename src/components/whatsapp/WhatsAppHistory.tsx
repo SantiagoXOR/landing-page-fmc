@@ -39,39 +39,66 @@ export default function WhatsAppHistory({ leadId, telefono }: WhatsAppHistoryPro
   const fetchMessages = async () => {
     try {
       setLoading(true)
+      setError(null)
+      
       // Usar el nuevo endpoint de mensajes de conversaciones
       const response = await fetch(`/api/leads/${leadId}/messages?platform=whatsapp`)
       
       if (!response.ok) {
-        throw new Error('Error al cargar mensajes')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Error ${response.status}: Error al cargar mensajes`)
       }
       
       const data = await response.json()
-      setMessages(data.messages || [])
+      
+      // Validar y filtrar mensajes con fechas inválidas
+      const validMessages = (data.messages || []).filter((msg: WhatsAppMessage) => {
+        if (!msg.createdAt) return false
+        const date = new Date(msg.createdAt)
+        return !isNaN(date.getTime())
+      })
+      
+      setMessages(validMessages)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
+      console.error('Error fetching WhatsApp messages:', err)
+      setError(err instanceof Error ? err.message : 'Error desconocido al cargar mensajes')
     } finally {
       setLoading(false)
     }
   }
 
   const formatMessageTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+    if (!dateString) {
+      return 'Fecha no disponible'
+    }
     
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('es-AR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      })
-    } else {
-      return date.toLocaleDateString('es-AR', { 
-        day: '2-digit', 
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+    try {
+      const date = new Date(dateString)
+      
+      // Validar que la fecha sea válida
+      if (isNaN(date.getTime())) {
+        return 'Fecha inválida'
+      }
+      
+      const now = new Date()
+      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+      
+      if (diffInHours < 24) {
+        return date.toLocaleTimeString('es-AR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })
+      } else {
+        return date.toLocaleDateString('es-AR', { 
+          day: '2-digit', 
+          month: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      }
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error)
+      return 'Fecha inválida'
     }
   }
 

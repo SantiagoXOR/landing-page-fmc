@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { MessageCircle, ArrowRight, ArrowLeft, Clock, User, Bot } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { safeToLocaleTimeString, safeToLocaleDateString } from '@/lib/safe-date-utils'
 
 interface WhatsAppMessage {
   id: string
@@ -77,6 +78,7 @@ export default function WhatsAppHistory({ leadId, telefono }: WhatsAppHistoryPro
       
       // Validar que la fecha sea válida
       if (isNaN(date.getTime())) {
+        console.warn('Fecha inválida detectada en formatMessageTime:', dateString)
         return 'Fecha inválida'
       }
       
@@ -84,17 +86,21 @@ export default function WhatsAppHistory({ leadId, telefono }: WhatsAppHistoryPro
       const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
       
       if (diffInHours < 24) {
-        return date.toLocaleTimeString('es-AR', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })
-      } else {
-        return date.toLocaleDateString('es-AR', { 
-          day: '2-digit', 
-          month: '2-digit',
+        return safeToLocaleTimeString(date, 'es-AR', {
           hour: '2-digit',
           minute: '2-digit'
         })
+      } else {
+        // Combinar fecha y hora usando funciones seguras
+        const datePart = safeToLocaleDateString(date, 'es-AR', {
+          day: '2-digit',
+          month: '2-digit'
+        })
+        const timePart = safeToLocaleTimeString(date, 'es-AR', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+        return `${datePart} ${timePart}`
       }
     } catch (error) {
       console.error('Error formatting date:', dateString, error)

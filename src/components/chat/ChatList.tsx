@@ -38,37 +38,50 @@ export function ChatList({
   })
 
   const formatTime = (dateString: string) => {
+    if (!dateString) return 'Fecha inválida'
+    
     const date = new Date(dateString)
-    const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
-    const diffInDays = Math.floor(diffInHours / 24)
+    
+    // Validar que la fecha sea válida
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida'
+    }
+    
+    try {
+      const now = new Date()
+      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+      const diffInDays = Math.floor(diffInHours / 24)
 
-    // Si es hoy, mostrar hora
-    if (diffInHours < 24 && date.getDate() === now.getDate()) {
-      return date.toLocaleTimeString('es-ES', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false
-      })
-    }
-    
-    // Si fue ayer
-    if (diffInDays === 1 || (diffInHours < 48 && date.getDate() === now.getDate() - 1)) {
-      return 'Ayer'
-    }
-    
-    // Si fue esta semana, mostrar día abreviado
-    if (diffInDays < 7) {
+      // Si es hoy, mostrar hora
+      if (diffInHours < 24 && date.getDate() === now.getDate()) {
+        return date.toLocaleTimeString('es-ES', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false
+        })
+      }
+      
+      // Si fue ayer
+      if (diffInDays === 1 || (diffInHours < 48 && date.getDate() === now.getDate() - 1)) {
+        return 'Ayer'
+      }
+      
+      // Si fue esta semana, mostrar día abreviado
+      if (diffInDays < 7) {
+        return date.toLocaleDateString('es-ES', { 
+          weekday: 'short'
+        }).toLowerCase()
+      }
+      
+      // Si fue hace más tiempo, mostrar fecha
       return date.toLocaleDateString('es-ES', { 
-        weekday: 'short'
-      }).toLowerCase()
+        day: '2-digit', 
+        month: 'short' 
+      })
+    } catch (error) {
+      console.error('Error formateando tiempo:', error, dateString)
+      return 'Fecha inválida'
     }
-    
-    // Si fue hace más tiempo, mostrar fecha
-    return date.toLocaleDateString('es-ES', { 
-      day: '2-digit', 
-      month: 'short' 
-    })
   }
 
   const getPlatformIcon = (platform: string) => {

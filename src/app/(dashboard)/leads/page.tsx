@@ -374,7 +374,7 @@ function LeadsPage() {
             lead.origen || '',
             lead.ingresos || '',
             lead.zona || '',
-            new Date(lead.createdAt).toLocaleDateString('es-AR')
+            formatDate(lead.createdAt).split(' ')[0] // Solo la fecha sin hora
           ].join(','))
         ].join('\n')
 

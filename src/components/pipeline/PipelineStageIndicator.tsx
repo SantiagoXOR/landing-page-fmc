@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatDate } from '@/lib/utils'
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -158,7 +159,7 @@ export function PipelineStageIndicator({
         
         {pipeline?.stage_entered_at && (
           <CardDescription>
-            En esta etapa desde {new Date(pipeline.stage_entered_at).toLocaleDateString('es-AR')}
+            En esta etapa desde {pipeline.stage_entered_at ? formatDate(pipeline.stage_entered_at).split(' ')[0] : 'Fecha no disponible'}
           </CardDescription>
         )}
       </CardHeader>
@@ -189,7 +190,7 @@ export function PipelineStageIndicator({
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Clock className="h-4 w-4" />
                 <span>
-                  Cierre esperado: {new Date(pipeline.expected_close_date).toLocaleDateString('es-AR')}
+                  Cierre esperado: {pipeline.expected_close_date ? formatDate(pipeline.expected_close_date).split(' ')[0] : 'Fecha no disponible'}
                 </span>
               </div>
             </div>

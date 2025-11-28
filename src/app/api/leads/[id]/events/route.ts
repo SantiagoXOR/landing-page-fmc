@@ -36,10 +36,24 @@ export async function GET(
         )
       : events
 
-    // Ordenar por fecha (más recientes primero)
-    const sortedEvents = filteredEvents.sort((a: any, b: any) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
+    // Ordenar por fecha (más recientes primero) con validación
+    const sortedEvents = filteredEvents.sort((a: any, b: any) => {
+      try {
+        if (!a.createdAt || !b.createdAt) return 0
+        
+        const dateA = new Date(a.createdAt)
+        const dateB = new Date(b.createdAt)
+        
+        // Si alguna fecha es inválida, ponerla al final
+        if (isNaN(dateA.getTime())) return 1
+        if (isNaN(dateB.getTime())) return -1
+        
+        return dateB.getTime() - dateA.getTime()
+      } catch (error) {
+        console.error('Error sorting events:', error)
+        return 0
+      }
+    })
 
     logger.info('Events retrieved for lead', {
       leadId,

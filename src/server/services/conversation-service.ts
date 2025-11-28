@@ -107,9 +107,50 @@ export class ConversationService {
         throw new Error('Conversation not found')
       }
 
+      // Transformar mensajes al formato esperado por el frontend
+      const formattedMessages = (messages || []).map((msg: any) => {
+        // Función helper para convertir cualquier formato de fecha a ISO string
+        const toISOString = (dateValue: any): string => {
+          if (!dateValue) return new Date().toISOString()
+          
+          // Si ya es un string ISO válido
+          if (typeof dateValue === 'string') {
+            const parsed = new Date(dateValue)
+            if (!isNaN(parsed.getTime())) {
+              return parsed.toISOString()
+            }
+          }
+          
+          // Si es un objeto Date
+          if (dateValue instanceof Date) {
+            if (!isNaN(dateValue.getTime())) {
+              return dateValue.toISOString()
+            }
+          }
+          
+          // Fallback: fecha actual
+          return new Date().toISOString()
+        }
+
+        // Obtener la mejor fecha disponible (sent_at tiene prioridad)
+        const sentAt = msg.sent_at || msg.sentAt || msg.created_at || msg.createdAt
+        const formattedSentAt = toISOString(sentAt)
+
+        return {
+          id: msg.id,
+          direction: msg.direction || 'inbound',
+          content: msg.content || '',
+          messageType: msg.message_type || msg.messageType || 'text',
+          sentAt: formattedSentAt, // Asegurar que siempre sea un string ISO válido
+          readAt: msg.read_at || msg.readAt || undefined,
+          isFromBot: msg.is_from_bot || msg.isFromBot || false,
+          manychatFlowId: msg.manychat_flow_id || msg.manychatFlowId || undefined
+        }
+      })
+
       return {
         ...(conversation as any),
-        messages: messages || []
+        messages: formattedMessages
       }
     } catch (error) {
       console.error('Error fetching conversation:', error)

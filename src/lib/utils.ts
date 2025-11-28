@@ -31,6 +31,29 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+/**
+ * Valida si una fecha es válida
+ */
+function isValidDate(date: Date | string | null | undefined): boolean {
+  if (!date) return false
+  const dateObj = date instanceof Date ? date : new Date(date)
+  return !isNaN(dateObj.getTime())
+}
+
+/**
+ * Convierte cualquier formato de fecha a Date válido
+ */
+function toValidDate(date: Date | string | null | undefined): Date | null {
+  if (!date) return null
+  try {
+    const dateObj = date instanceof Date ? date : new Date(date)
+    if (isNaN(dateObj.getTime())) return null
+    return dateObj
+  } catch {
+    return null
+  }
+}
+
 export function formatDate(date: Date | string | null | undefined): string {
   // Si no hay fecha, retornar mensaje por defecto
   if (!date) {
@@ -38,10 +61,10 @@ export function formatDate(date: Date | string | null | undefined): string {
   }
   
   // Convertir a Date si es string
-  const dateObj = date instanceof Date ? date : new Date(date)
+  const dateObj = toValidDate(date)
   
   // Validar que la fecha sea válida
-  if (isNaN(dateObj.getTime())) {
+  if (!dateObj) {
     return 'Fecha inválida'
   }
   
@@ -55,6 +78,44 @@ export function formatDate(date: Date | string | null | undefined): string {
     }).format(dateObj)
   } catch (error) {
     console.error('Error formateando fecha:', error, date)
+    return 'Fecha inválida'
+  }
+}
+
+/**
+ * Formatea una fecha de forma segura usando toLocaleDateString
+ */
+export function safeLocaleDateString(
+  date: Date | string | null | undefined,
+  locale: string = 'es-AR',
+  options?: Intl.DateTimeFormatOptions
+): string {
+  const dateObj = toValidDate(date)
+  if (!dateObj) return 'Fecha inválida'
+  
+  try {
+    return dateObj.toLocaleDateString(locale, options)
+  } catch (error) {
+    console.error('Error en toLocaleDateString:', error, date)
+    return 'Fecha inválida'
+  }
+}
+
+/**
+ * Formatea una fecha de forma segura usando toLocaleTimeString
+ */
+export function safeLocaleTimeString(
+  date: Date | string | null | undefined,
+  locale: string = 'es-AR',
+  options?: Intl.DateTimeFormatOptions
+): string {
+  const dateObj = toValidDate(date)
+  if (!dateObj) return 'Fecha inválida'
+  
+  try {
+    return dateObj.toLocaleTimeString(locale, options)
+  } catch (error) {
+    console.error('Error en toLocaleTimeString:', error, date)
     return 'Fecha inválida'
   }
 }

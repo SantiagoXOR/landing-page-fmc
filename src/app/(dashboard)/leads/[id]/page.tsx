@@ -342,22 +342,44 @@ export default function LeadDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {lead.events.map((event) => (
-                  <div key={event.id} className="flex items-start space-x-3 pb-4 border-b last:border-b-0">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">{event.tipo}</p>
-                        <p className="text-xs text-gray-500">{formatDate(event.createdAt)}</p>
-                      </div>
-                      {event.payload && (
-                        <pre className="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">
-                          {JSON.stringify(event.payload, null, 2)}
-                        </pre>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                {lead.events && Array.isArray(lead.events) && lead.events.length > 0 ? (
+                  lead.events.map((event) => {
+                    // Validar que el evento tenga una fecha válida antes de renderizar
+                    if (!event.createdAt) {
+                      return null
+                    }
+                    
+                    try {
+                      const eventDate = new Date(event.createdAt)
+                      if (isNaN(eventDate.getTime())) {
+                        console.warn('Evento con fecha inválida:', event.id, event.createdAt)
+                        return null
+                      }
+                      
+                      return (
+                        <div key={event.id} className="flex items-start space-x-3 pb-4 border-b last:border-b-0">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium">{event.tipo || 'Sin tipo'}</p>
+                              <p className="text-xs text-gray-500">{formatDate(event.createdAt)}</p>
+                            </div>
+                            {event.payload && (
+                              <pre className="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">
+                                {JSON.stringify(event.payload, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    } catch (error) {
+                      console.error('Error renderizando evento:', event.id, error)
+                      return null
+                    }
+                  })
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No hay eventos para este lead</p>
+                )}
               </div>
             </CardContent>
           </Card>

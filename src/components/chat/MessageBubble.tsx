@@ -16,8 +16,26 @@ export function MessageBubble({ message, className }: MessageBubbleProps) {
   const isRead = !!message.readAt
   const isFromBot = message.isFromBot || false
 
-  const formatTime = (dateString: string) => {
-    return format(new Date(dateString), 'HH:mm', { locale: es })
+  const formatTime = (dateString: string | null | undefined) => {
+    // Validar que dateString exista
+    if (!dateString) {
+      return '--:--'
+    }
+    
+    try {
+      const date = new Date(dateString)
+      
+      // Validar que la fecha sea válida
+      if (isNaN(date.getTime())) {
+        console.warn('Fecha inválida en MessageBubble formatTime:', dateString)
+        return '--:--'
+      }
+      
+      return format(date, 'HH:mm', { locale: es })
+    } catch (error) {
+      console.error('Error formateando fecha en MessageBubble:', error, dateString)
+      return '--:--'
+    }
   }
 
   const getMessageIcon = () => {

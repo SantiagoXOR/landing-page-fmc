@@ -10,6 +10,7 @@ import { ArrowLeft, Save, Loader2, User, Shield, Key } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/toast'
 import { PermissionGuard } from '@/components/auth/PermissionGuard'
+import { formatDate } from '@/lib/utils'
 
 interface User {
   id: string
@@ -340,8 +341,8 @@ function EditUserPage() {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">Información del usuario:</h4>
                 <div className="text-sm text-gray-600 space-y-1">
-                  <p><strong>Creado:</strong> {new Date(user.created_at).toLocaleDateString('es-AR')}</p>
-                  <p><strong>Último login:</strong> {user.last_login ? new Date(user.last_login).toLocaleDateString('es-AR') : 'Nunca'}</p>
+                  <p><strong>Creado:</strong> {formatDate(user.created_at)}</p>
+                  <p><strong>Último login:</strong> {user.last_login ? formatDate(user.last_login) : 'Nunca'}</p>
                   <p><strong>ID:</strong> {user.id}</p>
                 </div>
               </div>

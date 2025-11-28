@@ -62,15 +62,43 @@ export async function GET(request: NextRequest) {
             .order('sent_at', { ascending: false })
             .limit(1) // Solo el último mensaje para la lista
 
-          messages = (messagesData || []).map((msg: any) => ({
-            id: msg.id,
-            direction: msg.direction === 'inbound' ? 'inbound' : 'outbound',
-            content: msg.content || '',
-            messageType: msg.message_type || 'text',
-            sentAt: msg.sent_at || msg.created_at,
-            readAt: msg.read_at,
-            isFromBot: msg.direction === 'outbound' || msg.is_from_bot || false
-          }))
+          messages = (messagesData || []).map((msg: any) => {
+            // Función helper para convertir cualquier formato de fecha a ISO string
+            const toISOString = (dateValue: any): string => {
+              if (!dateValue) return new Date().toISOString()
+              
+              // Si ya es un string ISO válido
+              if (typeof dateValue === 'string') {
+                const parsed = new Date(dateValue)
+                if (!isNaN(parsed.getTime())) {
+                  return parsed.toISOString()
+                }
+              }
+              
+              // Si es un objeto Date
+              if (dateValue instanceof Date) {
+                if (!isNaN(dateValue.getTime())) {
+                  return dateValue.toISOString()
+                }
+              }
+              
+              // Fallback: fecha actual
+              return new Date().toISOString()
+            }
+
+            const sentAt = msg.sent_at || msg.created_at
+            const formattedSentAt = toISOString(sentAt)
+
+            return {
+              id: msg.id,
+              direction: msg.direction === 'inbound' ? 'inbound' : 'outbound',
+              content: msg.content || '',
+              messageType: msg.message_type || 'text',
+              sentAt: formattedSentAt, // Asegurar formato ISO válido
+              readAt: msg.read_at ? toISOString(msg.read_at) : undefined,
+              isFromBot: msg.direction === 'outbound' || msg.is_from_bot || false
+            }
+          })
         }
 
         // Calcular unreadCount (mensajes no leídos)

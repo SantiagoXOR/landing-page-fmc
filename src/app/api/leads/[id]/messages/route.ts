@@ -9,6 +9,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const leadId = params.id
+  const { searchParams } = new URL(request.url)
+  const platform = searchParams.get('platform') || 'whatsapp'
+
   try {
     // Verificar autenticación
     const session = await getServerSession(authOptions)
@@ -18,10 +22,6 @@ export async function GET(
 
     // Verificar permisos
     checkPermission(session.user.role, 'leads:read')
-
-    const leadId = params.id
-    const { searchParams } = new URL(request.url)
-    const platform = searchParams.get('platform') || 'whatsapp'
 
     // Obtener mensajes de la conversación del lead
     const messages = await ConversationService.getMessagesByLeadId(leadId, platform)

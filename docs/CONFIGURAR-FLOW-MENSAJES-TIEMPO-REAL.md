@@ -274,3 +274,6 @@ Si ves mensajes duplicados en el CRM:
 - [ ] Mensaje verificado en el CRM
 - [ ] Logs revisados para confirmar recepción
 
+
+
+

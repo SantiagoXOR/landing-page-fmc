@@ -123,6 +123,7 @@ export const UI_SELECTORS = {
   NAV_LEADS: '[data-testid="sidebar"] a[href="/leads"]',
   NAV_DOCUMENTS: '[data-testid="sidebar"] a[href="/documents"]',
   NAV_SETTINGS: '[data-testid="sidebar"] a[href="/settings"]',
+  NAV_CHATS: '[data-testid="sidebar"] a[href="/chats"], a[href*="/chats"]',
   
   // Leads
   LEADS_TITLE: 'h1:has-text("Gestión de Leads")',
@@ -143,6 +144,41 @@ export const UI_SELECTORS = {
   SETTINGS_SECTIONS: '[data-testid="settings-sections"]',
   FORMOSA_SETTINGS: '[data-testid="formosa-settings"]',
   
+      // Chats Panel
+      CHATS_PAGE_TITLE: 'h1:has-text("Chats"), h2:has-text("Chats"), [class*="text-2xl"]:has-text("Chats"), [class*="text-xl"]:has-text("Chats")',
+  CHATS_SUBTITLE: 'text=/Gestiona las conversaciones de WhatsApp e Instagram/i',
+  CHATS_LIST_CONTAINER: '.divide-y.divide-gray-100',
+  CONVERSATION_ITEM: '.flex.items-start.space-x-2.cursor-pointer:has(h4), .flex.items-start.space-x-3.cursor-pointer:has(h4)',
+  CONVERSATION_ITEM_SELECTED: '.bg-purple-50.border-l-4.border-purple-600',
+  CONVERSATION_NAME: 'h4.font-medium.text-gray-900',
+  CONVERSATION_PREVIEW: 'p.text-gray-600.truncate',
+  CONVERSATION_TIMESTAMP: 'span.text-gray-500.flex-shrink-0',
+  CONVERSATION_UNREAD_BADGE: '.bg-purple-600.rounded-full:has(span)',
+  CONVERSATION_BOT_ALERT: '.bg-pink-500:has-text("Bot Alert"), .bg-pink-500:has-text("Alert")',
+  CHATS_SEARCH_INPUT: 'input[placeholder*="Buscar"]',
+  CHATS_FILTER_ALL: 'button:has-text("Todos")',
+  CHATS_FILTER_INSTAGRAM: 'button:has-text("Instagram"), button:has-text("IG")',
+  CHATS_FILTER_WHATSAPP: 'button:has-text("WhatsApp"), button:has-text("WA")',
+  CHATS_SYNC_BUTTON: 'button:has(svg[class*="RefreshCw"])',
+  CHATS_SYNC_STATUS: '.bg-green-50, .bg-red-50, .bg-blue-50',
+  CHAT_WINDOW_CONTAINER: '.flex.flex-col.h-full.bg-white',
+  CHAT_WINDOW_HEADER: '.p-3.border-b, .p-4.border-b',
+  CHAT_CONTACT_NAME: 'h3.font-semibold.text-gray-900',
+  CHAT_CONTACT_PHONE: '.text-xs.text-gray-500, .text-sm.text-gray-500:has-text("+54")',
+  CHAT_MESSAGES_CONTAINER: '[data-radix-scroll-area-viewport], .space-y-2, .space-y-3, .space-y-4',
+  CHAT_MESSAGE_BUBBLE: '.rounded-2xl, .rounded-lg',
+  CHAT_MESSAGE_INPUT: 'input[placeholder*="Escribe un mensaje"]',
+  CHAT_SEND_BUTTON: 'button:has(svg[class*="Send"]), button:has-text("Enviar")',
+  CHAT_EMPTY_STATE: '.flex.flex-col.items-center.justify-center.py-12, .flex.flex-col.items-center.justify-center.py-16',
+  CHATS_SIDEBAR: '.w-80.bg-white.border-l, .bg-white.border-l',
+  SIDEBAR_CONTACT_INFO: 'text="Información del Contacto"',
+  SIDEBAR_CHATBOT_STATUS: 'text="Chatbot"',
+  SIDEBAR_CONVERSATION_STATUS: 'text="Estado de la Conversación"',
+  SIDEBAR_ASSIGN_USER: 'text="Asignar a Agente", select:has(option:has-text("Seleccionar agente"))',
+  SIDEBAR_ASSIGN_BUTTON: 'button:has-text("Asignar")',
+  SIDEBAR_CLOSE_CONVERSATION: 'button:has-text("Cerrar Conversación")',
+  CHATS_EMPTY_STATE: 'text=/No hay conversaciones|No se encontraron conversaciones/i',
+  
   // UI Elements
   GRADIENT_ELEMENTS: '.gradient-primary, .gradient-success, .gradient-warning',
   FORMOSA_BADGES: '.formosa-badge-nuevo, .formosa-badge-preaprobado, .formosa-badge-rechazado',
@@ -155,5 +191,7 @@ export const TIMEOUTS = {
   MEDIUM: 10000,  // 10 segundos  
   LONG: 30000,    // 30 segundos
   NAVIGATION: 15000, // 15 segundos para navegación
-  API_CALL: 20000    // 20 segundos para llamadas API
+  API_CALL: 20000,    // 20 segundos para llamadas API
+  CHAT_SYNC: 30000,   // 30 segundos para sincronización de chats
+  MESSAGE_SEND: 10000  // 10 segundos para envío de mensajes
 } as const;

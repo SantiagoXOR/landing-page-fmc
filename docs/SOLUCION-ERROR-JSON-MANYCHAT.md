@@ -157,3 +157,6 @@ El body debe verse así en la vista previa (con las variables expandidas):
 - [Guía Completa: Configurar Flow para Mensajes en Tiempo Real](CONFIGURAR-FLOW-MENSAJES-TIEMPO-REAL.md)
 - [Configurar Webhook en ManyChat - Guía Paso a Paso](CONFIGURAR-WEBHOOK-MANYCHAT-PASO-A-PASO.md)
 
+
+
+

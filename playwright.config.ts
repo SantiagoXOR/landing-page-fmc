@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
+import * as fs from 'fs'
+import * as path from 'path'
+
+// Verificar si existe el archivo de autenticación
+const authFile = path.join(__dirname, './playwright/.auth/user.json')
+const hasAuthFile = fs.existsSync(authFile)
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -32,6 +38,9 @@ export default defineConfig({
     
     /* Record video on failure */
     video: 'retain-on-failure',
+    
+    /* Usar estado de autenticación guardado si existe */
+    ...(hasAuthFile && { storageState: authFile }),
   },
 
   /* Configure projects for major browsers */

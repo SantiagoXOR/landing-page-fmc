@@ -846,6 +846,9 @@ export class ManychatWebhookService {
               value: customField.value
             })
 
+            // Crear mensaje en la conversación para mostrar el dato recopilado
+            await this.createCustomFieldMessage(leadId, subscriber, customField)
+
             // Actualizar actividad
             await this.updateLeadActivity(leadId)
 
@@ -875,6 +878,9 @@ export class ManychatWebhookService {
 
       await ManychatSyncService.syncManychatToLead(subscriber)
 
+      // Crear mensaje en la conversación para mostrar el dato recopilado
+      await this.createCustomFieldMessage(leadId, subscriber, customField)
+
       // Actualizar actividad
       await this.updateLeadActivity(leadId)
 
@@ -894,6 +900,123 @@ export class ManychatWebhookService {
         fieldValue: customField.value
       })
       return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Crear mensaje en la conversación cuando se recopila un dato del AI Step
+   * Esto permite ver todos los datos recopilados en orden en el chat del CRM
+   */
+  private static async createCustomFieldMessage(
+    leadId: string,
+    subscriber: ManychatSubscriber,
+    customField: { id: number; name: string; value: any }
+  ): Promise<void> {
+    try {
+      if (!supabase.client) {
+        return
+      }
+
+      // Mapeo de nombres de campos a etiquetas amigables en español
+      const fieldLabels: Record<string, string> = {
+        'producto': 'Producto',
+        'banco': 'Banco',
+        'trabajo_actual': 'Trabajo Actual',
+        'zona': 'Zona',
+        'cuit': 'CUIT',
+        'cuil': 'CUIL',
+        'dni': 'DNI',
+        'ingresos': 'Ingresos',
+        'monto': 'Monto',
+        'agencia': 'Agencia',
+        'estado': 'Estado',
+        'origen': 'Origen'
+      }
+
+      const fieldName = customField.name.toLowerCase()
+      const fieldLabel = fieldLabels[fieldName] || customField.name
+
+      // Formatear el valor del campo
+      let fieldValue = customField.value
+      if (fieldValue === null || fieldValue === undefined || fieldValue === '') {
+        return // No crear mensaje si el valor está vacío
+      }
+
+      // Formatear según el tipo de campo
+      if (fieldName === 'ingresos' || fieldName === 'monto') {
+        // Formatear números como moneda
+        const numValue = typeof fieldValue === 'string' ? parseFloat(fieldValue) : fieldValue
+        if (!isNaN(numValue)) {
+          fieldValue = new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            minimumFractionDigits: 0
+          }).format(numValue)
+        }
+      }
+
+      // Crear el texto del mensaje
+      const messageText = `${fieldLabel}: ${fieldValue}`
+
+      // Determinar plataforma y platformId
+      const platform = subscriber.instagram_id ? 'instagram' : 'whatsapp'
+      const platformId = subscriber.instagram_id || subscriber.whatsapp_phone || subscriber.phone || String(subscriber.id)
+
+      // Buscar o crear conversación
+      const conversationId = await this.findOrCreateConversation(leadId, platform, platformId)
+
+      if (!conversationId) {
+        logger.warn('No se pudo encontrar o crear conversación para mensaje de custom field', {
+          leadId,
+          fieldName: customField.name
+        })
+        return
+      }
+
+      // Usar timestamp actual para mantener el orden cronológico correcto
+      // Esto asegura que los mensajes aparezcan en el orden en que se recopilaron los datos
+      const timestamp = Math.floor(Date.now() / 1000)
+
+      // Generar un platform_msg_id único para este mensaje de custom field
+      // Incluir microsegundos para evitar colisiones si múltiples campos se actualizan al mismo tiempo
+      const microsecondPrecision = Date.now() % 1000
+      const platformMsgId = `manychat_cf_${subscriber.id}_${customField.name}_${timestamp}_${microsecondPrecision}_${Math.random().toString(36).substring(2, 8)}`
+
+      const message: ManychatWebhookMessage = {
+        id: `cf_msg_${subscriber.id}_${customField.name}_${Date.now()}`,
+        type: 'text',
+        text: messageText,
+        timestamp,
+        direction: 'inbound',
+        platform_msg_id: platformMsgId
+      }
+
+      // Guardar el mensaje
+      const messageId = await this.saveMessage(conversationId, message, 'inbound')
+
+      if (messageId) {
+        logger.info('✅ Mensaje de custom field creado en conversación', {
+          messageId,
+          conversationId,
+          leadId,
+          fieldName: customField.name,
+          fieldLabel,
+          messageText
+        })
+      } else {
+        logger.warn('No se pudo crear mensaje de custom field en conversación', {
+          conversationId,
+          leadId,
+          fieldName: customField.name
+        })
+      }
+    } catch (error: any) {
+      // No fallar si no se puede crear el mensaje, solo loguear
+      logger.warn('Error creando mensaje de custom field en conversación', {
+        error: error.message,
+        leadId,
+        fieldName: customField.name
+      })
     }
   }
 

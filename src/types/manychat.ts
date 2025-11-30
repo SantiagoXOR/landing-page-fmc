@@ -328,3 +328,68 @@ export interface ManychatLeadData {
   tags?: string[]
 }
 
+// ============================================================================
+// Channel Detection & Multi-Channel Messaging
+// ============================================================================
+
+/**
+ * Canales soportados por ManyChat
+ */
+export type ManychatChannel = 'whatsapp' | 'instagram' | 'facebook' | 'unknown'
+
+/**
+ * Identificador para buscar un subscriber
+ */
+export interface ManychatSubscriberIdentifier {
+  phone?: string
+  email?: string
+  subscriberId?: number
+}
+
+/**
+ * Parámetros para envío de mensaje multi-canal
+ */
+export interface ManychatSendMessageParams {
+  to: ManychatSubscriberIdentifier
+  message: string
+  messageType?: 'text' | 'image' | 'video' | 'file' | 'audio'
+  mediaUrl?: string
+  caption?: string
+  filename?: string
+  channel?: ManychatChannel | 'auto'
+  tag?: string
+}
+
+/**
+ * Resultado del envío de mensaje
+ */
+export interface ManychatSendMessageResult {
+  success: boolean
+  messageId?: string
+  channel?: ManychatChannel
+  subscriberId?: number
+  error?: string
+  errorCode?: string
+}
+
+/**
+ * Errores específicos por canal
+ */
+export type ManychatChannelErrorCode =
+  | 'SUBSCRIBER_NOT_FOUND'
+  | 'CHANNEL_UNAVAILABLE'
+  | 'OUTSIDE_WINDOW'
+  | 'RATE_LIMIT'
+  | 'INVALID_PHONE'
+  | 'INVALID_EMAIL'
+  | 'MESSAGE_TOO_LONG'
+  | 'UNSUPPORTED_MESSAGE_TYPE'
+  | 'INTERNAL_ERROR'
+
+export interface ManychatChannelError {
+  code: ManychatChannelErrorCode
+  message: string
+  channel?: ManychatChannel
+  details?: any
+}
+

@@ -8,6 +8,9 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.te
 process.env.JWT_SECRET = 'test-jwt-secret-key'
 process.env.ALLOWED_WEBHOOK_TOKEN = 'test-webhook-token'
 process.env.TESTING_MODE = 'true'
+// ManyChat API variables for tests
+process.env.MANYCHAT_API_KEY = 'test-api-key'
+process.env.MANYCHAT_BASE_URL = 'https://api.manychat.com'
 // NODE_ENV is read-only, so we don't set it directly
 
 // Mock fetch globally
@@ -92,6 +95,19 @@ vi.mock('@/server/services/pipeline-service', () => ({
     createLeadPipeline: vi.fn(),
     updatePipelineStage: vi.fn(),
     getPipelineByLeadId: vi.fn(),
+  },
+}))
+
+// NOTA: ManyChat Service y Messaging Service NO se mockean globalmente
+// Cada test que los necesite mockeados debe hacerlo explícitamente
+// Esto permite que los tests que prueban estos servicios directamente funcionen correctamente
+
+// Mock Conversation Service
+vi.mock('@/server/services/conversation-service', () => ({
+  ConversationService: {
+    getConversationById: vi.fn(),
+    updateLastActivity: vi.fn(),
+    getMessagesByLeadId: vi.fn(),
   },
 }))
 

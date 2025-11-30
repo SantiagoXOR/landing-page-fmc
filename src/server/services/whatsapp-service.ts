@@ -2,8 +2,10 @@ import { supabase } from '@/lib/db'
 import { ConversationService } from './conversation-service'
 import { ManychatService } from './manychat-service'
 import { ManychatSyncService } from './manychat-sync-service'
+import { MessagingService } from './messaging-service'
 import { ManychatMessage } from '@/types/manychat'
 import { WhatsAppBusinessAPI, WhatsAppAPIError, formatWhatsAppNumber, isValidWhatsAppNumber } from '@/lib/integrations/whatsapp-business-api'
+import { logger } from '@/lib/logger'
 
 export interface WhatsAppMessage {
   id: string
@@ -153,76 +155,88 @@ export class WhatsAppService {
 
   /**
    * Enviar mensaje usando Manychat
+   * Usa el nuevo MessagingService para mejor detección de canal y manejo de errores
    */
   private static async sendMessageViaManychat(data: SendMessageData) {
     try {
-      // Buscar subscriber por teléfono
-      let subscriber = await ManychatService.getSubscriberByPhone(data.to)
+      logger.info('Enviando mensaje vía ManyChat', {
+        to: data.to.substring(0, 5) + '***',
+        messageType: data.messageType || 'text',
+        hasMedia: !!data.mediaUrl
+      })
 
-      // Si no existe, buscar lead en CRM y sincronizar
+      // Intentar sincronizar lead si no existe el subscriber
+      let subscriber = await ManychatService.getSubscriberByPhone(data.to)
+      
       if (!subscriber) {
+        logger.debug('Subscriber no encontrado, intentando sincronizar lead', {
+          phone: data.to.substring(0, 5) + '***'
+        })
+        
         const lead = await supabase.findLeadByPhoneOrDni(data.to)
 
         if (lead) {
+          logger.info('Lead encontrado, sincronizando a ManyChat', {
+            leadId: lead.id,
+            phone: data.to.substring(0, 5) + '***'
+          })
+          
           // Sincronizar lead a Manychat
           await ManychatSyncService.syncLeadToManychat(lead.id)
+          
           // Intentar obtener subscriber nuevamente
           subscriber = await ManychatService.getSubscriberByPhone(data.to)
+          
+          if (subscriber) {
+            logger.info('Subscriber creado después de sincronización', {
+              subscriberId: subscriber.id
+            })
+          }
         }
       }
 
-      if (!subscriber) {
-        throw new Error(`No se encontró subscriber en Manychat para ${data.to}`)
-      }
+      // Usar el nuevo MessagingService para mejor manejo multi-canal
+      // Mapear messageType 'document' a 'file' para ManyChat
+      const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
 
-      // Construir mensaje para Manychat
-      const messages: ManychatMessage[] = []
+      const result = await MessagingService.sendMessage({
+        to: {
+          phone: data.to,
+        },
+        message: data.message,
+        messageType: messageType as 'text' | 'image' | 'video' | 'file' | 'audio',
+        mediaUrl: data.mediaUrl,
+        channel: 'auto', // Detectar automáticamente
+      })
 
-      if (data.messageType === 'image' && data.mediaUrl) {
-        messages.push({
-          type: 'image',
-          url: data.mediaUrl,
-          caption: data.message,
+      if (result.success) {
+        logger.info('Mensaje enviado exitosamente vía ManyChat', {
+          messageId: result.messageId,
+          channel: result.channel,
+          subscriberId: result.subscriberId
         })
-      } else if (data.messageType === 'video' && data.mediaUrl) {
-        messages.push({
-          type: 'video',
-          url: data.mediaUrl,
-          caption: data.message,
-        })
-      } else if (data.messageType === 'audio' && data.mediaUrl) {
-        messages.push({
-          type: 'audio',
-          url: data.mediaUrl,
-        })
-      } else if (data.messageType === 'document' && data.mediaUrl) {
-        messages.push({
-          type: 'file',
-          url: data.mediaUrl,
-          filename: 'document.pdf',
-        })
-      } else {
-        // Mensaje de texto por defecto
-        messages.push({
-          type: 'text',
-          text: data.message,
-        })
-      }
 
-      // Enviar mensaje
-      const response = await ManychatService.sendMessage(subscriber.id, messages)
-
-      if (response.status === 'success') {
         return {
           success: true,
-          messageId: response.data?.message_id,
+          messageId: result.messageId,
           provider: 'manychat',
+          channel: result.channel,
         }
       } else {
-        throw new Error(response.error || 'Error enviando mensaje por Manychat')
+        logger.error('Error enviando mensaje vía ManyChat', {
+          error: result.error,
+          errorCode: result.errorCode,
+          channel: result.channel
+        })
+        
+        throw new Error(result.error || 'Error enviando mensaje por Manychat')
       }
-    } catch (error) {
-      console.error('Error en sendMessageViaManychat:', error)
+    } catch (error: any) {
+      logger.error('Error en sendMessageViaManychat', {
+        error: error.message,
+        stack: error.stack,
+        to: data.to.substring(0, 5) + '***'
+      })
       throw error
     }
   }

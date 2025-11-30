@@ -14,6 +14,8 @@ import {
   ManychatRequestOptions,
   ManychatLeadData,
   ManychatWebhookMessage,
+  ManychatChannel,
+  ManychatSubscriberIdentifier,
 } from '@/types/manychat'
 import { logger } from '@/lib/logger'
 
@@ -231,6 +233,179 @@ export class ManychatService {
     }
 
     return null
+  }
+
+  /**
+   * Obtener subscriber por email (Instagram/Facebook)
+   */
+  static async getSubscriberByEmail(email: string): Promise<ManychatSubscriber | null> {
+    if (!email || typeof email !== 'string') {
+      logger.warn('Email inválido para buscar subscriber', { email })
+      return null
+    }
+
+    // Validar formato básico de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      logger.warn('Formato de email inválido', { email })
+      return null
+    }
+
+    logger.debug('Buscando subscriber por email en Manychat', {
+      email: email.substring(0, 3) + '***' // Ocultar parte del email en logs
+    })
+
+    const response = await this.executeWithRateLimit(() =>
+      this.makeRequest<ManychatSubscriber>({
+        method: 'GET',
+        endpoint: `/fb/subscriber/findBySystemField`,
+        params: { 
+          email: email.toLowerCase().trim(),
+        },
+      })
+    )
+
+    if (response.status === 'success' && response.data) {
+      logger.info('Subscriber encontrado por email', {
+        subscriberId: response.data.id,
+        email: email.substring(0, 3) + '***'
+      })
+      return response.data
+    }
+
+    // Log detallado del error para debugging
+    if (response.status === 'error') {
+      logger.error('Error buscando subscriber por email en Manychat', {
+        email: email.substring(0, 3) + '***',
+        error: response.error,
+        errorCode: response.error_code,
+        details: response.details
+      })
+    }
+
+    return null
+  }
+
+  /**
+   * Obtener subscriber por múltiples identificadores
+   * Intenta buscar usando phone, email o subscriberId
+   */
+  static async getSubscriberByIdentifier(
+    identifier: ManychatSubscriberIdentifier
+  ): Promise<ManychatSubscriber | null> {
+    // Si ya tenemos el subscriber_id, usarlo directamente
+    if (identifier.subscriberId) {
+      logger.debug('Buscando subscriber por ID', {
+        subscriberId: identifier.subscriberId
+      })
+      return await this.getSubscriberById(identifier.subscriberId)
+    }
+
+    // Intentar por teléfono primero (más común para WhatsApp)
+    if (identifier.phone) {
+      logger.debug('Intentando buscar subscriber por teléfono', {
+        phone: identifier.phone.substring(0, 5) + '***'
+      })
+      const subscriberByPhone = await this.getSubscriberByPhone(identifier.phone)
+      if (subscriberByPhone) {
+        logger.info('Subscriber encontrado por teléfono', {
+          subscriberId: subscriberByPhone.id
+        })
+        return subscriberByPhone
+      }
+    }
+
+    // Intentar por email (Instagram/Facebook)
+    if (identifier.email) {
+      logger.debug('Intentando buscar subscriber por email', {
+        email: identifier.email.substring(0, 3) + '***'
+      })
+      const subscriberByEmail = await this.getSubscriberByEmail(identifier.email)
+      if (subscriberByEmail) {
+        logger.info('Subscriber encontrado por email', {
+          subscriberId: subscriberByEmail.id
+        })
+        return subscriberByEmail
+      }
+    }
+
+    logger.warn('No se pudo encontrar subscriber con los identificadores proporcionados', {
+      hasPhone: !!identifier.phone,
+      hasEmail: !!identifier.email,
+      hasSubscriberId: !!identifier.subscriberId
+    })
+
+    return null
+  }
+
+  /**
+   * Detectar el canal principal de un subscriber
+   * Basado en la información disponible del subscriber
+   */
+  static detectChannel(subscriber: ManychatSubscriber): ManychatChannel {
+    // Prioridad 1: WhatsApp (si tiene whatsapp_phone o phone con formato E.164)
+    if (subscriber.whatsapp_phone || (subscriber.phone && this.isWhatsAppPhone(subscriber.phone))) {
+      logger.debug('Canal detectado: WhatsApp', {
+        subscriberId: subscriber.id,
+        phone: subscriber.whatsapp_phone || subscriber.phone
+      })
+      return 'whatsapp'
+    }
+
+    // Prioridad 2: Instagram (si tiene instagram_id)
+    if (subscriber.instagram_id) {
+      logger.debug('Canal detectado: Instagram', {
+        subscriberId: subscriber.id,
+        instagramId: subscriber.instagram_id
+      })
+      return 'instagram'
+    }
+
+    // Prioridad 3: Facebook Messenger (si tiene email o está asociado a página de Facebook)
+    // Por defecto, si tiene page_id, probablemente es Facebook Messenger
+    if (subscriber.page_id && subscriber.email) {
+      logger.debug('Canal detectado: Facebook Messenger', {
+        subscriberId: subscriber.id,
+        pageId: subscriber.page_id,
+        email: subscriber.email.substring(0, 3) + '***'
+      })
+      return 'facebook'
+    }
+
+    // Si solo tiene teléfono pero no está en formato WhatsApp, asumir WhatsApp
+    if (subscriber.phone) {
+      logger.debug('Canal asumido: WhatsApp (por teléfono)', {
+        subscriberId: subscriber.id
+      })
+      return 'whatsapp'
+    }
+
+    // Si solo tiene email, asumir Facebook Messenger
+    if (subscriber.email) {
+      logger.debug('Canal asumido: Facebook Messenger (por email)', {
+        subscriberId: subscriber.id
+      })
+      return 'facebook'
+    }
+
+    logger.warn('No se pudo detectar el canal del subscriber', {
+      subscriberId: subscriber.id,
+      hasPhone: !!subscriber.phone,
+      hasEmail: !!subscriber.email,
+      hasWhatsAppPhone: !!subscriber.whatsapp_phone,
+      hasInstagramId: !!subscriber.instagram_id
+    })
+
+    return 'unknown'
+  }
+
+  /**
+   * Verificar si un teléfono está en formato WhatsApp (E.164)
+   */
+  private static isWhatsAppPhone(phone: string): boolean {
+    // Formato E.164: +[código país][número] (máximo 15 dígitos)
+    const whatsappPhoneRegex = /^\+[1-9]\d{1,14}$/
+    return whatsappPhoneRegex.test(phone)
   }
 
   /**

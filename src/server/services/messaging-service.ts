@@ -48,6 +48,17 @@ export class MessagingService {
         }
       }
 
+      // Si el subscriber no tiene teléfono pero se proporcionó uno en params, usarlo temporalmente
+      // para detectar el canal correctamente
+      if (!subscriber.whatsapp_phone && !subscriber.phone && params.to.phone) {
+        logger.debug('Subscriber sin teléfono, usando teléfono proporcionado para detección de canal', {
+          subscriberId: subscriber.id,
+          providedPhone: params.to.phone.substring(0, 5) + '***'
+        })
+        subscriber.whatsapp_phone = params.to.phone
+        subscriber.phone = params.to.phone
+      }
+
       // Detectar o validar canal
       const detectedChannel = ManychatService.detectChannel(subscriber)
       let channel = params.channel === 'auto' ? detectedChannel : params.channel || detectedChannel
@@ -63,6 +74,15 @@ export class MessagingService {
         channel = detectedChannel
       }
 
+      // Si el canal sigue siendo 'unknown' pero tenemos un teléfono, asumir WhatsApp
+      if (channel === 'unknown' && params.to.phone) {
+        logger.info('Canal unknown pero hay teléfono, asumiendo WhatsApp', {
+          subscriberId: subscriber.id,
+          phone: params.to.phone.substring(0, 5) + '***'
+        })
+        channel = 'whatsapp'
+      }
+
       if (channel === 'unknown') {
         logger.error('No se pudo determinar el canal del subscriber', {
           subscriberId: subscriber.id,
@@ -72,7 +92,8 @@ export class MessagingService {
             hasWhatsAppPhone: !!subscriber.whatsapp_phone,
             hasInstagramId: !!subscriber.instagram_id,
             pageId: subscriber.page_id
-          }
+          },
+          providedPhone: params.to.phone ? params.to.phone.substring(0, 5) + '***' : undefined
         })
         return {
           success: false,

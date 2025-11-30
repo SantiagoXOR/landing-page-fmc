@@ -222,6 +222,54 @@ export class WhatsAppService {
         throw new Error(errorMessage)
       }
 
+      // Asegurar que el subscriber tenga whatsapp_phone configurado
+      // Si no lo tiene, actualizarlo con el teléfono que estamos usando
+      if (!subscriber.whatsapp_phone && !subscriber.phone) {
+        logger.warn('Subscriber sin teléfono configurado, actualizando...', {
+          subscriberId: subscriber.id,
+          phone: data.to.substring(0, 5) + '***'
+        })
+        
+        try {
+          // Actualizar el subscriber con el teléfono
+          await ManychatService.setCustomField(subscriber.id, 'whatsapp_phone', data.to)
+          // También actualizar el campo phone si está disponible
+          if (subscriber.phone !== data.to) {
+            // Nota: ManyChat no tiene un endpoint directo para actualizar phone,
+            // pero podemos intentar actualizar el custom field
+            await ManychatService.setCustomField(subscriber.id, 'phone', data.to)
+          }
+          
+          // Obtener el subscriber actualizado
+          subscriber = await ManychatService.getSubscriberById(subscriber.id)
+          
+          if (subscriber) {
+            logger.info('Subscriber actualizado con teléfono', {
+              subscriberId: subscriber.id,
+              hasWhatsAppPhone: !!subscriber.whatsapp_phone,
+              hasPhone: !!subscriber.phone
+            })
+          }
+        } catch (updateError: any) {
+          logger.warn('No se pudo actualizar teléfono del subscriber, continuando...', {
+            error: updateError.message,
+            subscriberId: subscriber.id
+          })
+          // Continuar de todas formas, puede que funcione
+        }
+      }
+
+      // Si el subscriber aún no tiene teléfono, asignarlo manualmente al objeto
+      // para que detectChannel pueda funcionar
+      if (!subscriber.whatsapp_phone && !subscriber.phone) {
+        subscriber.whatsapp_phone = data.to
+        subscriber.phone = data.to
+        logger.info('Asignando teléfono manualmente al subscriber para detección de canal', {
+          subscriberId: subscriber.id,
+          phone: data.to.substring(0, 5) + '***'
+        })
+      }
+
       // Usar el nuevo MessagingService para mejor manejo multi-canal
       // Mapear messageType 'document' a 'file' para ManyChat
       const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'

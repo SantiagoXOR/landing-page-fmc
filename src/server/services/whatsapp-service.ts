@@ -225,23 +225,24 @@ export class WhatsAppService {
       // Asegurar que el subscriber tenga whatsapp_phone configurado
       // Si no lo tiene, actualizarlo con el teléfono que estamos usando
       if (!subscriber.whatsapp_phone && !subscriber.phone) {
+        const subscriberId = subscriber.id
         logger.warn('Subscriber sin teléfono configurado, actualizando...', {
-          subscriberId: subscriber.id,
+          subscriberId: subscriberId,
           phone: data.to.substring(0, 5) + '***'
         })
         
         try {
           // Actualizar el subscriber con el teléfono
-          await ManychatService.setCustomField(subscriber.id, 'whatsapp_phone', data.to)
+          await ManychatService.setCustomField(subscriberId, 'whatsapp_phone', data.to)
           // También actualizar el campo phone si está disponible
           if (subscriber.phone !== data.to) {
             // Nota: ManyChat no tiene un endpoint directo para actualizar phone,
             // pero podemos intentar actualizar el custom field
-            await ManychatService.setCustomField(subscriber.id, 'phone', data.to)
+            await ManychatService.setCustomField(subscriberId, 'phone', data.to)
           }
           
           // Obtener el subscriber actualizado
-          subscriber = await ManychatService.getSubscriberById(subscriber.id)
+          subscriber = await ManychatService.getSubscriberById(subscriberId)
           
           if (subscriber) {
             logger.info('Subscriber actualizado con teléfono', {
@@ -253,7 +254,7 @@ export class WhatsAppService {
         } catch (updateError: any) {
           logger.warn('No se pudo actualizar teléfono del subscriber, continuando...', {
             error: updateError.message,
-            subscriberId: subscriber.id
+            subscriberId: subscriberId
           })
           // Continuar de todas formas, puede que funcione
         }

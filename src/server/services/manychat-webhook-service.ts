@@ -61,6 +61,12 @@ export class ManychatWebhookService {
               wasCreated: leadResult.wasCreated
             })
 
+            // Crear mensajes para custom_fields si existen (antes del mensaje del usuario)
+            // Esto asegura que los datos del AI Step aparezcan antes del último mensaje
+            if (subscriber.custom_fields && Object.keys(subscriber.custom_fields).length > 0) {
+              await this.createMessagesForCustomFields(leadResult.leadId, subscriber)
+            }
+
             // Luego procesar el mensaje
             const messageResult = await this.handleMessageEvent(
               subscriber, 
@@ -545,6 +551,12 @@ export class ManychatWebhookService {
       // Sincronizar datos del subscriber al lead
       await ManychatSyncService.syncManychatToLead(subscriber)
 
+      // Crear mensajes para cada custom_field que tenga un valor
+      // Esto permite ver todos los datos recopilados del AI Step en el chat
+      if (subscriber.custom_fields && Object.keys(subscriber.custom_fields).length > 0) {
+        await this.createMessagesForCustomFields(leadId, subscriber)
+      }
+
       // Actualizar actividad
       await this.updateLeadActivity(leadId)
 
@@ -904,6 +916,104 @@ export class ManychatWebhookService {
   }
 
   /**
+   * Crear mensajes para todos los custom_fields del subscriber
+   * Esto permite ver todos los datos recopilados del AI Step en el chat
+   */
+  private static async createMessagesForCustomFields(
+    leadId: string,
+    subscriber: ManychatSubscriber
+  ): Promise<void> {
+    try {
+      if (!subscriber.custom_fields || Object.keys(subscriber.custom_fields).length === 0) {
+        return
+      }
+
+      // Lista de campos que queremos mostrar como mensajes, en orden de prioridad
+      // Este orden determina el orden en que aparecerán los mensajes
+      const relevantFields = [
+        'producto',
+        'banco',
+        'trabajo_actual',
+        'zona',
+        'cuit',
+        'cuil',
+        'dni',
+        'ingresos',
+        'monto',
+        'agencia',
+        'estado',
+        'origen'
+      ]
+
+      // Obtener timestamp base (usar last_interaction si está disponible, sino usar ahora)
+      const baseTimestamp = subscriber.last_interaction
+        ? Math.floor(new Date(subscriber.last_interaction).getTime() / 1000)
+        : Math.floor(Date.now() / 1000)
+
+      // Crear mensajes para cada campo relevante que tenga un valor
+      const customFields = subscriber.custom_fields
+      const fieldsToProcess: Array<{ name: string; value: any; order: number }> = []
+
+      // Primero, recopilar todos los campos que necesitan mensajes
+      for (const [fieldName, fieldValue] of Object.entries(customFields)) {
+        const normalizedFieldName = fieldName.toLowerCase()
+        
+        // Solo procesar campos relevantes que tengan un valor
+        if (
+          relevantFields.includes(normalizedFieldName) &&
+          fieldValue !== null &&
+          fieldValue !== undefined &&
+          fieldValue !== ''
+        ) {
+          const order = relevantFields.indexOf(normalizedFieldName)
+          fieldsToProcess.push({
+            name: fieldName,
+            value: fieldValue,
+            order
+          })
+        }
+      }
+
+      // Ordenar por orden de prioridad
+      fieldsToProcess.sort((a, b) => a.order - b.order)
+
+      // Crear mensajes con timestamps incrementales para mantener el orden
+      // Usar timestamps que sean anteriores al último mensaje para que aparezcan en orden
+      let timestampOffset = -fieldsToProcess.length // Empezar antes del último mensaje
+      
+      for (const field of fieldsToProcess) {
+        // Crear mensaje con timestamp incremental
+        await this.createCustomFieldMessageWithTimestamp(
+          leadId,
+          subscriber,
+          {
+            id: 0,
+            name: field.name,
+            value: field.value
+          },
+          baseTimestamp + timestampOffset
+        )
+        
+        timestampOffset++ // Incrementar para el siguiente mensaje
+      }
+
+      logger.info('✅ Mensajes de custom fields creados para subscriber', {
+        leadId,
+        subscriberId: subscriber.id,
+        fieldsCount: fieldsToProcess.length,
+        fieldsProcessed: fieldsToProcess.map(f => f.name)
+      })
+    } catch (error: any) {
+      // No fallar si no se pueden crear los mensajes, solo loguear
+      logger.warn('Error creando mensajes de custom fields para subscriber', {
+        error: error.message,
+        leadId,
+        subscriberId: subscriber.id
+      })
+    }
+  }
+
+  /**
    * Crear mensaje en la conversación cuando se recopila un dato del AI Step
    * Esto permite ver todos los datos recopilados en orden en el chat del CRM
    */
@@ -912,51 +1022,32 @@ export class ManychatWebhookService {
     subscriber: ManychatSubscriber,
     customField: { id: number; name: string; value: any }
   ): Promise<void> {
+    // Usar timestamp actual por defecto
+    const timestamp = Math.floor(Date.now() / 1000)
+    return this.createCustomFieldMessageWithTimestamp(leadId, subscriber, customField, timestamp)
+  }
+
+  /**
+   * Crear mensaje en la conversación con un timestamp específico
+   * Permite controlar el orden de los mensajes
+   */
+  private static async createCustomFieldMessageWithTimestamp(
+    leadId: string,
+    subscriber: ManychatSubscriber,
+    customField: { id: number; name: string; value: any },
+    timestamp: number
+  ): Promise<void> {
     try {
       if (!supabase.client) {
         return
       }
 
-      // Mapeo de nombres de campos a etiquetas amigables en español
-      const fieldLabels: Record<string, string> = {
-        'producto': 'Producto',
-        'banco': 'Banco',
-        'trabajo_actual': 'Trabajo Actual',
-        'zona': 'Zona',
-        'cuit': 'CUIT',
-        'cuil': 'CUIL',
-        'dni': 'DNI',
-        'ingresos': 'Ingresos',
-        'monto': 'Monto',
-        'agencia': 'Agencia',
-        'estado': 'Estado',
-        'origen': 'Origen'
-      }
-
+      // Verificar si el mensaje ya existe para evitar duplicados
+      // Buscar mensajes existentes con el mismo contenido para este lead
       const fieldName = customField.name.toLowerCase()
-      const fieldLabel = fieldLabels[fieldName] || customField.name
-
-      // Formatear el valor del campo
-      let fieldValue = customField.value
-      if (fieldValue === null || fieldValue === undefined || fieldValue === '') {
-        return // No crear mensaje si el valor está vacío
-      }
-
-      // Formatear según el tipo de campo
-      if (fieldName === 'ingresos' || fieldName === 'monto') {
-        // Formatear números como moneda
-        const numValue = typeof fieldValue === 'string' ? parseFloat(fieldValue) : fieldValue
-        if (!isNaN(numValue)) {
-          fieldValue = new Intl.NumberFormat('es-AR', {
-            style: 'currency',
-            currency: 'ARS',
-            minimumFractionDigits: 0
-          }).format(numValue)
-        }
-      }
-
-      // Crear el texto del mensaje
-      const messageText = `${fieldLabel}: ${fieldValue}`
+      const fieldLabel = this.getFieldLabel(fieldName)
+      const formattedValue = this.formatFieldValue(fieldName, customField.value)
+      const messageText = `${fieldLabel}: ${formattedValue}`
 
       // Determinar plataforma y platformId
       const platform = subscriber.instagram_id ? 'instagram' : 'whatsapp'
@@ -973,17 +1064,30 @@ export class ManychatWebhookService {
         return
       }
 
-      // Usar timestamp actual para mantener el orden cronológico correcto
-      // Esto asegura que los mensajes aparezcan en el orden en que se recopilaron los datos
-      const timestamp = Math.floor(Date.now() / 1000)
+      // Verificar si ya existe un mensaje con el mismo contenido para evitar duplicados
+      const { data: existingMessages } = await supabase.client
+        .from('messages')
+        .select('id, content, sent_at')
+        .eq('conversation_id', conversationId)
+        .eq('content', messageText)
+        .limit(1)
+
+      if (existingMessages && existingMessages.length > 0) {
+        logger.debug('Mensaje de custom field ya existe, omitiendo duplicado', {
+          conversationId,
+          leadId,
+          fieldName: customField.name,
+          existingMessageId: existingMessages[0].id
+        })
+        return
+      }
 
       // Generar un platform_msg_id único para este mensaje de custom field
-      // Incluir microsegundos para evitar colisiones si múltiples campos se actualizan al mismo tiempo
       const microsecondPrecision = Date.now() % 1000
       const platformMsgId = `manychat_cf_${subscriber.id}_${customField.name}_${timestamp}_${microsecondPrecision}_${Math.random().toString(36).substring(2, 8)}`
 
       const message: ManychatWebhookMessage = {
-        id: `cf_msg_${subscriber.id}_${customField.name}_${Date.now()}`,
+        id: `cf_msg_${subscriber.id}_${customField.name}_${timestamp}_${Date.now()}`,
         type: 'text',
         text: messageText,
         timestamp,
@@ -1001,7 +1105,8 @@ export class ManychatWebhookService {
           leadId,
           fieldName: customField.name,
           fieldLabel,
-          messageText
+          messageText,
+          timestamp
         })
       } else {
         logger.warn('No se pudo crear mensaje de custom field en conversación', {
@@ -1018,6 +1123,50 @@ export class ManychatWebhookService {
         fieldName: customField.name
       })
     }
+  }
+
+  /**
+   * Obtener etiqueta amigable para un campo
+   */
+  private static getFieldLabel(fieldName: string): string {
+    const fieldLabels: Record<string, string> = {
+      'producto': 'Producto',
+      'banco': 'Banco',
+      'trabajo_actual': 'Trabajo Actual',
+      'zona': 'Zona',
+      'cuit': 'CUIT',
+      'cuil': 'CUIL',
+      'dni': 'DNI',
+      'ingresos': 'Ingresos',
+      'monto': 'Monto',
+      'agencia': 'Agencia',
+      'estado': 'Estado',
+      'origen': 'Origen'
+    }
+    return fieldLabels[fieldName] || fieldName
+  }
+
+  /**
+   * Formatear valor de campo según su tipo
+   */
+  private static formatFieldValue(fieldName: string, fieldValue: any): string {
+    if (fieldValue === null || fieldValue === undefined || fieldValue === '') {
+      return ''
+    }
+
+    // Formatear números como moneda
+    if (fieldName === 'ingresos' || fieldName === 'monto') {
+      const numValue = typeof fieldValue === 'string' ? parseFloat(fieldValue) : fieldValue
+      if (!isNaN(numValue)) {
+        return new Intl.NumberFormat('es-AR', {
+          style: 'currency',
+          currency: 'ARS',
+          minimumFractionDigits: 0
+        }).format(numValue)
+      }
+    }
+
+    return String(fieldValue)
   }
 
   /**

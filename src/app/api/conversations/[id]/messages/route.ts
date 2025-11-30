@@ -247,7 +247,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       conversationId: params.id,
       messageId: whatsappResult.messageId,
       messageRecordId: messageRecord.id,
-      channel: whatsappResult.channel || channel,
+      channel: ('channel' in whatsappResult ? whatsappResult.channel : undefined) || channel,
       userId: session.user.id
     })
 
@@ -267,7 +267,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       message: formattedMessage,
       whatsappResult: {
         messageId: whatsappResult.messageId,
-        channel: whatsappResult.channel || channel,
+        channel: ('channel' in whatsappResult ? whatsappResult.channel : undefined) || channel,
         provider: whatsappResult.provider || 'manychat'
       }
     }, { status: 201 })

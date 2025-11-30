@@ -129,8 +129,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Validar datos de entrada
-    const body = await request.json()
-    const { message, messageType = 'text', mediaUrl } = body
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError: any) {
+      logger.error('Error parseando body del request', {
+        error: parseError.message,
+        conversationId: params.id,
+        userId: session.user.id
+      })
+      return NextResponse.json(
+        { error: 'Error al procesar los datos del mensaje. Verifica el formato.' },
+        { status: 400 }
+      )
+    }
+
+    const { message, messageType = 'text', mediaUrl } = body || {}
 
     // Validación de mensaje
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
@@ -259,14 +273,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Crear mensaje en la base de datos
-    const messageRecord = await WhatsAppService.createMessage({
-      conversationId: params.id,
-      direction: 'outbound',
-      content: message.trim(),
-      messageType,
-      mediaUrl,
-      platformMsgId: whatsappResult.messageId
-    })
+    let messageRecord
+    try {
+      messageRecord = await WhatsAppService.createMessage({
+        conversationId: params.id,
+        direction: 'outbound',
+        content: message.trim(),
+        messageType,
+        mediaUrl,
+        platformMsgId: whatsappResult.messageId
+      })
+    } catch (createError: any) {
+      logger.error('Error creando mensaje en base de datos', {
+        error: createError.message,
+        stack: createError.stack,
+        conversationId: params.id,
+        messageId: whatsappResult.messageId,
+        userId: session.user.id
+      })
+      
+      // El mensaje ya se envió por WhatsApp, pero no se pudo guardar en la BD
+      // Retornar éxito pero con advertencia
+      return NextResponse.json({
+        success: true,
+        warning: 'El mensaje se envió pero no se pudo guardar en la base de datos',
+        messageId: whatsappResult.messageId,
+        channel: ('channel' in whatsappResult ? whatsappResult.channel : undefined) || channel
+      }, { status: 201 })
+    }
 
     // Actualizar última actividad
     await ConversationService.updateLastActivity(params.id)
@@ -304,9 +338,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     logger.error('Error enviando mensaje', {
       error: error.message,
       stack: error.stack,
+      errorName: error.name,
       conversationId: params.id,
       userId: (await getServerSession(authOptions))?.user?.id
     })
+
+    // Manejar errores de validación de Zod
+    if (error.name === 'ZodError') {
+      logger.error('Error de validación Zod', {
+        errors: error.errors,
+        conversationId: params.id
+      })
+      return NextResponse.json(
+        { 
+          error: 'Error de validación',
+          details: error.errors 
+        },
+        { status: 400 }
+      )
+    }
 
     if (error.message.includes('Insufficient permissions')) {
       return NextResponse.json(
@@ -315,8 +365,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
+    // Proporcionar mensaje de error más descriptivo
+    const errorMessage = error.message || 'Error al enviar mensaje'
+    
     return NextResponse.json(
-      { error: error.message || 'Error al enviar mensaje' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

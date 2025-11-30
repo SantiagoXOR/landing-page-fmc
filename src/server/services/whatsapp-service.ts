@@ -262,7 +262,7 @@ export class WhatsAppService {
 
       // Si el subscriber aún no tiene teléfono, asignarlo manualmente al objeto
       // para que detectChannel pueda funcionar
-      if (!subscriber.whatsapp_phone && !subscriber.phone) {
+      if (subscriber && !subscriber.whatsapp_phone && !subscriber.phone) {
         subscriber.whatsapp_phone = data.to
         subscriber.phone = data.to
         logger.info('Asignando teléfono manualmente al subscriber para detección de canal', {

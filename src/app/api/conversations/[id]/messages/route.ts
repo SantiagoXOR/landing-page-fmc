@@ -211,21 +211,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Enviar mensaje usando WhatsAppService (que internamente usa MessagingService)
     // WhatsAppService maneja la lógica de ManyChat o Meta API
-    const whatsappResult = await WhatsAppService.sendMessage({
-      to: phoneNumber || email || '',
-      message: message.trim(),
-      messageType,
-      mediaUrl
-    })
+    let whatsappResult
+    try {
+      whatsappResult = await WhatsAppService.sendMessage({
+        to: phoneNumber || email || '',
+        message: message.trim(),
+        messageType,
+        mediaUrl
+      })
+    } catch (sendError: any) {
+      logger.error('Error al enviar mensaje - excepción', {
+        error: sendError.message,
+        stack: sendError.stack,
+        conversationId: params.id,
+        leadId: conversation.lead?.id,
+        userId: session.user.id,
+        phone: phoneNumber ? phoneNumber.substring(0, 5) + '***' : undefined
+      })
+      
+      // Proporcionar mensaje de error más específico
+      let errorMessage = 'No se pudo enviar el mensaje. Intenta nuevamente.'
+      if (sendError.message?.includes('not found') || sendError.message?.includes('no encontrado')) {
+        errorMessage = 'El contacto no está sincronizado con ManyChat. Por favor, sincroniza el contacto primero.'
+      } else if (sendError.message?.includes('not configured') || sendError.message?.includes('no configurado')) {
+        errorMessage = 'WhatsApp no está configurado correctamente. Contacta al administrador.'
+      } else if (sendError.message) {
+        errorMessage = sendError.message
+      }
+      
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 500 }
+      )
+    }
 
     if (!whatsappResult || !whatsappResult.messageId) {
       logger.error('Error al enviar mensaje - resultado inválido', {
         conversationId: params.id,
         leadId: conversation.lead?.id,
-        userId: session.user.id
+        userId: session.user.id,
+        result: whatsappResult
       })
       return NextResponse.json(
-        { error: 'No se pudo enviar el mensaje. Intenta nuevamente.' },
+        { error: 'No se pudo enviar el mensaje. El contacto puede no estar sincronizado con ManyChat.' },
         { status: 500 }
       )
     }

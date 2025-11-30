@@ -181,18 +181,45 @@ export class WhatsAppService {
             phone: data.to.substring(0, 5) + '***'
           })
           
-          // Sincronizar lead a Manychat
-          await ManychatSyncService.syncLeadToManychat(lead.id)
-          
-          // Intentar obtener subscriber nuevamente
-          subscriber = await ManychatService.getSubscriberByPhone(data.to)
-          
-          if (subscriber) {
-            logger.info('Subscriber creado después de sincronización', {
-              subscriberId: subscriber.id
+          try {
+            // Sincronizar lead a Manychat
+            await ManychatSyncService.syncLeadToManychat(lead.id)
+            
+            // Intentar obtener subscriber nuevamente
+            subscriber = await ManychatService.getSubscriberByPhone(data.to)
+            
+            if (subscriber) {
+              logger.info('Subscriber creado después de sincronización', {
+                subscriberId: subscriber.id
+              })
+            } else {
+              logger.warn('Subscriber no encontrado después de sincronización', {
+                leadId: lead.id,
+                phone: data.to.substring(0, 5) + '***'
+              })
+            }
+          } catch (syncError: any) {
+            logger.error('Error sincronizando lead a ManyChat', {
+              error: syncError.message,
+              leadId: lead.id,
+              phone: data.to.substring(0, 5) + '***'
             })
+            // Continuar intentando enviar el mensaje, puede que el subscriber ya exista
           }
+        } else {
+          logger.warn('Lead no encontrado para sincronizar', {
+            phone: data.to.substring(0, 5) + '***'
+          })
         }
+      }
+      
+      // Si aún no hay subscriber, lanzar error descriptivo
+      if (!subscriber) {
+        const errorMessage = `El contacto con teléfono ${data.to.substring(0, 5)}*** no está sincronizado con ManyChat. Por favor, sincroniza el contacto primero desde la página del lead.`
+        logger.error('No se puede enviar mensaje: subscriber no encontrado', {
+          phone: data.to.substring(0, 5) + '***'
+        })
+        throw new Error(errorMessage)
       }
 
       // Usar el nuevo MessagingService para mejor manejo multi-canal

@@ -126,8 +126,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="p-6">
-          <div className="text-center py-8 text-destructive">{error}</div>
-        </div>
+        <div className="text-center py-8 text-destructive">{error}</div>
       </div>
     )
   }
@@ -204,7 +203,6 @@ export default function DashboardPage() {
           {/* Conversaciones por Canal */}
           <ConversationsByChannel />
         </div>
-      </div>
     </div>
   )
 }

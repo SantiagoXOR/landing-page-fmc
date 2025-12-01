@@ -392,6 +392,7 @@ function LeadsPage() {
   }
 
   return (
+    <>
     <div className="space-y-8 p-6">
 
         {/* Métricas rápidas */}
@@ -880,7 +881,7 @@ function LeadsPage() {
         itemName={deleteModal.leadName}
         loading={deletingId === deleteModal.leadId}
       />
-    </div>
+    </>
   )
 }
 

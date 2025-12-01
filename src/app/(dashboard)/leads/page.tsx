@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatCurrency, cn } from '@/lib/utils'
 import { Search, Plus, Filter, Download, Users, TrendingUp, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Tag, RefreshCw, CheckCircle2 } from 'lucide-react'
-import { Header } from '@/components/layout/Header'
 import { TagPill } from '@/components/manychat/TagPill'
 import DeleteConfirmationModal from '@/components/ui/delete-confirmation-modal'
 import { useToast } from '@/components/ui/toast'
@@ -393,19 +392,7 @@ function LeadsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header moderno */}
-      <Header
-        title="Gestión de Leads"
-        subtitle={getPageTitle()}
-        showNewButton={true}
-        newButtonText="Nuevo Lead"
-        newButtonHref="/leads/new"
-        showExportButton={true}
-        onExport={exportCSV}
-      />
-
-      <div className="space-y-8 p-6">
+    <div className="space-y-8 p-6">
 
         {/* Métricas rápidas */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">

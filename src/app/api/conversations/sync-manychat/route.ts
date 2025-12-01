@@ -57,7 +57,7 @@ export async function POST() {
     
     const { data: leadsWithManychatId, error: leadsError } = await supabase.client
       .from('Lead')
-      .select('id, nombre, telefono, email, manychatId, tags, estado, createdAt, updatedAt')
+      .select('id, nombre, telefono, email, manychatId, tags, estado, createdAt, updatedAt, producto, monto, zona, banco, trabajo_actual')
       .not('manychatId', 'is', null)
       .gte('updatedAt', thirtyDaysAgo.toISOString())
       .order('updatedAt', { ascending: false })
@@ -73,7 +73,7 @@ export async function POST() {
     // ESTRATEGIA 2: Buscar leads sin manychatId que tengan teléfono y buscar en Manychat
     const { data: leadsWithoutManychatId } = await supabase.client
       .from('Lead')
-      .select('id, nombre, telefono, email, manychatId, tags, estado, createdAt, updatedAt')
+      .select('id, nombre, telefono, email, manychatId, tags, estado, createdAt, updatedAt, producto, monto, zona, banco, trabajo_actual')
       .is('manychatId', null)
       .not('telefono', 'is', null)
       .order('updatedAt', { ascending: false })

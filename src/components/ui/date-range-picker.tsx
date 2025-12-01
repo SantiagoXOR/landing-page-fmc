@@ -34,29 +34,33 @@ interface DateRangePickerProps {
 const getPresetRange = (preset: DatePreset): DateRange => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const endOfToday = new Date(today)
+  endOfToday.setHours(23, 59, 59, 999)
 
   switch (preset) {
     case 'today':
       return {
         from: new Date(today),
-        to: new Date(today),
+        to: endOfToday,
       }
     case 'thisWeek': {
       const startOfWeek = new Date(today)
       const day = startOfWeek.getDay()
       const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1) // Lunes
       startOfWeek.setDate(diff)
+      startOfWeek.setHours(0, 0, 0, 0)
       return {
         from: startOfWeek,
-        to: today,
+        to: endOfToday,
       }
     }
     case 'last30Days': {
       const thirtyDaysAgo = new Date(today)
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      thirtyDaysAgo.setHours(0, 0, 0, 0)
       return {
         from: thirtyDaysAgo,
-        to: today,
+        to: endOfToday,
       }
     }
     default:
@@ -67,35 +71,41 @@ const getPresetRange = (preset: DatePreset): DateRange => {
 const getPresetFromRange = (range: DateRange): DatePreset | 'custom' => {
   if (!range.from || !range.to) return 'custom'
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // Normalizar fechas para comparación (solo fecha, sin horas)
+  const normalizeDate = (date: Date): string => {
+    const normalized = new Date(date)
+    normalized.setHours(0, 0, 0, 0)
+    // Comparar solo la fecha (YYYY-MM-DD)
+    return normalized.toISOString().split('T')[0]
+  }
 
-  const from = new Date(range.from)
-  from.setHours(0, 0, 0, 0)
-  const to = new Date(range.to)
-  to.setHours(0, 0, 0, 0)
+  const fromStr = normalizeDate(range.from)
+  const toStr = normalizeDate(range.to)
+  const todayStr = normalizeDate(new Date())
 
   // Verificar si es hoy
-  if (from.getTime() === today.getTime() && to.getTime() === today.getTime()) {
+  if (fromStr === todayStr && toStr === todayStr) {
     return 'today'
   }
 
   // Verificar si es esta semana
   const thisWeekRange = getPresetRange('thisWeek')
-  if (
-    from.getTime() === thisWeekRange.from?.getTime() &&
-    to.getTime() === thisWeekRange.to?.getTime()
-  ) {
-    return 'thisWeek'
+  if (thisWeekRange.from && thisWeekRange.to) {
+    const thisWeekFromStr = normalizeDate(thisWeekRange.from)
+    const thisWeekToStr = normalizeDate(thisWeekRange.to)
+    if (fromStr === thisWeekFromStr && toStr === thisWeekToStr) {
+      return 'thisWeek'
+    }
   }
 
   // Verificar si son últimos 30 días
   const last30Range = getPresetRange('last30Days')
-  if (
-    from.getTime() === last30Range.from?.getTime() &&
-    to.getTime() === last30Range.to?.getTime()
-  ) {
-    return 'last30Days'
+  if (last30Range.from && last30Range.to) {
+    const last30FromStr = normalizeDate(last30Range.from)
+    const last30ToStr = normalizeDate(last30Range.to)
+    if (fromStr === last30FromStr && toStr === last30ToStr) {
+      return 'last30Days'
+    }
   }
 
   return 'custom'
@@ -116,8 +126,15 @@ export function DateRangePicker({
 
   React.useEffect(() => {
     if (value) {
-      setDateRange(value)
-      setSelectedPreset(getPresetFromRange(value))
+      const preset = getPresetFromRange(value)
+      setSelectedPreset(preset)
+      // Si el valor coincide con un preset, usar el preset para asegurar consistencia
+      if (preset !== 'custom') {
+        const presetRange = getPresetRange(preset as DatePreset)
+        setDateRange(presetRange)
+      } else {
+        setDateRange(value)
+      }
     }
   }, [value])
 
@@ -126,6 +143,7 @@ export function DateRangePicker({
     if (preset !== 'custom') {
       const range = getPresetRange(preset as DatePreset)
       setDateRange(range)
+      // Forzar actualización inmediata
       onChange?.(range)
     } else {
       setIsCustomOpen(true)
@@ -149,7 +167,10 @@ export function DateRangePicker({
   const formatDateRange = () => {
     if (!dateRange.from) return 'Seleccionar rango'
     if (!dateRange.to) return format(dateRange.from, 'dd/MM/yyyy', { locale: es })
-    if (dateRange.from.getTime() === dateRange.to.getTime()) {
+    // Comparar solo las fechas (sin horas)
+    const fromDate = dateRange.from.toISOString().split('T')[0]
+    const toDate = dateRange.to.toISOString().split('T')[0]
+    if (fromDate === toDate) {
       return format(dateRange.from, 'dd/MM/yyyy', { locale: es })
     }
     return `${format(dateRange.from, 'dd/MM/yyyy', { locale: es })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: es })}`

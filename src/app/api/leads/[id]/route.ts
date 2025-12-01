@@ -81,25 +81,6 @@ export async function PATCH(
 
     const lead = await leadService.updateLead(params.id, validatedData, session.user?.id || '')
 
-    // Enviar notificación en tiempo real
-    try {
-      const { notifyLeadUpdated } = await import('@/lib/notification-helpers')
-      const changes = Object.keys(validatedData)
-      notifyLeadUpdated({
-        id: params.id,
-        nombre: lead?.nombre || '',
-        email: lead?.email,
-        telefono: lead?.telefono,
-        estado: lead?.estado
-      }, session.user.id, changes.length > 0 ? changes : undefined)
-    } catch (notificationError) {
-      // Log error pero no fallar la actualización del lead
-      logger.warn('Error enviando notificación de lead actualizado', {
-        error: notificationError,
-        leadId: params.id
-      })
-    }
-
     // Sincronizar automáticamente con ManyChat si está configurado
     if (ManychatService.isConfigured()) {
       try {

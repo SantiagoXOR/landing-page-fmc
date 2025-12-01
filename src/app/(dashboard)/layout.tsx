@@ -6,7 +6,6 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import { FMCLogo } from '@/components/branding/FMCLogo'
 import { LoadingSpinner } from '@/components/ui/loading-states'
-import { NotificationCenter } from '@/components/notifications/NotificationCenter'
 import { cn } from '@/lib/utils'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -51,58 +50,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         sidebar.isOpen ? "md:pl-64" : "md:pl-0",
         "lg:pl-64"
       )}>
-        {/* Header superior con botón de notificación */}
-        <header className={cn(
-          "fixed top-0 right-0 z-40 bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 md:px-6 transition-all duration-300",
-          "left-0 lg:left-64",
-          sidebar.isOpen ? "md:left-64" : "md:left-0"
-        )}>
-          {/* Lado izquierdo: Saludo y fecha en una sola línea */}
-          <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 whitespace-nowrap">
-                {(() => {
-                  const hour = new Date().getHours()
-                  const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches'
-                  return `${greeting}, ${session?.user?.name || 'Usuario'} 👋`
-                })()}
-              </h1>
-              <span className="hidden sm:inline text-xs sm:text-sm text-gray-500">•</span>
-              <div className="hidden sm:flex items-center space-x-1.5">
-                <span className="text-xs sm:text-sm text-gray-500">Hoy</span>
-                <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">
-                  {new Date().toLocaleDateString('es-ES', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Lado derecho: Notificación y usuario */}
-          <div className="flex items-center space-x-3 sm:space-x-4 flex-shrink-0">
-            {/* Botón de notificación en el margen superior derecho */}
-            <NotificationCenter />
-            
-            {/* Información del usuario */}
-            <div className="hidden sm:flex items-center">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900 whitespace-nowrap">
-                  {session?.user?.name || 'Usuario'}
-                </p>
-                <p className="text-xs text-gray-500 whitespace-nowrap">
-                  {session?.user?.role || 'Usuario'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Contenido con padding superior para el header */}
-        <main className="min-h-screen pt-16">
+        <main className="min-h-screen">
           {children}
         </main>
       </div>

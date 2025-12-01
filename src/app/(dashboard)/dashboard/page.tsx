@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Header } from '@/components/layout/Header'
 import { useSidebar } from '@/contexts/SidebarContext'
 import {
   MessageSquare,
@@ -112,27 +113,66 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-8 p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
+      <div className="min-h-screen bg-gray-50">
+        <Header
+          title="Dashboard"
+          subtitle="Resumen de actividad y métricas principales de FMC"
+          showDateFilter={true}
+          showExportButton={true}
+          showNewButton={true}
+          newButtonText="Nuevo Lead"
+          newButtonHref="/leads/new"
+          onSidebarToggle={sidebar.toggle}
+        />
+        <div className="space-y-8 p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+          <Skeleton className="h-96" />
         </div>
-        <Skeleton className="h-96" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className="text-center py-8 text-destructive">{error}</div>
+      <div className="min-h-screen bg-gray-50">
+        <Header
+          title="Dashboard"
+          subtitle="Resumen de actividad y métricas principales de FMC"
+          showDateFilter={true}
+          showExportButton={true}
+          showNewButton={true}
+          newButtonText="Nuevo Lead"
+          newButtonHref="/leads/new"
+          onSidebarToggle={sidebar.toggle}
+        />
+        <div className="p-6">
+          <div className="text-center py-8 text-destructive">{error}</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 lg:space-y-8">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <Header
+        title="Dashboard"
+        subtitle="Resumen de actividad y métricas principales de FMC"
+        showDateFilter={true}
+        showExportButton={true}
+        showNewButton={true}
+        newButtonText="Nuevo Lead"
+        newButtonHref="/leads/new"
+        onSidebarToggle={sidebar.toggle}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+      />
+
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Sección de Indicadores */}
         <div>
           <div className="mb-3 sm:mb-4">
@@ -203,6 +243,7 @@ export default function DashboardPage() {
           {/* Conversaciones por Canal */}
           <ConversationsByChannel />
         </div>
+      </div>
     </div>
   )
 }

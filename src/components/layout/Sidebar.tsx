@@ -28,6 +28,7 @@ import {
   RefreshCw
 } from "lucide-react"
 import { FMCLogo } from '@/components/branding/FMCLogo'
+import NotificationCenter from '@/components/notifications/NotificationCenter'
 
 interface NavigationItem {
   name: string
@@ -353,6 +354,11 @@ export function Sidebar({
 
           {/* User section */}
           <div className="p-4 border-t border-gray-200">
+            {/* Notifications */}
+            <div className="mb-4 flex justify-center">
+              <NotificationCenter className="" />
+            </div>
+
             {/* User info */}
             <div className="space-y-2">
               <div className="flex items-center space-x-3 p-2 rounded-lg bg-gray-100" data-testid="user-info">

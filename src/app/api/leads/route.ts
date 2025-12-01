@@ -370,24 +370,6 @@ async function postHandler(
       userId: session.user.id
     })
 
-    // Enviar notificación en tiempo real
-    try {
-      const { notifyLeadCreated } = await import('@/lib/notification-helpers')
-      notifyLeadCreated({
-        id: lead.id!,
-        nombre: lead.nombre || validatedData.nombre,
-        email: lead.email || validatedData.email,
-        telefono: lead.telefono || validatedData.telefono,
-        estado: finalEstado
-      }, session.user.id)
-    } catch (notificationError) {
-      // Log error pero no fallar la creación del lead
-      logger.warn('Error enviando notificación de lead creado', {
-        error: notificationError,
-        leadId: lead.id
-      })
-    }
-
     return NextResponse.json({
       id: lead.id,
       estado: finalEstado,

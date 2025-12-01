@@ -123,22 +123,41 @@ export function DateRangePicker({
     value || getPresetRange('thisWeek')
   )
   const [isCustomOpen, setIsCustomOpen] = React.useState(false)
+  const lastUserPresetRef = React.useRef<DatePreset | 'custom' | null>(null)
 
   React.useEffect(() => {
     if (value) {
       const preset = getPresetFromRange(value)
-      setSelectedPreset(preset)
-      // Si el valor coincide con un preset, usar el preset para asegurar consistencia
-      if (preset !== 'custom') {
-        const presetRange = getPresetRange(preset as DatePreset)
-        setDateRange(presetRange)
+      
+      // Si el usuario acaba de seleccionar un preset, mantenerlo
+      if (lastUserPresetRef.current !== null) {
+        // El usuario seleccionó un preset, mantenerlo sin importar lo que detecte getPresetFromRange
+        setSelectedPreset(lastUserPresetRef.current)
+        // Actualizar el rango según el preset del usuario
+        if (lastUserPresetRef.current !== 'custom') {
+          const presetRange = getPresetRange(lastUserPresetRef.current as DatePreset)
+          setDateRange(presetRange)
+        } else {
+          setDateRange(value)
+        }
+        // Resetear después de procesar
+        lastUserPresetRef.current = null
       } else {
-        setDateRange(value)
+        // Cambio externo, actualizar normalmente
+        setSelectedPreset(preset)
+        if (preset !== 'custom') {
+          const presetRange = getPresetRange(preset as DatePreset)
+          setDateRange(presetRange)
+        } else {
+          setDateRange(value)
+        }
       }
     }
   }, [value])
 
   const handlePresetChange = (preset: DatePreset | 'custom') => {
+    // Guardar el preset seleccionado por el usuario
+    lastUserPresetRef.current = preset
     setSelectedPreset(preset)
     if (preset !== 'custom') {
       const range = getPresetRange(preset as DatePreset)
@@ -156,9 +175,15 @@ export function DateRangePicker({
         from: range.from,
         to: range.to,
       }
+      // Asegurar que el to incluya todo el día
+      if (newRange.to) {
+        newRange.to.setHours(23, 59, 59, 999)
+      }
       setDateRange(newRange)
       if (range.from && range.to) {
+        lastUserPresetRef.current = 'custom'
         setIsCustomOpen(false)
+        setSelectedPreset('custom')
         onChange?.(newRange)
       }
     }

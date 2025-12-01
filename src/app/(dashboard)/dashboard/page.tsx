@@ -65,13 +65,16 @@ export default function DashboardPage() {
     // Inicializar con "Esta semana"
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const endOfToday = new Date(today)
+    endOfToday.setHours(23, 59, 59, 999)
     const startOfWeek = new Date(today)
     const day = startOfWeek.getDay()
     const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
     startOfWeek.setDate(diff)
+    startOfWeek.setHours(0, 0, 0, 0)
     return {
       from: startOfWeek,
-      to: today,
+      to: endOfToday,
     }
   })
   const sidebar = useSidebar()

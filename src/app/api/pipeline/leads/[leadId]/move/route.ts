@@ -33,9 +33,10 @@ export async function POST(
     }
 
     // Verificar permisos granulares
-    const hasUpdatePermission = await checkUserPermission(session.user.id, 'pipeline', 'update')
+    // Usar pipeline:write que es el permiso correcto para mover leads
+    const hasWritePermission = await checkUserPermission(session.user.id, 'pipeline', 'write')
     
-    if (!hasUpdatePermission) {
+    if (!hasWritePermission) {
       logger.warn('Permission denied for pipeline move', {
         userId: session.user.id,
         leadId: params.leadId

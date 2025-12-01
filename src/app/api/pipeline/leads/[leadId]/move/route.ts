@@ -78,6 +78,13 @@ export async function POST(
 
     const { fromStageId, toStageId, notes, reason } = validatedData
 
+    logger.info('Moving lead', {
+      leadId,
+      fromStageId,
+      toStageId,
+      userId: session.user.id
+    })
+
     // Verificar que las etapas sean diferentes
     if (fromStageId === toStageId) {
       return NextResponse.json({
@@ -86,11 +93,21 @@ export async function POST(
       }, { status: 400 })
     }
 
+    // Normalizar IDs de etapas (pueden venir con guión bajo o guión)
+    const normalizedFromStageId = fromStageId.replace(/_/g, '-')
+    const normalizedToStageId = toStageId.replace(/_/g, '-')
+
     // Validaciones de negocio (solo warnings, permitir movimientos hacia atrás)
-    const validationResult = await validateStageTransition(leadId, fromStageId, toStageId)
+    const validationResult = await validateStageTransition(leadId, normalizedFromStageId, normalizedToStageId)
     
     // Solo bloquear si hay errores críticos, no por warnings
     if (!validationResult.isValid) {
+      logger.warn('Transition validation failed', {
+        leadId,
+        fromStageId: normalizedFromStageId,
+        toStageId: normalizedToStageId,
+        errors: validationResult.errors
+      })
       return NextResponse.json({
         error: 'Transition not allowed',
         message: 'La transición no está permitida',
@@ -106,13 +123,27 @@ export async function POST(
       'propuesta': 'PROPUESTA',
       'negociacion': 'NEGOCIACION',
       'cerrado-ganado': 'CIERRE_GANADO',
-      'cerrado-perdido': 'CIERRE_PERDIDO'
+      'cerrado-perdido': 'CIERRE_PERDIDO',
+      'cerrado_ganado': 'CIERRE_GANADO', // También aceptar con guión bajo
+      'cerrado_perdido': 'CIERRE_PERDIDO' // También aceptar con guión bajo
     }
 
-    const toStageEnum = stageMapping[toStageId] || toStageId
+    const toStageEnum = stageMapping[normalizedToStageId] || normalizedToStageId
+
+    logger.info('Stage mapping', {
+      originalToStageId: toStageId,
+      normalizedToStageId,
+      mappedToStageEnum: toStageEnum
+    })
 
     // Actualizar en la base de datos usando el servicio de pipeline
+    let pipelineUpdated = false
     try {
+      logger.info('Attempting to update pipeline via service', {
+        leadId,
+        toStageEnum
+      })
+      
       await pipelineService.moveLeadToStage(
         leadId,
         toStageEnum as any,
@@ -120,9 +151,12 @@ export async function POST(
         notes,
         reason as any
       )
+      pipelineUpdated = true
+      logger.info('Pipeline updated successfully via service', { leadId })
     } catch (pipelineError: any) {
-      logger.error('Error updating pipeline in database', {
+      logger.warn('Pipeline service update failed, trying direct update', {
         error: pipelineError.message,
+        stack: pipelineError.stack,
         leadId,
         toStageEnum
       })
@@ -133,8 +167,14 @@ export async function POST(
         const currentPipeline = await pipelineService.getLeadPipeline(leadId)
         
         if (currentPipeline) {
+          logger.info('Updating existing pipeline record', {
+            pipelineId: currentPipeline.id,
+            leadId,
+            toStageEnum
+          })
+          
           // Actualizar directamente
-          await supabase.request(`/lead_pipeline?id=eq.${currentPipeline.id}`, {
+          const updateResult = await supabase.request(`/lead_pipeline?id=eq.${currentPipeline.id}`, {
             method: 'PATCH',
             headers: { 'Prefer': 'return=representation' },
             body: JSON.stringify({
@@ -143,9 +183,17 @@ export async function POST(
               updated_at: new Date().toISOString()
             })
           })
+          
+          logger.info('Pipeline updated directly', {
+            leadId,
+            updateResult: updateResult ? 'success' : 'no result'
+          })
+          pipelineUpdated = true
         } else {
+          logger.info('Pipeline record not found, creating new one', { leadId })
+          
           // Si no existe pipeline, crearlo
-          await supabase.request('/lead_pipeline', {
+          const createResult = await supabase.request('/lead_pipeline', {
             method: 'POST',
             headers: { 'Prefer': 'return=representation' },
             body: JSON.stringify({
@@ -154,27 +202,59 @@ export async function POST(
               stage_entered_at: new Date().toISOString()
             })
           })
+          
+          logger.info('Pipeline created', {
+            leadId,
+            createResult: createResult ? 'success' : 'no result'
+          })
+          pipelineUpdated = true
         }
       } catch (directUpdateError: any) {
         logger.error('Error in direct pipeline update', {
           error: directUpdateError.message,
+          stack: directUpdateError.stack,
           leadId
         })
-        throw new Error('No se pudo actualizar el pipeline en la base de datos')
+        // No lanzar error aquí, continuar con el proceso
       }
     }
 
-    // Asignar tags según la nueva etapa
-    await assignStageTag(leadId, toStageId)
+    if (!pipelineUpdated) {
+      logger.error('Failed to update pipeline in database', { leadId })
+      return NextResponse.json({
+        error: 'Database update failed',
+        message: 'No se pudo actualizar el pipeline en la base de datos'
+      }, { status: 500 })
+    }
 
-    // Ejecutar automatizaciones de la nueva etapa
-    await executeStageAutomations(leadId, fromStageId, toStageId, session.user.id)
+    // Asignar tags según la nueva etapa (no crítico si falla)
+    try {
+      await assignStageTag(leadId, normalizedToStageId)
+    } catch (tagError: any) {
+      logger.warn('Failed to assign stage tag', {
+        error: tagError.message,
+        leadId,
+        stageId: normalizedToStageId
+      })
+      // Continuar aunque falle la asignación de tags
+    }
+
+    // Ejecutar automatizaciones de la nueva etapa (no crítico si falla)
+    try {
+      await executeStageAutomations(leadId, normalizedFromStageId, normalizedToStageId, session.user.id)
+    } catch (automationError: any) {
+      logger.warn('Failed to execute stage automations', {
+        error: automationError.message,
+        leadId
+      })
+      // Continuar aunque falle la automatización
+    }
 
     const transition = {
       id: `transition-${Date.now()}`,
       leadId,
-      fromStageId,
-      toStageId,
+      fromStageId: normalizedFromStageId,
+      toStageId: normalizedToStageId,
       date: new Date(),
       userId: session.user.id,
       userName: session.user.name,
@@ -183,14 +263,14 @@ export async function POST(
       wasAutomated: false
     }
 
-    logger.info('Lead moved between stages', {
+    logger.info('Lead moved between stages successfully', {
       userId: session.user.id,
       userName: session.user.name,
       leadId,
-      fromStageId,
-      toStageId,
-      notes,
-      reason
+      fromStageId: normalizedFromStageId,
+      toStageId: normalizedToStageId,
+      toStageEnum,
+      warnings: validationResult.warnings.length
     })
 
     return NextResponse.json({

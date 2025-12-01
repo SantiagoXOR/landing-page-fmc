@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -78,6 +78,13 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     description: "Configuración de alertas y notificaciones",
     icon: Bell,
     gradient: "from-purple-100 to-pink-100"
+  },
+  {
+    id: "agents",
+    title: "Gestión de Agentes",
+    description: "Configurar agentes disponibles para asignación",
+    icon: Users,
+    gradient: "from-indigo-100 to-blue-100"
   }
 ]
 
@@ -102,6 +109,29 @@ export default function SettingsPage() {
     rangoIngresoMin: 69400000,
     rangoIngresoMax: 215400000
   })
+
+  // Estado para agentes
+  const [agents, setAgents] = useState<Array<{ id: string; nombre: string; email: string }>>([])
+  const [loadingAgents, setLoadingAgents] = useState(false)
+
+  // Cargar agentes al montar el componente
+  useEffect(() => {
+    const fetchAgents = async () => {
+      setLoadingAgents(true)
+      try {
+        const response = await fetch('/api/agents')
+        if (response.ok) {
+          const data = await response.json()
+          setAgents(data)
+        }
+      } catch (error) {
+        console.error('Error fetching agents:', error)
+      } finally {
+        setLoadingAgents(false)
+      }
+    }
+    fetchAgents()
+  }, [])
 
   const handleSave = async () => {
     setSaving(true)
@@ -312,6 +342,78 @@ export default function SettingsPage() {
     <NotificationSettings />
   )
 
+  const renderAgentsSettings = () => (
+    <div className="space-y-6">
+      <Card className="formosa-card">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Agentes Disponibles</span>
+            <Link href="/admin/users/new">
+              <Button size="sm" variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Agente
+              </Button>
+            </Link>
+          </CardTitle>
+          <CardDescription>
+            Los agentes listados aquí estarán disponibles para asignar conversaciones y leads.
+            Solo se muestran usuarios con rol AGENT o VENDEDOR que estén activos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingAgents ? (
+            <div className="text-center py-8">
+              <RefreshCw className="h-8 w-8 text-blue-600 mx-auto mb-4 animate-spin" />
+              <p className="text-gray-600">Cargando agentes...</p>
+            </div>
+          ) : agents.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                No hay agentes configurados
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Crea usuarios con rol AGENT o VENDEDOR para que aparezcan aquí
+              </p>
+              <Link href="/admin/users/new">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Primer Agente
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {agents.map((agent) => (
+                <div
+                  key={agent.id}
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-200"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold">
+                      {agent.nombre.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{agent.nombre}</p>
+                      <p className="text-sm text-gray-500">{agent.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Link href={`/admin/users/${agent.id}/edit`}>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+
   const renderContent = () => {
     switch (activeSection) {
       case "general":
@@ -320,6 +422,8 @@ export default function SettingsPage() {
         return renderFormosaSettings()
       case "users":
         return renderUsersSettings()
+      case "agents":
+        return renderAgentsSettings()
       case "notifications":
         return renderNotificationsSettings()
       default:

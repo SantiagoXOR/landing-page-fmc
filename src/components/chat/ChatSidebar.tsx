@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,7 +28,8 @@ import {
   Briefcase,
   Building2,
   Package,
-  ExternalLink as ExternalLinkIcon
+  ExternalLink as ExternalLinkIcon,
+  RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -51,6 +52,8 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
   const [note, setNote] = useState('')
   const [selectedUser, setSelectedUser] = useState('')
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; nombre: string; email: string }>>([])
+  const [loadingAgents, setLoadingAgents] = useState(true)
   
   // Hook de sincronización del chatbot
   const {
@@ -60,12 +63,37 @@ export function ChatSidebar({
     lastSyncAt,
   } = useManychatSync(conversation?.lead?.id || '')
 
-  // Mock de usuarios disponibles
-  const availableUsers = [
-    { id: '1', nombre: 'Agustina Rivas', email: 'agustina@fmc.com' },
-    { id: '2', nombre: 'Carlos Mendoza', email: 'carlos@fmc.com' },
-    { id: '3', nombre: 'María González', email: 'maria@fmc.com' }
-  ]
+  // Obtener agentes desde la API
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const response = await fetch('/api/agents')
+        if (response.ok) {
+          const agents = await response.json()
+          setAvailableUsers(agents)
+        } else {
+          // Fallback a agentes por defecto si hay error
+          setAvailableUsers([
+            { id: '1', nombre: 'Agustina Rivas', email: 'agustina@fmc.com' },
+            { id: '2', nombre: 'Carlos Mendoza', email: 'carlos@fmc.com' },
+            { id: '3', nombre: 'María González', email: 'maria@fmc.com' }
+          ])
+        }
+      } catch (error) {
+        console.error('Error fetching agents:', error)
+        // Fallback a agentes por defecto
+        setAvailableUsers([
+          { id: '1', nombre: 'Agustina Rivas', email: 'agustina@fmc.com' },
+          { id: '2', nombre: 'Carlos Mendoza', email: 'carlos@fmc.com' },
+          { id: '3', nombre: 'María González', email: 'maria@fmc.com' }
+        ])
+      } finally {
+        setLoadingAgents(false)
+      }
+    }
+
+    fetchAgents()
+  }, [])
 
   const handleAddNote = () => {
     if (note.trim()) {
@@ -387,28 +415,37 @@ export function ChatSidebar({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar agente" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableUsers.map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Button 
-            onClick={handleAssignUser}
-            disabled={!selectedUser}
-            className="w-full"
-            size="sm"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Asignar
-          </Button>
+          {loadingAgents ? (
+            <div className="text-center py-4">
+              <RefreshCw className="h-4 w-4 text-gray-400 mx-auto mb-2 animate-spin" />
+              <p className="text-xs text-gray-500">Cargando agentes...</p>
+            </div>
+          ) : (
+            <>
+              <Select value={selectedUser} onValueChange={setSelectedUser} disabled={availableUsers.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={availableUsers.length === 0 ? "No hay agentes disponibles" : "Seleccionar agente"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Button 
+                onClick={handleAssignUser}
+                disabled={!selectedUser || availableUsers.length === 0}
+                className="w-full"
+                size="sm"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Asignar
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 

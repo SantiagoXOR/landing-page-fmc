@@ -81,19 +81,12 @@ export function Header({
                 {getGreeting()}, {session?.user?.name || 'Usuario'} 👋
               </h1>
               
-              {/* Segunda línea: Fecha y subtítulo */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between sm:gap-4 mt-1.5 sm:mt-0">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs sm:text-sm text-gray-500">Hoy</span>
-                  <span className="text-xs sm:text-sm font-medium text-gray-700">
-                    {formatDate()}
-                  </span>
-                </div>
-                {subtitle && (
-                  <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-0">
-                    {subtitle}
-                  </p>
-                )}
+              {/* Segunda línea: Solo fecha */}
+              <div className="flex items-center space-x-2 mt-1.5 sm:mt-0">
+                <span className="text-xs sm:text-sm text-gray-500">Hoy</span>
+                <span className="text-xs sm:text-sm font-medium text-gray-700">
+                  {formatDate()}
+                </span>
               </div>
             </div>
           </div>
@@ -147,6 +140,13 @@ export function Header({
               </>
             )}
           </div>
+
+          {/* Subtítulo alineado a la derecha */}
+          {subtitle && (
+            <p className="text-xs sm:text-sm text-gray-600 hidden lg:block whitespace-nowrap">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
     </div>

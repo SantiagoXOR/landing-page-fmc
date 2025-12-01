@@ -5,6 +5,8 @@ import { checkPermission, checkUserPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 import { automationService } from '@/services/automation-service'
+import { pipelineService } from '@/server/services/pipeline-service'
+import { supabase } from '@/lib/db'
 
 // Schema de validación para mover lead
 const MoveLeadSchema = z.object({
@@ -84,9 +86,10 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Simular validaciones de negocio
+    // Validaciones de negocio (solo warnings, permitir movimientos hacia atrás)
     const validationResult = await validateStageTransition(leadId, fromStageId, toStageId)
     
+    // Solo bloquear si hay errores críticos, no por warnings
     if (!validationResult.isValid) {
       return NextResponse.json({
         error: 'Transition not allowed',
@@ -95,7 +98,78 @@ export async function POST(
       }, { status: 422 })
     }
 
-    // Simular actualización en base de datos
+    // Mapear IDs de etapas del frontend a los valores del enum de la base de datos
+    const stageMapping: Record<string, string> = {
+      'nuevo': 'LEAD_NUEVO',
+      'contactado': 'CONTACTO_INICIAL',
+      'calificado': 'CALIFICACION',
+      'propuesta': 'PROPUESTA',
+      'negociacion': 'NEGOCIACION',
+      'cerrado-ganado': 'CIERRE_GANADO',
+      'cerrado-perdido': 'CIERRE_PERDIDO'
+    }
+
+    const toStageEnum = stageMapping[toStageId] || toStageId
+
+    // Actualizar en la base de datos usando el servicio de pipeline
+    try {
+      await pipelineService.moveLeadToStage(
+        leadId,
+        toStageEnum as any,
+        session.user.id,
+        notes,
+        reason as any
+      )
+    } catch (pipelineError: any) {
+      logger.error('Error updating pipeline in database', {
+        error: pipelineError.message,
+        leadId,
+        toStageEnum
+      })
+      
+      // Si falla la actualización del pipeline, intentar actualizar directamente
+      try {
+        // Obtener el pipeline actual del lead
+        const currentPipeline = await pipelineService.getLeadPipeline(leadId)
+        
+        if (currentPipeline) {
+          // Actualizar directamente
+          await supabase.request(`/lead_pipeline?id=eq.${currentPipeline.id}`, {
+            method: 'PATCH',
+            headers: { 'Prefer': 'return=representation' },
+            body: JSON.stringify({
+              current_stage: toStageEnum,
+              stage_entered_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+          })
+        } else {
+          // Si no existe pipeline, crearlo
+          await supabase.request('/lead_pipeline', {
+            method: 'POST',
+            headers: { 'Prefer': 'return=representation' },
+            body: JSON.stringify({
+              lead_id: leadId,
+              current_stage: toStageEnum,
+              stage_entered_at: new Date().toISOString()
+            })
+          })
+        }
+      } catch (directUpdateError: any) {
+        logger.error('Error in direct pipeline update', {
+          error: directUpdateError.message,
+          leadId
+        })
+        throw new Error('No se pudo actualizar el pipeline en la base de datos')
+      }
+    }
+
+    // Asignar tags según la nueva etapa
+    await assignStageTag(leadId, toStageId)
+
+    // Ejecutar automatizaciones de la nueva etapa
+    await executeStageAutomations(leadId, fromStageId, toStageId, session.user.id)
+
     const transition = {
       id: `transition-${Date.now()}`,
       leadId,
@@ -108,12 +182,6 @@ export async function POST(
       reason,
       wasAutomated: false
     }
-
-    // En una implementación real, aquí se actualizaría la base de datos
-    // await updateLeadStage(leadId, toStageId, transition)
-
-    // Ejecutar automatizaciones de la nueva etapa
-    await executeStageAutomations(leadId, fromStageId, toStageId, session.user.id)
 
     logger.info('Lead moved between stages', {
       userId: session.user.id,
@@ -185,9 +253,10 @@ async function validateStageTransition(
     warnings.push(`Se está saltando ${orderDiff - 1} etapa(s) del pipeline`)
   }
 
-  // Validar retroceso
+  // Permitir retrocesos (solo warning, no error)
   if (toStage.order < fromStage.order && !['cerrado-perdido'].includes(toStageId)) {
     warnings.push('Se está retrocediendo en el pipeline')
+    // No bloqueamos retrocesos, solo avisamos
   }
 
   // Validaciones específicas por etapa
@@ -216,6 +285,71 @@ async function validateStageTransition(
     isValid: errors.length === 0,
     errors,
     warnings
+  }
+}
+
+// Función para asignar tags según la etapa
+async function assignStageTag(leadId: string, stageId: string): Promise<void> {
+  try {
+    // Mapeo de etapas a tags
+    const stageTags: Record<string, string> = {
+      'nuevo': 'nuevo-lead',
+      'contactado': 'contactado',
+      'calificado': 'calificado',
+      'propuesta': 'propuesta-enviada',
+      'negociacion': 'negociacion',
+      'cerrado-ganado': 'cerrado-ganado',
+      'cerrado-perdido': 'cerrado-perdido'
+    }
+
+    const tagToAdd = stageTags[stageId]
+    if (!tagToAdd) return
+
+    // Obtener lead actual
+    const lead = await supabase.findLeadById(leadId)
+    if (!lead) {
+      logger.warn('Lead not found for tag assignment', { leadId })
+      return
+    }
+
+    // Obtener tags actuales
+    let currentTags: string[] = []
+    if (lead.tags) {
+      try {
+        currentTags = typeof lead.tags === 'string' 
+          ? JSON.parse(lead.tags) 
+          : lead.tags
+      } catch {
+        currentTags = Array.isArray(lead.tags) ? lead.tags : []
+      }
+    }
+
+    // Remover tags de otras etapas
+    const stageTagValues = Object.values(stageTags)
+    const filteredTags = currentTags.filter(tag => !stageTagValues.includes(tag))
+
+    // Agregar el nuevo tag si no existe
+    if (!filteredTags.includes(tagToAdd)) {
+      filteredTags.push(tagToAdd)
+    }
+
+    // Actualizar lead con nuevos tags
+    await supabase.updateLead(leadId, {
+      tags: JSON.stringify(filteredTags)
+    })
+
+    logger.info('Stage tag assigned', {
+      leadId,
+      stageId,
+      tag: tagToAdd
+    })
+  } catch (error) {
+    logger.error('Error assigning stage tag', {
+      leadId,
+      stageId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
+    // No lanzar error, es opcional
   }
 }
 

@@ -321,10 +321,10 @@ export default function ChatsPage() {
       />
 
       {/* Layout Responsive */}
-      <div className="flex h-[calc(100vh-80px)] relative">
+      <div className="flex h-[calc(100vh-80px)] relative overflow-hidden">
         {/* Mobile: Vista de lista */}
         <div className={cn(
-          'bg-white border-r border-gray-200 flex flex-col transition-transform duration-300',
+          'bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 h-full overflow-hidden',
           'md:w-1/3 lg:w-80',
           mobileView === 'list' ? 'w-full' : 'hidden md:flex',
           mobileView === 'chat' && 'hidden'
@@ -338,7 +338,7 @@ export default function ChatsPage() {
 
         {/* Mobile: Vista de chat */}
         <div className={cn(
-          'flex-1 flex flex-col bg-white transition-transform duration-300',
+          'flex-1 flex flex-col bg-white transition-transform duration-300 h-full overflow-hidden',
           mobileView === 'chat' ? 'w-full' : 'hidden md:flex',
           mobileView === 'list' && 'hidden'
         )}>
@@ -380,7 +380,7 @@ export default function ChatsPage() {
 
         {/* Desktop: Sidebar siempre visible, Mobile: Drawer */}
         <div className={cn(
-          'bg-white border-l border-gray-200 transition-transform duration-300',
+          'bg-white border-l border-gray-200 transition-transform duration-300 h-full overflow-y-auto',
           'lg:w-80',
           // Desktop: siempre visible en lg+
           'hidden lg:block',

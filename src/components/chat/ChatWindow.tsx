@@ -69,9 +69,9 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
   }
 
   return (
-    <div className={cn('flex flex-col h-full bg-white', className)}>
+    <div className={cn('flex flex-col h-full bg-white overflow-hidden', className)}>
       {/* Header de la conversación - Responsive (oculto en mobile porque ya está en la página) */}
-      <div className="hidden md:block p-3 md:p-4 border-b border-gray-200 space-y-2 md:space-y-3">
+      <div className="hidden md:block p-3 md:p-4 border-b border-gray-200 space-y-2 md:space-y-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 md:space-x-3">
             <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-xs md:text-sm">
@@ -160,7 +160,7 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
       </ScrollArea>
 
       {/* Input de mensaje - Responsive */}
-      <div className="p-2 sm:p-3 md:p-4 border-t border-gray-200">
+      <div className="p-2 sm:p-3 md:p-4 border-t border-gray-200 flex-shrink-0">
         <div className="flex items-center space-x-1.5 sm:space-x-2">
           <Button variant="ghost" size="sm" className="h-8 w-8 sm:h-9 sm:w-9 p-0 flex-shrink-0">
             <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

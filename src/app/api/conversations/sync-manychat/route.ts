@@ -349,7 +349,13 @@ export async function POST() {
             email: subscriber.email || lead.email,
             manychatId: String(subscriber.id),
             tags: tags,
-            profileImage: subscriber.profile_pic
+            profileImage: subscriber.profile_pic,
+            producto: lead.producto,
+            monto: lead.monto,
+            zona: lead.zona,
+            banco: lead.banco,
+            trabajo_actual: lead.trabajo_actual,
+            estado: lead.estado
           },
           messages: messages,
           manychatData: {

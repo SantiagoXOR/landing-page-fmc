@@ -23,6 +23,12 @@ export interface Lead {
   manychatId?: string
   tags?: string[]
   profileImage?: string
+  producto?: string
+  monto?: number
+  zona?: string
+  banco?: string
+  trabajo_actual?: string
+  estado?: string
 }
 
 export interface AssignedUser {

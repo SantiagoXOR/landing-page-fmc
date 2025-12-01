@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Search, MessageSquare, MoreHorizontal, Phone, Camera } from 'lucide-react'
+import { Search, MessageSquare, MoreHorizontal, Phone, Camera, MessageCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Conversation } from '@/types/chat'
 import Image from 'next/image'
@@ -23,7 +23,7 @@ export function ChatList({
   className 
 }: ChatListProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'instagram'>('all')
+  const [filter, setFilter] = useState<'all' | 'whatsapp' | 'instagram' | 'facebook'>('all')
 
   const filteredConversations = conversations.filter(conversation => {
     const matchesSearch = conversation.lead?.nombre
@@ -32,7 +32,9 @@ export function ChatList({
       conversation.lead?.telefono.includes(searchTerm) ||
       conversation.messages[0]?.content.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesFilter = filter === 'all' || conversation.platform === filter
+    const matchesFilter = filter === 'all' || 
+      conversation.platform === filter || 
+      (filter === 'facebook' && (conversation.platform === 'facebook' || conversation.platform === 'messenger'))
 
     return matchesSearch && matchesFilter
   })
@@ -90,6 +92,9 @@ export function ChatList({
         return <Phone className="h-3.5 w-3.5 text-purple-600" />
       case 'instagram':
         return <Camera className="h-3.5 w-3.5 text-purple-600" />
+      case 'facebook':
+      case 'messenger':
+        return <MessageCircle className="h-3.5 w-3.5 text-purple-600" />
       default:
         return <MessageSquare className="h-3.5 w-3.5 text-purple-600" />
     }
@@ -103,6 +108,40 @@ export function ChatList({
       .join('')
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  // Función para generar colores únicos basados en el nombre o ID
+  const getAvatarColor = (identifier: string) => {
+    if (!identifier) return 'from-purple-500 to-purple-600'
+    
+    // Generar hash simple del identificador
+    let hash = 0
+    for (let i = 0; i < identifier.length; i++) {
+      hash = identifier.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    
+    // Paleta de colores atractivos con gradientes
+    const colorPalettes = [
+      'from-purple-500 to-purple-600',
+      'from-blue-500 to-blue-600',
+      'from-green-500 to-green-600',
+      'from-pink-500 to-pink-600',
+      'from-orange-500 to-orange-600',
+      'from-indigo-500 to-indigo-600',
+      'from-teal-500 to-teal-600',
+      'from-red-500 to-red-600',
+      'from-yellow-500 to-yellow-600',
+      'from-cyan-500 to-cyan-600',
+      'from-violet-500 to-violet-600',
+      'from-rose-500 to-rose-600',
+      'from-emerald-500 to-emerald-600',
+      'from-amber-500 to-amber-600',
+      'from-sky-500 to-sky-600',
+    ]
+    
+    // Usar el hash para seleccionar un color de forma consistente
+    const index = Math.abs(hash) % colorPalettes.length
+    return colorPalettes[index]
   }
 
   const getLastMessagePreview = (conversation: Conversation) => {
@@ -121,9 +160,9 @@ export function ChatList({
   }
 
   return (
-    <div className={cn('flex flex-col h-full bg-white', className)}>
+    <div className={cn('flex flex-col h-full bg-white overflow-hidden', className)}>
       {/* Header con búsqueda */}
-      <div className="p-2 sm:p-3 md:p-4 border-b border-gray-200">
+      <div className="p-2 sm:p-3 md:p-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center space-x-1.5 sm:space-x-2 mb-2 sm:mb-3 md:mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
@@ -183,6 +222,21 @@ export function ChatList({
             <Phone className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1 sm:mr-1.5" />
             <span className="hidden xs:inline">WhatsApp</span>
             <span className="xs:hidden">WA</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFilter('facebook')}
+            className={cn(
+              'text-xs h-7 sm:h-8 px-2 sm:px-3 flex-shrink-0',
+              filter === 'facebook' 
+                ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            )}
+          >
+            <MessageCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1 sm:mr-1.5" />
+            <span className="hidden xs:inline">Facebook</span>
+            <span className="xs:hidden">FB</span>
           </Button>
         </div>
       </div>
@@ -247,7 +301,10 @@ export function ChatList({
                         />
                       </div>
                     ) : (
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-600 flex items-center justify-center text-white font-semibold text-xs sm:text-sm ring-2 ring-purple-100">
+                      <div className={cn(
+                        "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-semibold text-xs sm:text-sm ring-2 ring-gray-200",
+                        getAvatarColor(conversation.lead?.nombre || conversation.lead?.id || 'U')
+                      )}>
                         {getInitials(conversation.lead?.nombre || 'U')}
                       </div>
                     )}

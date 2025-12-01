@@ -134,7 +134,13 @@ export async function GET(request: NextRequest) {
             email: conv.lead.email,
             manychatId: conv.lead.manychatId || conv.lead.manychat_id,
             tags: conv.lead.tags ? (typeof conv.lead.tags === 'string' ? JSON.parse(conv.lead.tags) : conv.lead.tags) : [],
-            profileImage: conv.lead.profile_image || conv.lead.profileImage
+            profileImage: conv.lead.profile_image || conv.lead.profileImage,
+            producto: conv.lead.producto,
+            monto: conv.lead.monto,
+            zona: conv.lead.zona,
+            banco: conv.lead.banco,
+            trabajo_actual: conv.lead.trabajo_actual,
+            estado: conv.lead.estado
           } : undefined,
           assignedUser: conv.assigned_user ? {
             id: conv.assigned_user.id,

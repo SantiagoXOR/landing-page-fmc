@@ -22,8 +22,15 @@ import {
   FileText,
   Calendar,
   ExternalLink,
-  Bot
+  Bot,
+  MapPin,
+  DollarSign,
+  Briefcase,
+  Building2,
+  Package,
+  ExternalLink as ExternalLinkIcon
 } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { Conversation } from '@/types/chat'
 
@@ -75,13 +82,32 @@ export function ChatSidebar({
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    if (!dateString) return 'Fecha no disponible'
+    
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return 'Fecha inválida'
+      }
+      return date.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      return 'Fecha inválida'
+    }
+  }
+
+  const formatCurrency = (amount?: number) => {
+    if (!amount) return 'No especificado'
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 0
+    }).format(amount)
   }
 
   if (!conversation) {
@@ -96,18 +122,29 @@ export function ChatSidebar({
   }
 
   return (
-    <div className={cn('w-80 bg-white border-l border-gray-200 p-4 space-y-6', className)}>
+    <div className={cn('w-80 bg-white border-l border-gray-200 p-4 space-y-6 overflow-y-auto h-full', className)}>
       {/* Información del contacto */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Información del Contacto
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              Información del Contacto
+            </CardTitle>
+            {conversation.lead?.id && (
+              <Link 
+                href={`/leads/${conversation.lead.id}`}
+                className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1"
+              >
+                Ver detalle
+                <ExternalLinkIcon className="h-3 w-3" />
+              </Link>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center space-x-3">
             <User className="h-4 w-4 text-gray-400" />
-            <div>
+            <div className="flex-1">
               <p className="font-medium text-gray-900">{conversation.lead?.nombre}</p>
               <p className="text-sm text-gray-500">Nombre completo</p>
             </div>
@@ -115,7 +152,7 @@ export function ChatSidebar({
           
           <div className="flex items-center space-x-3">
             <Phone className="h-4 w-4 text-gray-400" />
-            <div>
+            <div className="flex-1">
               <p className="font-medium text-gray-900">{conversation.lead?.telefono}</p>
               <p className="text-sm text-gray-500">Teléfono</p>
             </div>
@@ -124,14 +161,88 @@ export function ChatSidebar({
           {conversation.lead?.email && (
             <div className="flex items-center space-x-3">
               <Mail className="h-4 w-4 text-gray-400" />
-              <div>
+              <div className="flex-1">
                 <p className="font-medium text-gray-900">{conversation.lead.email}</p>
                 <p className="text-sm text-gray-500">Email</p>
               </div>
             </div>
           )}
+
+          {conversation.lead?.estado && (
+            <div className="flex items-center space-x-3">
+              <Tag className="h-4 w-4 text-gray-400" />
+              <div className="flex-1">
+                <Badge variant="outline" className="text-xs">
+                  {conversation.lead.estado}
+                </Badge>
+                <p className="text-sm text-gray-500 mt-1">Estado del lead</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Información del crédito */}
+      {(conversation.lead?.producto || conversation.lead?.monto || conversation.lead?.zona || conversation.lead?.banco || conversation.lead?.trabajo_actual) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              Información del Crédito
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {conversation.lead?.producto && (
+              <div className="flex items-center space-x-3">
+                <Package className="h-4 w-4 text-gray-400" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{conversation.lead.producto}</p>
+                  <p className="text-sm text-gray-500">Producto</p>
+                </div>
+              </div>
+            )}
+
+            {conversation.lead?.monto && (
+              <div className="flex items-center space-x-3">
+                <DollarSign className="h-4 w-4 text-gray-400" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{formatCurrency(conversation.lead.monto)}</p>
+                  <p className="text-sm text-gray-500">Monto solicitado</p>
+                </div>
+              </div>
+            )}
+
+            {conversation.lead?.zona && (
+              <div className="flex items-center space-x-3">
+                <MapPin className="h-4 w-4 text-gray-400" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{conversation.lead.zona}</p>
+                  <p className="text-sm text-gray-500">Zona</p>
+                </div>
+              </div>
+            )}
+
+            {conversation.lead?.banco && (
+              <div className="flex items-center space-x-3">
+                <Building2 className="h-4 w-4 text-gray-400" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{conversation.lead.banco}</p>
+                  <p className="text-sm text-gray-500">Banco</p>
+                </div>
+              </div>
+            )}
+
+            {conversation.lead?.trabajo_actual && (
+              <div className="flex items-center space-x-3">
+                <Briefcase className="h-4 w-4 text-gray-400" />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{conversation.lead.trabajo_actual}</p>
+                  <p className="text-sm text-gray-500">Trabajo actual</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Chatbot Info */}
       {conversation.lead?.id && (
@@ -301,27 +412,49 @@ export function ChatSidebar({
         </CardContent>
       </Card>
 
-      {/* Historial de actividad */}
+      {/* Estadísticas de la conversación */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Historial de Actividad
+            Estadísticas de la Conversación
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-2">
+              <MessageSquare className="h-4 w-4 text-gray-400" />
+              <span className="text-gray-600">Total mensajes</span>
+            </div>
+            <span className="font-medium text-gray-900">
+              {conversation.messages?.length || 0}
+            </span>
+          </div>
+
+          {conversation.unreadCount !== undefined && conversation.unreadCount > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="h-2 w-2 rounded-full bg-purple-600"></div>
+                <span className="text-gray-600">No leídos</span>
+              </div>
+              <Badge variant="destructive" className="text-xs">
+                {conversation.unreadCount}
+              </Badge>
+            </div>
+          )}
+
           <div className="flex items-center space-x-3 text-sm">
             <Clock className="h-4 w-4 text-gray-400" />
-            <div>
+            <div className="flex-1">
               <p className="text-gray-900">Conversación iniciada</p>
-              <p className="text-gray-500">{formatDate(conversation.createdAt)}</p>
+              <p className="text-gray-500 text-xs">{formatDate(conversation.createdAt)}</p>
             </div>
           </div>
           
           <div className="flex items-center space-x-3 text-sm">
             <MessageSquare className="h-4 w-4 text-gray-400" />
-            <div>
+            <div className="flex-1">
               <p className="text-gray-900">Último mensaje</p>
-              <p className="text-gray-500">{formatDate(conversation.lastMessageAt)}</p>
+              <p className="text-gray-500 text-xs">{formatDate(conversation.lastMessageAt)}</p>
             </div>
           </div>
         </CardContent>

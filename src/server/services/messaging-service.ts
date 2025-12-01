@@ -172,7 +172,6 @@ export class MessagingService {
           channel,
           error: response.error,
           errorCode: response.error_code,
-          details: response.details,
           hasPhone: !!subscriber.phone,
           hasWhatsAppPhone: !!subscriber.whatsapp_phone,
           providedPhone: params.to.phone ? params.to.phone.substring(0, 5) + '***' : undefined
@@ -186,7 +185,7 @@ export class MessagingService {
           if (!subscriber.phone && !subscriber.whatsapp_phone) {
             errorMessage = 'El contacto no tiene teléfono configurado en ManyChat. Por favor, sincroniza el contacto primero desde la página del lead para actualizar su información en ManyChat.'
           } else {
-            errorMessage = `Error de validación de ManyChat: ${response.error}. ${response.details?.messages ? JSON.stringify(response.details.messages) : ''}`
+            errorMessage = `Error de validación de ManyChat: ${response.error}`
           }
         }
 

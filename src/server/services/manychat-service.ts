@@ -1006,6 +1006,39 @@ export class ManychatService {
     messages: ManychatMessage[],
     tag?: string
   ): Promise<ManychatSendMessageResponse> {
+    // Validar que subscriberId sea válido
+    if (!subscriberId || subscriberId === 0 || isNaN(subscriberId)) {
+      logger.error('Subscriber ID inválido para enviar mensaje', {
+        subscriberId,
+        messagesCount: messages.length
+      })
+      return {
+        status: 'error',
+        error: 'Subscriber ID inválido',
+        error_code: 'INVALID_SUBSCRIBER_ID'
+      }
+    }
+
+    // Validar que haya mensajes
+    if (!messages || messages.length === 0) {
+      logger.error('No hay mensajes para enviar', {
+        subscriberId
+      })
+      return {
+        status: 'error',
+        error: 'No hay mensajes para enviar',
+        error_code: 'NO_MESSAGES'
+      }
+    }
+
+    // Log del request que se enviará a ManyChat
+    logger.debug('Enviando mensaje a ManyChat API', {
+      subscriberId,
+      messagesCount: messages.length,
+      messageTypes: messages.map(m => m.type),
+      hasTag: !!tag
+    })
+
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest<ManychatSendMessageResponse>({
         method: 'POST',
@@ -1020,6 +1053,17 @@ export class ManychatService {
         },
       })
     )
+
+    // Log detallado de la respuesta
+    if (response.status === 'error') {
+      logger.error('Error en respuesta de ManyChat sendContent', {
+        subscriberId,
+        error: response.error,
+        errorCode: response.error_code,
+        details: response.details,
+        messagesSent: messages.length
+      })
+    }
 
     return response as ManychatSendMessageResponse
   }

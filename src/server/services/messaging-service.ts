@@ -48,6 +48,25 @@ export class MessagingService {
         }
       }
 
+      // Validar que el subscriber tenga un ID válido
+      if (!subscriber.id || subscriber.id === 0 || isNaN(Number(subscriber.id))) {
+        logger.error('Subscriber encontrado pero sin ID válido', {
+          subscriber: {
+            hasId: !!subscriber.id,
+            id: subscriber.id,
+            hasPhone: !!subscriber.phone,
+            hasWhatsAppPhone: !!subscriber.whatsapp_phone,
+            hasEmail: !!subscriber.email
+          },
+          identifier: this.sanitizeIdentifier(params.to)
+        })
+        return {
+          success: false,
+          error: 'El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente.',
+          errorCode: 'INVALID_SUBSCRIBER_ID',
+        }
+      }
+
       // Si el subscriber no tiene teléfono pero se proporcionó uno en params, usarlo temporalmente
       // para detectar el canal correctamente
       if (!subscriber.whatsapp_phone && !subscriber.phone && params.to.phone) {
@@ -147,16 +166,33 @@ export class MessagingService {
           subscriberId: subscriber.id,
         }
       } else {
+        // Log detallado del error de ManyChat
         logger.error('Error enviando mensaje a través de ManyChat', {
           subscriberId: subscriber.id,
           channel,
           error: response.error,
-          errorCode: response.error_code
+          errorCode: response.error_code,
+          details: response.details,
+          hasPhone: !!subscriber.phone,
+          hasWhatsAppPhone: !!subscriber.whatsapp_phone,
+          providedPhone: params.to.phone ? params.to.phone.substring(0, 5) + '***' : undefined
         })
+
+        // Proporcionar mensaje de error más descriptivo
+        let errorMessage = response.error || 'Error desconocido al enviar mensaje'
+        
+        // Si el error es de validación y el subscriber no tiene teléfono, sugerir sincronización
+        if (response.error_code === 'VALIDATION_ERROR' || (response.error && response.error.includes('Validation'))) {
+          if (!subscriber.phone && !subscriber.whatsapp_phone) {
+            errorMessage = 'El contacto no tiene teléfono configurado en ManyChat. Por favor, sincroniza el contacto primero desde la página del lead para actualizar su información en ManyChat.'
+          } else {
+            errorMessage = `Error de validación de ManyChat: ${response.error}. ${response.details?.messages ? JSON.stringify(response.details.messages) : ''}`
+          }
+        }
 
         return {
           success: false,
-          error: response.error || 'Error desconocido al enviar mensaje',
+          error: errorMessage,
           errorCode: this.mapManychatErrorToChannelError(response.error_code),
           channel,
           subscriberId: subscriber.id,

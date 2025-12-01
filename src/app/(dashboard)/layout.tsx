@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import { FMCLogo } from '@/components/branding/FMCLogo'
 import { LoadingSpinner } from '@/components/ui/loading-states'
+import { NotificationCenter } from '@/components/notifications/NotificationCenter'
 import { cn } from '@/lib/utils'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -50,7 +51,32 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         sidebar.isOpen ? "md:pl-64" : "md:pl-0",
         "lg:pl-64"
       )}>
-        <main className="min-h-screen">
+        {/* Header superior con botón de notificación */}
+        <header className={cn(
+          "fixed top-0 right-0 z-40 bg-white border-b border-gray-200 h-16 flex items-center justify-end px-4 md:px-6 transition-all duration-300",
+          "left-0 lg:left-64",
+          sidebar.isOpen ? "md:left-64" : "md:left-0"
+        )}>
+          <div className="flex items-center space-x-4">
+            {/* Botón de notificación en el margen superior derecho */}
+            <NotificationCenter />
+            
+            {/* Información del usuario */}
+            <div className="hidden sm:flex items-center space-x-3">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">
+                  {session?.user?.name || 'Usuario'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {session?.user?.role || 'Usuario'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Contenido con padding superior para el header */}
+        <main className="min-h-screen pt-16">
           {children}
         </main>
       </div>

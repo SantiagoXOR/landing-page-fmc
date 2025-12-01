@@ -222,53 +222,54 @@ export class WhatsAppService {
         throw new Error(errorMessage)
       }
 
-      // Asegurar que el subscriber tenga whatsapp_phone configurado
-      // Si no lo tiene, actualizarlo con el teléfono que estamos usando
+      // Si el subscriber no tiene teléfono configurado, intentar actualizarlo usando createOrUpdateSubscriber
+      // ManyChat requiere que el subscriber tenga teléfono en su perfil para enviar mensajes por WhatsApp
       if (!subscriber.whatsapp_phone && !subscriber.phone) {
-        const subscriberId = subscriber.id
-        logger.warn('Subscriber sin teléfono configurado, actualizando...', {
-          subscriberId: subscriberId,
+        logger.info('Subscriber sin teléfono configurado, intentando actualizar usando createOrUpdateSubscriber', {
+          subscriberId: subscriber.id,
           phone: data.to.substring(0, 5) + '***'
         })
         
         try {
-          // Actualizar el subscriber con el teléfono
-          await ManychatService.setCustomField(subscriberId, 'whatsapp_phone', data.to)
-          // También actualizar el campo phone si está disponible
-          if (subscriber.phone !== data.to) {
-            // Nota: ManyChat no tiene un endpoint directo para actualizar phone,
-            // pero podemos intentar actualizar el custom field
-            await ManychatService.setCustomField(subscriberId, 'phone', data.to)
-          }
+          // Intentar actualizar el subscriber con el teléfono usando createOrUpdateSubscriber
+          const updatedSubscriber = await ManychatService.createOrUpdateSubscriber({
+            phone: data.to,
+            whatsapp_phone: data.to,
+            first_name: subscriber.first_name,
+            last_name: subscriber.last_name,
+            email: subscriber.email
+          })
           
-          // Obtener el subscriber actualizado
-          subscriber = await ManychatService.getSubscriberById(subscriberId)
-          
-          if (subscriber) {
-            logger.info('Subscriber actualizado con teléfono', {
+          if (updatedSubscriber) {
+            subscriber = updatedSubscriber
+            logger.info('Subscriber actualizado con teléfono usando createOrUpdateSubscriber', {
               subscriberId: subscriber.id,
               hasWhatsAppPhone: !!subscriber.whatsapp_phone,
               hasPhone: !!subscriber.phone
             })
+          } else {
+            logger.warn('No se pudo actualizar subscriber, asignando teléfono temporalmente', {
+              subscriberId: subscriber.id
+            })
+            // Asignar temporalmente al objeto como fallback
+            subscriber.whatsapp_phone = data.to
+            subscriber.phone = data.to
           }
         } catch (updateError: any) {
-          logger.warn('No se pudo actualizar teléfono del subscriber, continuando...', {
+          logger.warn('Error actualizando subscriber con teléfono, asignando temporalmente', {
             error: updateError.message,
-            subscriberId: subscriberId
+            subscriberId: subscriber.id
           })
-          // Continuar de todas formas, puede que funcione
+          // Asignar temporalmente al objeto como fallback
+          subscriber.whatsapp_phone = data.to
+          subscriber.phone = data.to
         }
-      }
-
-      // Si el subscriber aún no tiene teléfono, asignarlo manualmente al objeto
-      // para que detectChannel pueda funcionar
-      if (subscriber && !subscriber.whatsapp_phone && !subscriber.phone) {
-        subscriber.whatsapp_phone = data.to
-        subscriber.phone = data.to
-        logger.info('Asignando teléfono manualmente al subscriber para detección de canal', {
-          subscriberId: subscriber.id,
-          phone: data.to.substring(0, 5) + '***'
-        })
+      } else if (!subscriber.whatsapp_phone && subscriber.phone) {
+        // Si tiene phone pero no whatsapp_phone, asignar whatsapp_phone también
+        subscriber.whatsapp_phone = subscriber.phone
+      } else if (subscriber.whatsapp_phone && !subscriber.phone) {
+        // Si tiene whatsapp_phone pero no phone, asignar phone también
+        subscriber.phone = subscriber.whatsapp_phone
       }
 
       // Usar el nuevo MessagingService para mejor manejo multi-canal

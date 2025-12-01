@@ -1,12 +1,19 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Header } from '@/components/layout/Header'
 import { ChatList } from '@/components/chat/ChatList'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { ChatSidebar } from '@/components/chat/ChatSidebar'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { ArrowLeft, RefreshCw, MoreVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Conversation } from '@/types/chat'
 
@@ -17,6 +24,9 @@ export default function ChatsPage() {
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<string | null>(null)
   const [mobileView, setMobileView] = useState<'list' | 'chat' | 'sidebar'>('list')
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false)
+  const hasInitialSync = useRef(false)
+  const periodicSyncInterval = useRef<NodeJS.Timeout | null>(null)
 
   const fetchConversations = useCallback(async (sync: boolean = false) => {
     try {
@@ -60,10 +70,14 @@ export default function ChatsPage() {
     }
   }, [])
 
-  const handleSyncManychat = async () => {
+  const handleSyncManychat = async (showStatus: boolean = true) => {
     try {
       setSyncing(true)
-      setSyncStatus('Sincronizando...')
+      if (showStatus) {
+        setSyncStatus('Sincronizando...')
+      } else {
+        setIsAutoSyncing(true)
+      }
       
       const response = await fetch('/api/conversations/sync-manychat', {
         method: 'POST',
@@ -78,44 +92,135 @@ export default function ChatsPage() {
         // Actualizar inmediatamente con las conversaciones retornadas
         if (syncedConversations.length > 0) {
           setConversations(syncedConversations)
-          const conversationsWithMessages = data.conversationsWithMessages || 0
-          const conversationsWithoutMessages = data.conversationsWithoutMessages || 0
-          
-          let statusMessage = `Sincronizado: ${syncedCount} conversaciones`
-          if (foundSubscribers > 0) {
-            statusMessage += `, ${foundSubscribers} nuevos subscribers encontrados`
+          if (showStatus) {
+            const conversationsWithMessages = data.conversationsWithMessages || 0
+            const conversationsWithoutMessages = data.conversationsWithoutMessages || 0
+            
+            let statusMessage = `Sincronizado: ${syncedCount} conversaciones`
+            if (foundSubscribers > 0) {
+              statusMessage += `, ${foundSubscribers} nuevos subscribers encontrados`
+            }
+            if (conversationsWithoutMessages > 0) {
+              statusMessage += `. ${conversationsWithoutMessages} sin mensajes aún (llegarán vía webhooks)`
+            }
+            
+            setSyncStatus(statusMessage)
           }
-          if (conversationsWithoutMessages > 0) {
-            statusMessage += `. ${conversationsWithoutMessages} sin mensajes aún (llegarán vía webhooks)`
-          }
-          
-          setSyncStatus(statusMessage)
         } else {
           // Si no hay conversaciones pero se encontraron subscribers, recargar
           if (foundSubscribers > 0) {
             await fetchConversations(false)
-            setSyncStatus(`Encontrados ${foundSubscribers} subscribers. Recargando conversaciones...`)
+            if (showStatus) {
+              setSyncStatus(`Encontrados ${foundSubscribers} subscribers. Recargando conversaciones...`)
+            }
           } else {
-            const errorMessage = data.message || 'No hay conversaciones para sincronizar. Asegúrate de tener leads con manychatId o teléfonos válidos.'
-            setSyncStatus(errorMessage)
+            if (showStatus) {
+              const errorMessage = data.message || 'No hay conversaciones para sincronizar. Asegúrate de tener leads con manychatId o teléfonos válidos.'
+              setSyncStatus(errorMessage)
+            }
           }
         }
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        setSyncStatus(errorData.error || 'Error al sincronizar')
+        if (showStatus) {
+          const errorData = await response.json().catch(() => ({}))
+          setSyncStatus(errorData.error || 'Error al sincronizar')
+        }
       }
     } catch (error: any) {
-      setSyncStatus(`Error de conexión: ${error.message || 'No se pudo conectar con el servidor'}`)
+      if (showStatus) {
+        setSyncStatus(`Error de conexión: ${error.message || 'No se pudo conectar con el servidor'}`)
+      }
     } finally {
       setSyncing(false)
-      setTimeout(() => setSyncStatus(null), 5000)
+      setIsAutoSyncing(false)
+      if (showStatus) {
+        setTimeout(() => setSyncStatus(null), 5000)
+      }
     }
   }
 
-  // Cargar conversaciones al montar el componente y cuando cambien filtros
+  // 1. Sincronización automática al cargar si no hay conversaciones
+  useEffect(() => {
+    const initialSync = async () => {
+      if (!hasInitialSync.current && conversations.length === 0 && !loading) {
+        hasInitialSync.current = true
+        try {
+          // Sincronizar silenciosamente en background
+          await handleSyncManychat(false)
+          // Recargar conversaciones después de sincronizar
+          await fetchConversations(false)
+        } catch (error) {
+          // Error silencioso - no mostrar al usuario
+          console.error('Auto-sync failed:', error)
+        }
+      }
+    }
+
+    if (!loading) {
+      initialSync()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, conversations.length])
+
+  // Cargar conversaciones al montar el componente
   useEffect(() => {
     fetchConversations()
   }, [fetchConversations])
+
+  // 2. Sincronización periódica cada 5 minutos (solo si página está visible)
+  useEffect(() => {
+    const startPeriodicSync = () => {
+      // Limpiar intervalo anterior si existe
+      if (periodicSyncInterval.current) {
+        clearInterval(periodicSyncInterval.current)
+      }
+
+      // Crear nuevo intervalo
+      periodicSyncInterval.current = setInterval(async () => {
+        // Solo sincronizar si la página está visible
+        if (document.visibilityState === 'visible' && !syncing) {
+          try {
+            await handleSyncManychat(false)
+            await fetchConversations(false)
+            localStorage.setItem('lastManychatSync', Date.now().toString())
+          } catch (error) {
+            console.error('Periodic sync failed:', error)
+          }
+        }
+      }, 5 * 60 * 1000) // 5 minutos
+    }
+
+    startPeriodicSync()
+
+    // Sincronizar cuando el usuario vuelve a la pestaña
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !syncing) {
+        // Sincronizar si pasaron más de 2 minutos desde la última vez
+        const lastSync = localStorage.getItem('lastManychatSync')
+        const now = Date.now()
+        const twoMinutesAgo = now - (2 * 60 * 1000)
+
+        if (!lastSync || parseInt(lastSync) < twoMinutesAgo) {
+          handleSyncManychat(false).then(() => {
+            fetchConversations(false)
+            localStorage.setItem('lastManychatSync', now.toString())
+          }).catch(() => {
+            // Error silencioso
+          })
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      if (periodicSyncInterval.current) {
+        clearInterval(periodicSyncInterval.current)
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncing])
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation)
@@ -241,10 +346,19 @@ export default function ChatsPage() {
     // Implementar lógica para agregar notas
   }
 
-  // Botón de sincronizar para el Header
-  const syncButton = (
+  // 3. Menú de opciones con sincronización manual + indicador discreto
+  const syncActions = (
     <div className="flex items-center gap-2">
-      {syncStatus && (
+      {/* Indicador discreto de sincronización en background */}
+      {(isAutoSyncing || syncing) && (
+        <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md text-xs bg-blue-50 text-blue-700 border border-blue-200">
+          <RefreshCw className="h-3 w-3 animate-spin text-blue-500" />
+          <span>Sincronizando...</span>
+        </div>
+      )}
+
+      {/* Mensaje de estado solo si es sincronización manual */}
+      {syncStatus && !isAutoSyncing && (
         <div className={cn(
           "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs sm:text-sm",
           syncStatus.includes('Error') || syncStatus.includes('error')
@@ -263,19 +377,44 @@ export default function ChatsPage() {
           <span>{syncStatus}</span>
         </div>
       )}
-      <Button
-        onClick={handleSyncManychat}
-        disabled={syncing || loading}
-        size="sm"
-        className={cn(
-          "h-9 sm:h-10 w-9 sm:w-10 p-0 flex items-center justify-center transition-all",
-          syncing
-            ? "bg-purple-400 cursor-not-allowed"
-            : "bg-purple-600 hover:bg-purple-700 text-white"
-        )}
-      >
-        <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${syncing ? 'animate-spin' : ''}`} />
-      </Button>
+
+      {/* Menú de opciones (3 puntos) */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 sm:h-10 w-9 sm:w-10 p-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem
+            onClick={() => handleSyncManychat(true)}
+            disabled={syncing || loading}
+            className="cursor-pointer"
+          >
+            <RefreshCw className={cn(
+              "mr-2 h-4 w-4",
+              syncing && "animate-spin"
+            )} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar con ManyChat'}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => fetchConversations(false)}
+            disabled={loading}
+            className="cursor-pointer"
+          >
+            <RefreshCw className={cn(
+              "mr-2 h-4 w-4",
+              loading && "animate-spin"
+            )} />
+            {loading ? 'Recargando...' : 'Recargar conversaciones'}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 
@@ -288,7 +427,7 @@ export default function ChatsPage() {
           showDateFilter={false}
           showExportButton={false}
           showNewButton={false}
-          actions={syncButton}
+          actions={syncActions}
         />
         <div className="flex h-[calc(100vh-80px)]">
           <div className="hidden md:block w-1/3 bg-white border-r border-gray-200 animate-pulse">
@@ -317,7 +456,7 @@ export default function ChatsPage() {
         showDateFilter={false}
         showExportButton={false}
         showNewButton={false}
-        actions={syncButton}
+        actions={syncActions}
       />
 
       {/* Layout Responsive */}

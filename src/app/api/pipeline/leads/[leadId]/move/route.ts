@@ -256,18 +256,54 @@ export async function POST(
           error: directUpdateError.message,
           stack: directUpdateError.stack,
           leadId,
-          errorType: directUpdateError.constructor.name
+          errorType: directUpdateError.constructor.name,
+          errorDetails: directUpdateError
         })
-        // Re-lanzar el error para que se capture y se muestre el mensaje correcto
-        throw directUpdateError
+        // No re-lanzar aquí, dejar que continúe para intentar otras opciones
+        // El error se manejará al final si pipelineUpdated sigue siendo false
       }
     }
 
     if (!pipelineUpdated) {
-      logger.error('Failed to update pipeline in database', { leadId })
+      // Intentar una última vez crear el pipeline de forma más simple
+      try {
+        logger.info('Attempting final fallback: create minimal pipeline', { leadId })
+        const minimalPipeline = await supabase.request('/lead_pipeline', {
+          method: 'POST',
+          headers: { 'Prefer': 'return=representation' },
+          body: JSON.stringify({
+            lead_id: leadId,
+            current_stage: toStageEnum,
+            probability_percent: pipelineService.getProbabilityForStage(toStageEnum as any),
+            stage_entered_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        })
+        
+        if (minimalPipeline && minimalPipeline.length > 0) {
+          logger.info('Pipeline created successfully with minimal data', { leadId })
+          pipelineUpdated = true
+        }
+      } catch (finalError: any) {
+        logger.error('Final fallback also failed', {
+          error: finalError.message,
+          stack: finalError.stack,
+          leadId,
+          errorDetails: finalError
+        })
+      }
+    }
+
+    if (!pipelineUpdated) {
+      logger.error('Failed to update pipeline in database after all attempts', { 
+        leadId,
+        toStageEnum,
+        fromStageEnum
+      })
       return NextResponse.json({
         error: 'Database update failed',
-        message: 'No se pudo actualizar el pipeline en la base de datos'
+        message: 'No se pudo actualizar el pipeline en la base de datos. Verifique que el lead existe y que tiene permisos.',
+        details: 'El sistema intentó múltiples métodos pero todos fallaron. Revise los logs del servidor para más detalles.'
       }, { status: 500 })
     }
 
@@ -372,13 +408,22 @@ export async function POST(
     logger.error('Error moving lead', {
       error: error.message,
       stack: error.stack,
+      errorName: error.name,
+      errorType: error.constructor?.name,
       userId: (await getServerSession(authOptions))?.user?.id,
-      leadId: params?.leadId
+      leadId: params?.leadId,
+      errorDetails: error.response?.data || error.details || error
     })
+
+    // Si el error tiene un mensaje específico, usarlo
+    const errorMessage = error.message || 'Error interno del servidor al mover lead'
+    const errorDetails = error.response?.data?.details || error.details || null
 
     return NextResponse.json({
       error: 'Internal server error',
-      message: 'Error interno del servidor al mover lead'
+      message: errorMessage,
+      details: errorDetails,
+      errorType: error.name || 'UnknownError'
     }, { status: 500 })
   }
 }

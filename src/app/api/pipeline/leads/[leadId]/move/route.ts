@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { automationService } from '@/services/automation-service'
 import { pipelineService } from '@/server/services/pipeline-service'
 import { supabase } from '@/lib/db'
+import { syncPipelineToManychat } from '@/lib/manychat-sync'
 
 // Schema de validación para mover lead
 const MoveLeadSchema = z.object({
@@ -117,17 +118,33 @@ export async function POST(
 
     // Mapear IDs de etapas del frontend a los valores del enum de la base de datos
     const stageMapping: Record<string, string> = {
-      'nuevo': 'LEAD_NUEVO',
-      'contactado': 'CONTACTO_INICIAL',
-      'calificado': 'CALIFICACION',
-      'propuesta': 'PROPUESTA',
-      'negociacion': 'NEGOCIACION',
-      'cerrado-ganado': 'CIERRE_GANADO',
-      'cerrado-perdido': 'CIERRE_PERDIDO',
-      'cerrado_ganado': 'CIERRE_GANADO', // También aceptar con guión bajo
-      'cerrado_perdido': 'CIERRE_PERDIDO' // También aceptar con guión bajo
+      // Mapeo anterior (legacy support)
+      'nuevo': 'CLIENTE_NUEVO',
+      'contactado': 'CONSULTANDO_CREDITO',
+      'calificado': 'LISTO_ANALISIS',
+      'propuesta': 'PREAPROBADO',
+      'negociacion': 'APROBADO',
+      'cerrado-ganado': 'CERRADO_GANADO',
+      'cerrado-perdido': 'RECHAZADO',
+      // Mapeo nuevo (ManyChat pipeline)
+      'cliente-nuevo': 'CLIENTE_NUEVO',
+      'consultando-credito': 'CONSULTANDO_CREDITO',
+      'solicitando-docs': 'SOLICITANDO_DOCS',
+      'solicitando-documentacion': 'SOLICITANDO_DOCS',
+      'listo-analisis': 'LISTO_ANALISIS',
+      'preaprobado': 'PREAPROBADO',
+      'aprobado': 'APROBADO',
+      'en-seguimiento': 'EN_SEGUIMIENTO',
+      'cerrado_ganado': 'CERRADO_GANADO',
+      'venta-cerrada': 'CERRADO_GANADO',
+      'encuesta': 'ENCUESTA',
+      'encuesta-pendiente': 'ENCUESTA',
+      'rechazado': 'RECHAZADO',
+      'cerrado_perdido': 'RECHAZADO',
+      'solicitar-referido': 'SOLICITAR_REFERIDO'
     }
 
+    const fromStageEnum = stageMapping[normalizedFromStageId] || normalizedFromStageId
     const toStageEnum = stageMapping[normalizedToStageId] || normalizedToStageId
 
     logger.info('Stage mapping', {
@@ -227,6 +244,46 @@ export async function POST(
       }, { status: 500 })
     }
 
+    // Sincronizar cambio de etapa con ManyChat (no crítico si falla)
+    let manychatSynced = false
+    try {
+      // Obtener información del lead para ManyChat
+      const lead = await supabase.findLeadById(leadId)
+      
+      if (lead && lead.manychatId) {
+        logger.info('Syncing pipeline change to ManyChat', {
+          leadId,
+          manychatId: lead.manychatId,
+          fromStage: fromStageEnum,
+          toStage: toStageEnum
+        })
+
+        await syncPipelineToManychat({
+          leadId,
+          manychatId: lead.manychatId,
+          previousStage: fromStageEnum,
+          newStage: toStageEnum,
+          userId: session.user.id,
+          notes
+        })
+
+        manychatSynced = true
+        logger.info('Successfully synced to ManyChat', {
+          leadId,
+          manychatId: lead.manychatId
+        })
+      } else {
+        logger.info('Lead does not have ManyChat ID, skipping sync', { leadId })
+      }
+    } catch (manychatError: any) {
+      logger.warn('Failed to sync to ManyChat (non-critical)', {
+        error: manychatError.message,
+        leadId
+      })
+      // Continuar aunque falle la sincronización con ManyChat
+      // No bloqueamos el movimiento del lead si ManyChat falla
+    }
+
     // Asignar tags según la nueva etapa (no crítico si falla)
     try {
       await assignStageTag(leadId, normalizedToStageId)
@@ -270,13 +327,17 @@ export async function POST(
       fromStageId: normalizedFromStageId,
       toStageId: normalizedToStageId,
       toStageEnum,
+      manychatSynced,
       warnings: validationResult.warnings.length
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Lead movido exitosamente',
+      message: manychatSynced 
+        ? 'Lead movido y sincronizado con ManyChat' 
+        : 'Lead movido exitosamente',
       transition,
+      manychatSynced,
       warnings: validationResult.warnings
     })
 

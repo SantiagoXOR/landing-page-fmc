@@ -60,6 +60,7 @@ export function PipelineBoardAdvanced({
     activeId,
     draggedLead,
     isValidating,
+    isSyncing,
     leadsByStage,
     sensors,
     handleDragStart,

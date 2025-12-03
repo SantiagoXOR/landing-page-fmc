@@ -39,6 +39,7 @@ export function usePipelineDragDrop({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedLead, setDraggedLead] = useState<PipelineLead | null>(null)
   const [isValidating, setIsValidating] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   // Configurar sensores para el drag & drop
@@ -208,28 +209,53 @@ export function usePipelineDragDrop({
         destinationIndex: 0 // Por defecto al inicio de la nueva etapa
       }
 
-      // Ejecutar el movimiento
-      const success = await onLeadMove(result)
+      // Mostrar toast de sincronización en progreso
+      const syncToastId = toast.loading('Moviendo lead y sincronizando con ManyChat...', {
+        description: 'Por favor espera...'
+      })
 
-      if (success) {
-        toast.success('Lead movido exitosamente')
+      try {
+        setIsSyncing(true)
         
-        // Crear registro de transición
-        const transition: StageTransition = {
-          id: `transition-${Date.now()}`,
-          leadId,
-          fromStageId: currentStageId,
-          toStageId: newStageId,
-          date: new Date(),
-          userId: 'current-user', // En una implementación real, obtener del contexto
-          userName: 'Usuario Actual',
-          duration: Math.floor((Date.now() - new Date(draggedLead.stageEntryDate).getTime()) / (1000 * 60 * 60 * 24)),
-          wasAutomated: false
-        }
+        // Ejecutar el movimiento
+        const success = await onLeadMove(result)
 
-        onStageTransition?.(transition)
-      } else {
-        toast.error('Error al mover el lead')
+        if (success) {
+          // Actualizar toast con éxito
+          toast.success('Lead movido exitosamente', {
+            id: syncToastId,
+            description: 'Sincronizado con ManyChat',
+            duration: 3000
+          })
+          
+          // Crear registro de transición
+          const transition: StageTransition = {
+            id: `transition-${Date.now()}`,
+            leadId,
+            fromStageId: currentStageId,
+            toStageId: newStageId,
+            date: new Date(),
+            userId: 'current-user', // En una implementación real, obtener del contexto
+            userName: 'Usuario Actual',
+            duration: Math.floor((Date.now() - new Date(draggedLead.stageEntryDate).getTime()) / (1000 * 60 * 60 * 24)),
+            wasAutomated: false
+          }
+
+          onStageTransition?.(transition)
+        } else {
+          // Actualizar toast con error
+          toast.error('Error al mover el lead', {
+            id: syncToastId,
+            description: 'No se pudo completar la operación'
+          })
+        }
+      } catch (moveError) {
+        // Actualizar toast con error específico
+        toast.error('Error al mover el lead', {
+          id: syncToastId,
+          description: moveError instanceof Error ? moveError.message : 'Error desconocido'
+        })
+        throw moveError
       }
 
     } catch (error) {
@@ -237,6 +263,7 @@ export function usePipelineDragDrop({
       toast.error('Error inesperado al mover el lead')
     } finally {
       setIsValidating(false)
+      setIsSyncing(false)
     }
   }, [draggedLead, leadsByStage, validateStageTransition, onLeadMove, onStageTransition])
 
@@ -286,6 +313,7 @@ export function usePipelineDragDrop({
     activeId,
     draggedLead,
     isValidating,
+    isSyncing,
     validationErrors,
     
     // Datos organizados

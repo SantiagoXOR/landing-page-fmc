@@ -8,9 +8,9 @@
 import { createClient } from '@supabase/supabase-js'
 import {
   getManychatSubscriber,
-  updateManychatTags,
   getSubscriberTags
 } from './manychat-client'
+import { ManychatService } from '@/server/services/manychat-service'
 import { logger } from './logger'
 
 // Cliente Supabase
@@ -273,8 +273,35 @@ export async function syncPipelineToManychat(
       return true
     }
 
-    // 9. Actualizar tags en ManyChat
-    await updateManychatTags(manychatId, tagsToAdd, tagsToRemove)
+    // 9. Actualizar tags en ManyChat usando ManychatService que busca tags por ID
+    // Remover tags primero
+    for (const tag of tagsToRemove) {
+      try {
+        const removed = await ManychatService.removeTagFromSubscriber(manychatId, tag)
+        if (!removed) {
+          logger.warn(`Failed to remove tag '${tag}' from subscriber ${manychatId}`)
+        }
+      } catch (error: any) {
+        // Si el tag no existe, ignorar el error
+        if (!error.message.includes('not found') && !error.message.includes('does not exist')) {
+          logger.warn(`Error removing tag '${tag}':`, error.message)
+        }
+      }
+    }
+    
+    // Agregar nuevos tags
+    for (const tag of tagsToAdd) {
+      try {
+        const added = await ManychatService.addTagToSubscriber(manychatId, tag)
+        if (!added) {
+          logger.warn(`Failed to add tag '${tag}' to subscriber ${manychatId}`)
+          throw new Error(`Failed to add tag '${tag}'`)
+        }
+      } catch (error: any) {
+        logger.error(`Error adding tag '${tag}' to subscriber ${manychatId}:`, error.message)
+        throw error
+      }
+    }
 
     logger.info('Successfully synced pipeline to ManyChat', {
       leadId,

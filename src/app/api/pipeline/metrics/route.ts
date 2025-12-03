@@ -203,8 +203,8 @@ async function calculatePeriodMetrics(
     logger.error('Error calculating period metrics:', error)
     return {
       totalLeads: 0,
-      totalValue: 0,
-      averageDealSize: 0,
+      approvedLeads: 0,
+      rejectedLeads: 0,
       highPriorityLeads: 0,
       leadsWithTasks: 0,
       urgentLeads: 0,

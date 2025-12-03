@@ -197,42 +197,69 @@ export async function POST(
             body: JSON.stringify({
               current_stage: toStageEnum,
               stage_entered_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              probability_percent: pipelineService.getProbabilityForStage(toStageEnum as any)
             })
           })
           
+          if (!updateResult || updateResult.length === 0) {
+            throw new Error('No result returned from pipeline update')
+          }
+          
           logger.info('Pipeline updated directly', {
             leadId,
-            updateResult: updateResult ? 'success' : 'no result'
+            updateResult: 'success'
           })
           pipelineUpdated = true
         } else {
           logger.info('Pipeline record not found, creating new one', { leadId })
           
-          // Si no existe pipeline, crearlo
-          const createResult = await supabase.request('/lead_pipeline', {
-            method: 'POST',
-            headers: { 'Prefer': 'return=representation' },
-            body: JSON.stringify({
-              lead_id: leadId,
-              current_stage: toStageEnum,
-              stage_entered_at: new Date().toISOString()
+          // Si no existe pipeline, crearlo usando el servicio que maneja todos los campos requeridos
+          try {
+            const newPipeline = await pipelineService.createLeadPipeline(leadId, session.user.id)
+            
+            // Ahora actualizar la etapa al valor deseado
+            if (newPipeline) {
+              const updateResult = await supabase.request(`/lead_pipeline?id=eq.${newPipeline.id}`, {
+                method: 'PATCH',
+                headers: { 'Prefer': 'return=representation' },
+                body: JSON.stringify({
+                  current_stage: toStageEnum,
+                  stage_entered_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  probability_percent: pipelineService.getProbabilityForStage(toStageEnum as any)
+                })
+              })
+              
+              if (!updateResult || updateResult.length === 0) {
+                throw new Error('No result returned from pipeline stage update')
+              }
+              
+              logger.info('Pipeline created and updated to target stage', {
+                leadId,
+                pipelineId: newPipeline.id,
+                toStageEnum
+              })
+              pipelineUpdated = true
+            }
+          } catch (createError: any) {
+            logger.error('Error creating pipeline via service', {
+              error: createError.message,
+              stack: createError.stack,
+              leadId
             })
-          })
-          
-          logger.info('Pipeline created', {
-            leadId,
-            createResult: createResult ? 'success' : 'no result'
-          })
-          pipelineUpdated = true
+            throw createError // Re-lanzar para que se capture en el catch externo
+          }
         }
       } catch (directUpdateError: any) {
         logger.error('Error in direct pipeline update', {
           error: directUpdateError.message,
           stack: directUpdateError.stack,
-          leadId
+          leadId,
+          errorType: directUpdateError.constructor.name
         })
-        // No lanzar error aquí, continuar con el proceso
+        // Re-lanzar el error para que se capture y se muestre el mensaje correcto
+        throw directUpdateError
       }
     }
 

@@ -324,7 +324,7 @@ export class PipelineService {
   }
 
   // Obtener probabilidad por etapa
-  private getProbabilityForStage(stage: PipelineStage): number {
+  getProbabilityForStage(stage: PipelineStage): number {
     const probabilities: Record<PipelineStage, number> = {
       // Nuevas etapas
       'CLIENTE_NUEVO': 10,

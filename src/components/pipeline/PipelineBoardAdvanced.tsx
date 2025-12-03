@@ -696,7 +696,8 @@ function LeadCard({
           // Si no se encontró, buscar en todos los valores de customFields por patrón
           if (!cuilValue && lead.customFields) {
             for (const [key, value] of Object.entries(lead.customFields)) {
-              const normalizedValue = typeof value === 'object' && 'value' in value ? value.value : value
+              if (value === null || value === undefined) continue
+              const normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
               if (looksLikeCUIL(normalizedValue)) {
                 cuilValue = normalizedValue
                 break
@@ -706,7 +707,7 @@ function LeadCard({
           
           // Normalizar el valor si es un objeto
           const displayValue = cuilValue 
-            ? (typeof cuilValue === 'object' && 'value' in cuilValue ? cuilValue.value : cuilValue)
+            ? (typeof cuilValue === 'object' && cuilValue !== null && 'value' in cuilValue ? cuilValue.value : cuilValue)
             : null
           
           return displayValue ? (
@@ -853,7 +854,8 @@ function LeadCardDragging({
           // Si no se encontró, buscar en todos los valores de customFields por patrón
           if (!cuilValue && lead.customFields) {
             for (const [key, value] of Object.entries(lead.customFields)) {
-              const normalizedValue = typeof value === 'object' && 'value' in value ? value.value : value
+              if (value === null || value === undefined) continue
+              const normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
               if (looksLikeCUIL(normalizedValue)) {
                 cuilValue = normalizedValue
                 break
@@ -863,7 +865,7 @@ function LeadCardDragging({
           
           // Normalizar el valor si es un objeto
           const displayValue = cuilValue 
-            ? (typeof cuilValue === 'object' && 'value' in cuilValue ? cuilValue.value : cuilValue)
+            ? (typeof cuilValue === 'object' && cuilValue !== null && 'value' in cuilValue ? cuilValue.value : cuilValue)
             : null
           
           return displayValue ? (

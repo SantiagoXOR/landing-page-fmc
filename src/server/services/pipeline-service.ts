@@ -360,10 +360,26 @@ export class PipelineService {
       }
 
       const endpoint = `/rpc/get_pipeline_metrics`
-      const rawMetrics = await supabase.request(endpoint, { 
-        method: 'POST',
-        body: JSON.stringify(rpcBody)
-      })
+      let rawMetrics: any = null
+      
+      try {
+        rawMetrics = await supabase.request(endpoint, { 
+          method: 'POST',
+          body: JSON.stringify(rpcBody)
+        })
+      } catch (rpcError: any) {
+        // Si la función RPC no existe (404), retornar métricas por defecto
+        if (rpcError?.message?.includes('PGRST202') || rpcError?.message?.includes('Could not find the function')) {
+          logger.warn('Pipeline metrics function not found in database, returning default metrics', {
+            endpoint,
+            error: rpcError.message
+          })
+          // Retornar métricas por defecto sin lanzar error
+          return this.getDefaultMetrics()
+        }
+        // Si es otro tipo de error, relanzarlo para que sea capturado por el catch externo
+        throw rpcError
+      }
 
       // Transformar los datos a la estructura esperada
       const metrics = {
@@ -406,26 +422,31 @@ export class PipelineService {
       logger.error('Error getting pipeline metrics:', error)
 
       // Retornar métricas por defecto en caso de error
-      return {
-        totalLeads: 0,
-        totalValue: 0,
-        averageDealSize: 0,
-        conversionRate: 0,
-        averageSalesCycle: 0,
-        stageMetrics: {},
-        trends: {
-          leadsThisWeek: 0,
-          leadsLastWeek: 0,
-          valueThisWeek: 0,
-          valueLastWeek: 0,
-          conversionThisWeek: 0,
-          conversionLastWeek: 0
-        },
-        forecasting: {
-          projectedRevenue: 0,
-          projectedClosedDeals: 0,
-          confidence: 0.75
-        }
+      return this.getDefaultMetrics()
+    }
+  }
+
+  // Método helper para retornar métricas por defecto
+  private getDefaultMetrics() {
+    return {
+      totalLeads: 0,
+      totalValue: 0,
+      averageDealSize: 0,
+      conversionRate: 0,
+      averageSalesCycle: 0,
+      stageMetrics: {},
+      trends: {
+        leadsThisWeek: 0,
+        leadsLastWeek: 0,
+        valueThisWeek: 0,
+        valueLastWeek: 0,
+        conversionThisWeek: 0,
+        conversionLastWeek: 0
+      },
+      forecasting: {
+        projectedRevenue: 0,
+        projectedClosedDeals: 0,
+        confidence: 0.75
       }
     }
   }

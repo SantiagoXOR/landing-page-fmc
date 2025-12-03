@@ -60,7 +60,7 @@ const extractCustomFieldValue = (value: any): string => {
   if (value === null || value === undefined) return 'No especificado'
   
   // Si es un objeto Manychat con estructura {id, name, type, description, value}
-  if (typeof value === 'object' && 'value' in value) {
+  if (typeof value === 'object' && value !== null && 'value' in value) {
     return String(value.value || 'No especificado')
   }
   
@@ -135,7 +135,7 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
       
       Object.entries(parsed).forEach(([key, value]) => {
         // Si el valor es un objeto con estructura Manychat, extraer solo el valor
-        if (value && typeof value === 'object' && 'value' in value) {
+        if (value && typeof value === 'object' && value !== null && 'value' in value) {
           normalized[key] = value.value
         } else {
           normalized[key] = value

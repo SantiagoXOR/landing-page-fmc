@@ -57,7 +57,7 @@ export interface PipelineLead {
   stageId: string
   stageEntryDate: Date
   lastActivity?: Date
-  score?: number
+  score?: number // Score basado en tiempo en etapa (0-100)
   tags?: string[]
   customFields?: Record<string, any>
   activities?: LeadActivity[]
@@ -67,6 +67,11 @@ export interface PipelineLead {
   priority: 'low' | 'medium' | 'high' | 'urgent'
   value?: number // valor estimado del lead
   probability?: number // probabilidad de conversión (0-100)
+  // Campos adicionales de scoring por tiempo
+  timeInStage?: number // Días que lleva en la etapa actual
+  urgency?: 'low' | 'medium' | 'high' | 'critical' // Nivel de urgencia
+  scoreColor?: string // Color para visualización (hex)
+  scoreLabel?: string // Etiqueta descriptiva del score
 }
 
 export interface LeadActivity {

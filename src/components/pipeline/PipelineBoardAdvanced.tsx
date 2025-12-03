@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { DndContext, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import { usePipelineDragDrop } from '@/hooks/usePipelineDragDrop'
 import { PipelineStage, PipelineLead, DragDropResult, StageTransition } from '@/types/pipeline'
 import { LoadingSpinner } from '@/components/ui/loading-states'
 import { toast } from 'sonner'
+import { PipelineFiltersDrawer, PipelineFilters } from '@/components/pipeline/PipelineFiltersDrawer'
 
 interface PipelineBoardAdvancedProps {
   stages: PipelineStage[]
@@ -45,7 +46,28 @@ export function PipelineBoardAdvanced({
   className = ''
 }: PipelineBoardAdvancedProps) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [filters, setFilters] = useState<PipelineFilters>({})
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounce de búsqueda
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setFilters(prev => ({ ...prev, search: searchTerm || undefined }))
+    }, 300)
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchTerm])
 
   // Log para debugging
   console.log('PipelineBoardAdvanced render:', {
@@ -83,11 +105,20 @@ export function PipelineBoardAdvanced({
   // Log leads agrupados por etapa
   console.log('Leads by stage:', leadsByStage)
 
-  // Filtrar leads según búsqueda
+  // Filtrar leads según búsqueda y filtros avanzados
   const filteredLeadsByStage = useCallback(() => {
     const leadsByStageData = leadsByStage // leadsByStage ya es un objeto, no una función
     
-    if (!searchTerm && selectedFilters.length === 0) {
+    const hasFilters = searchTerm || 
+      (filters.tags && filters.tags.length > 0) ||
+      (filters.stages && filters.stages.length > 0) ||
+      (filters.priority && filters.priority.length > 0) ||
+      filters.origen ||
+      filters.timeInStage ||
+      filters.score ||
+      filters.value
+
+    if (!hasFilters && selectedFilters.length === 0) {
       return leadsByStageData
     }
 
@@ -95,19 +126,75 @@ export function PipelineBoardAdvanced({
     
     Object.entries(leadsByStageData).forEach(([stageId, stageLeads]) => {
       filtered[stageId] = stageLeads.filter(lead => {
-        // Filtro de búsqueda
-        if (searchTerm) {
-          const searchLower = searchTerm.toLowerCase()
+        // Filtro de búsqueda (usar debounced)
+        const searchValue = filters.search || debouncedSearchTerm
+        if (searchValue) {
+          const searchLower = searchValue.toLowerCase()
           const matchesSearch = 
             lead.nombre.toLowerCase().includes(searchLower) ||
-            lead.telefono.includes(searchTerm) ||
+            lead.telefono.includes(searchValue) ||
             lead.email?.toLowerCase().includes(searchLower) ||
             lead.origen.toLowerCase().includes(searchLower)
           
           if (!matchesSearch) return false
         }
 
-        // Filtros adicionales
+        // Filtro por tags
+        if (filters.tags && filters.tags.length > 0) {
+          const leadTags = lead.tags || []
+          const hasMatchingTag = filters.tags.some(tagId => 
+            leadTags.some(tag => tag === tagId || tag.includes(tagId))
+          )
+          if (!hasMatchingTag) return false
+        }
+
+        // Filtro por etapas
+        if (filters.stages && filters.stages.length > 0) {
+          if (!filters.stages.includes(lead.stageId)) return false
+        }
+
+        // Filtro por prioridad
+        if (filters.priority && filters.priority.length > 0) {
+          if (!filters.priority.includes(lead.priority)) return false
+        }
+
+        // Filtro por origen
+        if (filters.origen && filters.origen.length > 0) {
+          if (!filters.origen.includes(lead.origen)) return false
+        }
+
+        // Filtro por tiempo en etapa
+        if (filters.timeInStage) {
+          const daysInStage = lead.timeInStage || 0
+          if (filters.timeInStage.min !== undefined && daysInStage < filters.timeInStage.min) {
+            return false
+          }
+          if (filters.timeInStage.max !== undefined && daysInStage > filters.timeInStage.max) {
+            return false
+          }
+        }
+
+        // Filtro por score
+        if (filters.score && lead.score !== undefined) {
+          if (filters.score.min !== undefined && lead.score < filters.score.min) {
+            return false
+          }
+          if (filters.score.max !== undefined && lead.score > filters.score.max) {
+            return false
+          }
+        }
+
+        // Filtro por valor
+        if (filters.value && lead.value !== undefined) {
+          if (filters.value.min !== undefined && lead.value < filters.value.min) {
+            return false
+          }
+          if (filters.value.max !== undefined && lead.value > filters.value.max) {
+            return false
+          }
+        }
+
+        // Filtros adicionales legacy
         if (selectedFilters.length > 0) {
           if (selectedFilters.includes('high-priority') && 
               !['high', 'urgent'].includes(lead.priority)) {
@@ -130,7 +217,7 @@ export function PipelineBoardAdvanced({
     })
 
     return filtered
-  }, [leadsByStage, searchTerm, selectedFilters])
+  }, [leadsByStage, debouncedSearchTerm, selectedFilters, filters])
 
   // Obtener color de prioridad
   const getPriorityColor = (priority: string) => {
@@ -206,31 +293,67 @@ export function PipelineBoardAdvanced({
             />
           </div>
           
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filtros
-          </Button>
+          <PipelineFiltersDrawer
+            filters={filters}
+            onFiltersChange={setFilters}
+            availableStages={stages.map(s => ({ id: s.id, name: s.name }))}
+          />
         </div>
       </div>
 
-      {/* Mensaje cuando no hay leads */}
+      {/* Mensaje cuando no hay leads - Mejorado */}
       {!hasAnyLeads && stages.length > 0 && (
-        <Card className="bg-gray-50 border-gray-200">
-          <CardContent className="p-8">
-            <div className="text-center">
-              <Users className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No hay contactos en el pipeline
+        <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
+          <CardContent className="p-12">
+            <div className="text-center max-w-2xl mx-auto">
+              <div className="mb-6">
+                <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-blue-100 mb-4">
+                  <Users className="h-12 w-12 text-blue-600" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                Tu pipeline está vacío
               </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Comienza agregando contactos desde la página de Leads o crea un nuevo contacto directamente.
+              <p className="text-base text-gray-700 mb-2">
+                El pipeline de ventas te ayuda a gestionar tus contactos a través de todo el proceso de ventas.
               </p>
-              <div className="flex gap-2 justify-center">
-                <Button asChild>
-                  <a href="/leads">Ver Leads</a>
+              <p className="text-sm text-gray-600 mb-8">
+                Arrastra y suelta contactos entre etapas para organizarlos visualmente y hacer seguimiento de su progreso.
+              </p>
+              
+              <div className="bg-white rounded-lg p-6 mb-8 border border-gray-200 shadow-sm">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <HelpCircle className="h-5 w-5 text-blue-600" />
+                  ¿Cómo funciona?
+                </h4>
+                <ul className="text-left text-sm text-gray-600 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">1.</span>
+                    <span>Agrega contactos desde la página de <strong>Leads</strong> o crea uno nuevo</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">2.</span>
+                    <span>Arrastra los contactos entre las diferentes etapas del proceso</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">3.</span>
+                    <span>Visualiza el progreso y métricas en tiempo real</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3 justify-center">
+                <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700">
+                  <a href="/leads">
+                    <Users className="h-4 w-4 mr-2" />
+                    Ver Todos los Leads
+                  </a>
                 </Button>
-                <Button asChild variant="outline">
-                  <a href="/leads/new">Nuevo Contacto</a>
+                <Button asChild variant="outline" size="lg">
+                  <a href="/leads/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Nuevo Contacto
+                  </a>
                 </Button>
               </div>
             </div>
@@ -456,7 +579,22 @@ function LeadCard({
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm truncate">{lead.nombre}</h4>
+          <div className="flex items-center gap-2">
+            <h4 className="font-medium text-sm truncate">{lead.nombre}</h4>
+            {/* Badge de urgencia si es alta o crítica */}
+            {(lead.urgency === 'high' || lead.urgency === 'critical') && (
+              <Badge 
+                variant="destructive" 
+                className="text-xs px-1.5 py-0"
+                style={{ 
+                  backgroundColor: lead.scoreColor || '#EF4444',
+                  borderColor: lead.scoreColor || '#EF4444'
+                }}
+              >
+                {lead.urgency === 'critical' ? 'Urgente' : 'Alerta'}
+              </Badge>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground truncate">{lead.telefono}</p>
         </div>
 
@@ -493,17 +631,41 @@ function LeadCard({
           <span>{formatRelativeDate(lead.stageEntryDate)}</span>
         </div>
 
-        {lead.score && (
+        {/* Mostrar tiempo en etapa si está disponible */}
+        {lead.timeInStage !== undefined && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Tiempo:</span>
+            <span className="font-medium">
+              {lead.timeInStage === 0 
+                ? 'Hoy' 
+                : lead.timeInStage === 1 
+                ? '1 día' 
+                : `${lead.timeInStage} días`}
+            </span>
+          </div>
+        )}
+
+        {/* Score visual mejorado con color según urgencia */}
+        {lead.score !== undefined && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Score:</span>
-            <div className="flex items-center gap-1">
-              <div className="w-12 h-1 bg-gray-200 rounded-full overflow-hidden">
+            <div className="flex items-center gap-1.5">
+              <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue-500 transition-all"
-                  style={{ width: `${Math.min(lead.score, 100)}%` }}
+                  className="h-full transition-all"
+                  style={{ 
+                    width: `${Math.min(lead.score, 100)}%`,
+                    backgroundColor: lead.scoreColor || '#3B82F6'
+                  }}
                 />
               </div>
-              <span className="text-xs">{lead.score}</span>
+              <span 
+                className="text-xs font-medium"
+                style={{ color: lead.scoreColor || '#6B7280' }}
+                title={lead.scoreLabel || `Score: ${lead.score}`}
+              >
+                {lead.score}
+              </span>
             </div>
           </div>
         )}
@@ -511,14 +673,23 @@ function LeadCard({
 
       {lead.tags && lead.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {lead.tags.slice(0, 2).map((tag, index) => (
-            <Badge key={index} variant="secondary" className="text-xs">
+          {lead.tags.slice(0, 3).map((tag, index) => (
+            <Badge 
+              key={index} 
+              variant="secondary" 
+              className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
+              title={`Click para filtrar por: ${tag}`}
+            >
               {tag}
             </Badge>
           ))}
-          {lead.tags.length > 2 && (
-            <Badge variant="secondary" className="text-xs">
-              +{lead.tags.length - 2}
+          {lead.tags.length > 3 && (
+            <Badge 
+              variant="secondary" 
+              className="text-xs"
+              title={`${lead.tags.slice(3).join(', ')}`}
+            >
+              +{lead.tags.length - 3}
             </Badge>
           )}
         </div>

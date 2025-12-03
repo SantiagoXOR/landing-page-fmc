@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { PipelineLead } from '@/types/pipeline'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
 import { pipelineService } from '@/server/services/pipeline-service'
+import { calculateTimeBasedScore } from '@/server/services/pipeline-scoring-service'
 
 // Mapeo de pipeline_stage (enum de DB) a stageId (string usado en componente)
 const pipelineStageToStageId: Record<string, string> = {
@@ -116,6 +117,19 @@ function mapLeadToPipelineLead(
     }
   }
 
+  // Calcular score basado en tiempo en etapa
+  const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
+  
+  // Determinar prioridad basada en score de tiempo
+  let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium'
+  if (timeScore.urgency === 'critical') {
+    priority = 'urgent'
+  } else if (timeScore.urgency === 'high') {
+    priority = 'high'
+  } else if (timeScore.urgency === 'low') {
+    priority = 'low'
+  }
+
   return {
     id: lead.id,
     nombre: lead.nombre,
@@ -126,17 +140,22 @@ function mapLeadToPipelineLead(
     stageId,
     stageEntryDate,
     lastActivity,
-    score: undefined, // Se puede calcular después
+    score: timeScore.score, // Score basado en tiempo en etapa
     tags: Array.isArray(tags) ? tags : [],
     customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
     notes: lead.notas || undefined,
     assignedTo: assignedTo || undefined,
-    priority: 'medium' as const, // Se puede calcular basado en score o valor
+    priority,
     value: lead.monto || undefined,
     probability: getProbabilityForStage(stageId),
     activities: [],
-    tasks: []
-  }
+    tasks: [],
+    // Agregar información adicional de scoring
+    timeInStage: timeScore.daysInStage,
+    urgency: timeScore.urgency,
+    scoreColor: timeScore.color,
+    scoreLabel: timeScore.label
+  } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string }
 }
 
 // Datos de ejemplo eliminados - Ahora se usan datos reales de la base de datos
@@ -173,6 +192,11 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority')
     const assignedTo = searchParams.get('assignedTo')
     const search = searchParams.get('search')
+    const tags = searchParams.get('tags') // Comma-separated tag IDs
+    const timeInStageMin = searchParams.get('timeInStageMin')
+    const timeInStageMax = searchParams.get('timeInStageMax')
+    const scoreMin = searchParams.get('scoreMin')
+    const scoreMax = searchParams.get('scoreMax')
 
     // Construir filtros para la consulta de leads
     // Para el pipeline, necesitamos obtener todos los leads sin límite estricto
@@ -262,6 +286,37 @@ export async function GET(request: NextRequest) {
 
     if (assignedTo) {
       pipelineLeads = pipelineLeads.filter(lead => lead.assignedTo === assignedTo)
+    }
+
+    // Filtro por tags
+    if (tags) {
+      const tagIds = tags.split(',').map(t => t.trim())
+      pipelineLeads = pipelineLeads.filter(lead => {
+        const leadTags = lead.tags || []
+        return tagIds.some(tagId => 
+          leadTags.some(tag => tag === tagId || tag.includes(tagId))
+        )
+      })
+    }
+
+    // Filtro por tiempo en etapa (ya calculado en el score)
+    if (timeInStageMin || timeInStageMax) {
+      pipelineLeads = pipelineLeads.filter(lead => {
+        const daysInStage = lead.timeInStage || 0
+        if (timeInStageMin && daysInStage < parseInt(timeInStageMin)) return false
+        if (timeInStageMax && daysInStage > parseInt(timeInStageMax)) return false
+        return true
+      })
+    }
+
+    // Filtro por score
+    if (scoreMin || scoreMax) {
+      pipelineLeads = pipelineLeads.filter(lead => {
+        const score = lead.score || 0
+        if (scoreMin && score < parseInt(scoreMin)) return false
+        if (scoreMax && score > parseInt(scoreMax)) return false
+        return true
+      })
     }
 
     // Agrupar leads por estado original y stageId para debugging

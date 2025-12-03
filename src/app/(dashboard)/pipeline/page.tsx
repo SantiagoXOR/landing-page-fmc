@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/Header'
 import {
   TrendingUp,
+  TrendingDown,
+  ArrowRight,
   DollarSign,
   Users,
   Clock,
@@ -18,13 +20,15 @@ import {
   Plus,
   Filter,
   Download,
-  AlertCircle
+  AlertCircle,
+  HelpCircle
 } from 'lucide-react'
 import { PipelineBoardAdvanced } from '@/components/pipeline/PipelineBoardAdvanced'
 import { LoadingSpinner } from '@/components/ui/loading-states'
 import { toast } from 'sonner'
 import { pipelineService } from '@/services/pipeline-service'
 import { PipelineStage, PipelineLead, DragDropResult } from '@/types/pipeline'
+import { usePipelineMetrics, formatChange, getTrendColor, getTrendIcon } from '@/hooks/usePipelineMetrics'
 
 function PipelinePage() {
   const { data: session } = useSession()
@@ -34,6 +38,9 @@ function PipelinePage() {
   const [error, setError] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<any>(null)
   const [activeTab, setActiveTab] = useState('board')
+  
+  // Hook para métricas reales
+  const { metrics: realMetrics, loading: metricsLoading, error: metricsError } = usePipelineMetrics('month')
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -41,6 +48,17 @@ function PipelinePage() {
       loadPipelineData()
     }
   }, [session])
+
+  // Mapeo entre stageId de leads y IDs de stages del API
+  const stageIdMapping: Record<string, string> = {
+    'nuevo': 'cliente-nuevo',
+    'contactado': 'consultando-credito',
+    'calificado': 'solicitando-docs',
+    'propuesta': 'listo-analisis',
+    'negociacion': 'preaprobado',
+    'cerrado-ganado': 'cerrado-ganado',
+    'cerrado-perdido': 'rechazado'
+  }
 
   const loadPipelineData = async () => {
     try {
@@ -52,13 +70,6 @@ function PipelinePage() {
         pipelineService.getStages(),
         pipelineService.getLeads()
       ])
-
-      console.log('Pipeline data loaded:', {
-        stagesCount: stagesData?.length || 0,
-        leadsCount: leadsData?.length || 0,
-        stages: stagesData?.map(s => ({ id: s.id, name: s.name })),
-        leadsSample: leadsData?.slice(0, 3).map(l => ({ id: l.id, nombre: l.nombre, stageId: l.stageId }))
-      })
 
       // Validar que existan stages
       if (!stagesData || stagesData.length === 0) {
@@ -74,12 +85,25 @@ function PipelinePage() {
         }
       }
 
+      // Mapear stageId de leads a IDs de stages
+      const mappedLeads = leadsData.map(lead => {
+        const mappedStageId = stageIdMapping[lead.stageId] || lead.stageId
+        // Buscar el stage correspondiente
+        const matchingStage = stagesData.find(s => s.id === mappedStageId)
+        if (matchingStage) {
+          return { ...lead, stageId: matchingStage.id }
+        }
+        return lead
+      })
+
       setStages(stagesData)
-      setLeads(leadsData)
+      setLeads(mappedLeads)
       
-      console.log('Pipeline state updated:', {
-        stagesSet: stagesData.length,
-        leadsSet: leadsData.length
+      console.log('Pipeline data loaded:', {
+        stagesCount: stagesData.length,
+        leadsCount: mappedLeads.length,
+        stageMapping: Object.entries(stageIdMapping),
+        unmatchedLeads: mappedLeads.filter(l => !stagesData.some(s => s.id === l.stageId)).length
       })
 
       // Cargar métricas
@@ -164,8 +188,42 @@ function PipelinePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size="lg" />
+      <div className="min-h-screen bg-gray-50">
+        <Header
+          title="Pipeline de Ventas"
+          subtitle="Gestiona y visualiza tu proceso de ventas completo"
+          showNewButton={true}
+          newButtonText="Nuevo Lead"
+          newButtonHref="/leads/new"
+          showExportButton={true}
+        />
+        <div className="p-6 space-y-6">
+          {/* Skeleton loaders para métricas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+                  <div className="h-4 w-4 bg-gray-200 rounded"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-32"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Skeleton loader para pipeline */}
+          <Card className="animate-pulse">
+            <CardContent className="p-12">
+              <div className="flex items-center justify-center">
+                <LoadingSpinner size="lg" />
+                <span className="ml-4 text-gray-600">Cargando pipeline...</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -213,10 +271,22 @@ function PipelinePage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{quickMetrics.totalLeads}</div>
-            <p className="text-xs text-muted-foreground">
-              +12% desde el mes pasado
-            </p>
+            <div className="text-2xl font-bold">
+              {realMetrics ? realMetrics.totalLeads.current : quickMetrics.totalLeads}
+            </div>
+            {realMetrics && (
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.totalLeads.trend)}`}>
+                {realMetrics.totalLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.totalLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.totalLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>{formatChange(realMetrics.totalLeads.change)} desde el mes pasado</span>
+              </div>
+            )}
+            {!realMetrics && (
+              <p className="text-xs text-muted-foreground">
+                Cargando comparación...
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -227,11 +297,21 @@ function PipelinePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(quickMetrics.totalValue)}
+              {formatCurrency(realMetrics ? realMetrics.totalValue.current : quickMetrics.totalValue)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              +8% desde el mes pasado
-            </p>
+            {realMetrics && (
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.totalValue.trend)}`}>
+                {realMetrics.totalValue.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.totalValue.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.totalValue.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>{formatChange(realMetrics.totalValue.change)} desde el mes pasado</span>
+              </div>
+            )}
+            {!realMetrics && (
+              <p className="text-xs text-muted-foreground">
+                Cargando comparación...
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -242,37 +322,71 @@ function PipelinePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(quickMetrics.averageDealSize)}
+              {formatCurrency(realMetrics ? realMetrics.averageDealSize.current : quickMetrics.averageDealSize)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              +5% desde el mes pasado
-            </p>
+            {realMetrics && (
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.averageDealSize.trend)}`}>
+                {realMetrics.averageDealSize.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.averageDealSize.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.averageDealSize.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>{formatChange(realMetrics.averageDealSize.change)} desde el mes pasado</span>
+              </div>
+            )}
+            {!realMetrics && (
+              <p className="text-xs text-muted-foreground">
+                Cargando comparación...
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alta Prioridad</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Leads Urgentes</CardTitle>
+            <AlertCircle className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{quickMetrics.highPriorityLeads}</div>
-            <p className="text-xs text-muted-foreground">
-              Requieren atención inmediata
-            </p>
+            <div className="text-2xl font-bold text-orange-600">
+              {realMetrics ? realMetrics.urgentLeads.current : quickMetrics.highPriorityLeads}
+            </div>
+            {realMetrics && (
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.urgentLeads.trend)}`}>
+                {realMetrics.urgentLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.urgentLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.urgentLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>Requieren atención inmediata</span>
+              </div>
+            )}
+            {!realMetrics && (
+              <p className="text-xs text-muted-foreground">
+                Requieren atención inmediata
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Con Tareas</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Leads Estancados</CardTitle>
+            <Clock className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{quickMetrics.leadsWithTasks}</div>
-            <p className="text-xs text-muted-foreground">
-              Leads con actividades pendientes
-            </p>
+            <div className="text-2xl font-bold text-red-600">
+              {realMetrics ? realMetrics.stalledLeads.current : 0}
+            </div>
+            {realMetrics && (
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.stalledLeads.trend)}`}>
+                {realMetrics.stalledLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.stalledLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.stalledLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>{formatChange(realMetrics.stalledLeads.change)} desde el mes pasado</span>
+              </div>
+            )}
+            {!realMetrics && (
+              <p className="text-xs text-muted-foreground">
+                15+ días sin movimiento
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

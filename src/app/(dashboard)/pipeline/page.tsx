@@ -26,6 +26,7 @@ import {
   XCircle
 } from 'lucide-react'
 import { PipelineBoardAdvanced } from '@/components/pipeline/PipelineBoardAdvanced'
+import { LeadDetailModal } from '@/components/pipeline/LeadDetailModal'
 import { LoadingSpinner } from '@/components/ui/loading-states'
 import { toast } from 'sonner'
 import { pipelineService } from '@/services/pipeline-service'
@@ -40,6 +41,8 @@ function PipelinePage() {
   const [error, setError] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<any>(null)
   const [activeTab, setActiveTab] = useState('board')
+  const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   
   // Hook para métricas reales
   const { metrics: realMetrics, loading: metricsLoading, error: metricsError } = usePipelineMetrics('month')
@@ -160,8 +163,8 @@ function PipelinePage() {
 
   // Manejar click en lead
   const handleLeadClick = (lead: PipelineLead) => {
-    // En una implementación real, abriríamos un modal o navegaríamos a la página del lead
-    toast.info(`Abriendo detalles de ${lead.nombre}`)
+    setSelectedLead(lead)
+    setIsModalOpen(true)
   }
 
   // Manejar click en etapa
@@ -478,6 +481,13 @@ function PipelinePage() {
         </TabsContent>
       </Tabs>
       </div>
+
+      {/* Modal de detalles del lead */}
+      <LeadDetailModal
+        lead={selectedLead}
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+      />
     </div>
   )
 }

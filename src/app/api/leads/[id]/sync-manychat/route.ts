@@ -36,6 +36,14 @@ export async function POST(
       )
     }
 
+    // Verificar que supabase.client esté disponible
+    if (!supabase.client) {
+      return NextResponse.json(
+        { error: 'Base de datos no disponible' },
+        { status: 500 }
+      )
+    }
+
     // Obtener el lead actual
     const { data: lead, error: leadError } = await supabase.client
       .from('Lead')

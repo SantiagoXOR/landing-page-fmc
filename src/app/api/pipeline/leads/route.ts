@@ -11,13 +11,21 @@ import { calculateTimeBasedScore } from '@/server/services/pipeline-scoring-serv
 // Mapeo de pipeline_stage (enum de DB) a stageId (string usado en componente)
 const pipelineStageToStageId: Record<string, string> = {
   'LEAD_NUEVO': 'nuevo',
+  'CLIENTE_NUEVO': 'nuevo',
   'CONTACTO_INICIAL': 'contactado',
+  'CONSULTANDO_CREDITO': 'contactado',
   'CALIFICACION': 'calificado',
+  'SOLICITANDO_DOCS': 'calificado',
   'PRESENTACION': 'calificado', // PRESENTACION se mapea a calificado ya que no hay etapa específica en el componente
+  'LISTO_ANALISIS': 'propuesta',
   'PROPUESTA': 'propuesta',
+  'PREAPROBADO': 'negociacion',
   'NEGOCIACION': 'negociacion',
+  'APROBADO': 'negociacion',
   'CIERRE_GANADO': 'cerrado-ganado',
+  'CERRADO_GANADO': 'cerrado-ganado',
   'CIERRE_PERDIDO': 'cerrado-perdido',
+  'RECHAZADO': 'cerrado-perdido',
   'SEGUIMIENTO': 'cerrado-ganado' // SEGUIMIENTO se mapea a cerrado-ganado ya que no hay etapa específica
 }
 
@@ -64,6 +72,8 @@ const tagToStageId: Record<string, string> = {
   'cerrado-ganado': 'cerrado-ganado',
   'venta-concretada': 'cerrado-ganado',
   'rechazado': 'cerrado-perdido', // Se mapeará a 'rechazado'
+  'credito-rechazado': 'cerrado-perdido', // Se mapeará a 'rechazado'
+  'rechazado-credito': 'cerrado-perdido',
   'perdido': 'cerrado-perdido',
   'nuevo-lead': 'nuevo', // Se mapeará a 'cliente-nuevo'
   'nuevo': 'nuevo',

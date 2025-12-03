@@ -16,8 +16,8 @@ interface MetricsComparison {
 
 interface PipelineMetricsResponse {
   totalLeads: MetricsComparison
-  totalValue: MetricsComparison
-  averageDealSize: MetricsComparison
+  approvedLeads: MetricsComparison
+  rejectedLeads: MetricsComparison
   highPriorityLeads: MetricsComparison
   leadsWithTasks: MetricsComparison
   urgentLeads: {
@@ -48,8 +48,8 @@ async function calculatePeriodMetrics(
   dateTo: Date
 ): Promise<{
   totalLeads: number
-  totalValue: number
-  averageDealSize: number
+  approvedLeads: number
+  rejectedLeads: number
   highPriorityLeads: number
   leadsWithTasks: number
   urgentLeads: number
@@ -57,40 +57,54 @@ async function calculatePeriodMetrics(
   stalledLeads: number
 }> {
   try {
-    // Obtener todos los leads del período
-    const { leads } = await supabaseLeadService.getLeads({
+    // Obtener TODOS los leads (no solo del período para totalLeads)
+    const { leads: allLeads } = await supabaseLeadService.getLeads({
       limit: 10000,
       offset: 0
     })
 
-    // Filtrar leads por fecha de creación
-    const periodLeads = leads.filter(lead => {
+    // Filtrar leads por fecha de creación para métricas del período
+    const periodLeads = allLeads.filter(lead => {
       if (!lead.createdAt) return false
       const leadDate = new Date(lead.createdAt)
       return leadDate >= dateFrom && leadDate <= dateTo
     })
 
-    const leadIds = periodLeads
+    const allLeadIds = allLeads
       .map(l => l.id)
       .filter((id): id is string => id !== undefined)
 
-    // Obtener información del pipeline
-    const pipelineMap = await supabaseLeadService.getLeadPipelines(leadIds)
+    // Obtener información del pipeline para todos los leads
+    const pipelineMap = await supabaseLeadService.getLeadPipelines(allLeadIds)
 
     // Mapeo de stages
     const pipelineStageToStageId: Record<string, string> = {
       'LEAD_NUEVO': 'nuevo',
+      'CLIENTE_NUEVO': 'nuevo',
       'CONTACTO_INICIAL': 'contactado',
+      'CONSULTANDO_CREDITO': 'contactado',
       'CALIFICACION': 'calificado',
+      'SOLICITANDO_DOCS': 'calificado',
       'PRESENTACION': 'calificado',
+      'LISTO_ANALISIS': 'propuesta',
       'PROPUESTA': 'propuesta',
+      'PREAPROBADO': 'negociacion',
       'NEGOCIACION': 'negociacion',
+      'APROBADO': 'negociacion',
       'CIERRE_GANADO': 'cerrado-ganado',
+      'CERRADO_GANADO': 'cerrado-ganado',
       'CIERRE_PERDIDO': 'cerrado-perdido',
+      'RECHAZADO': 'cerrado-perdido',
       'SEGUIMIENTO': 'cerrado-ganado'
     }
 
-    let totalValue = 0
+    // Tags que indican aprobación
+    const approvedTags = ['aprobado', 'preaprobado', 'pre-aprobado', 'cerrado-ganado', 'venta-concretada']
+    // Tags que indican rechazo
+    const rejectedTags = ['rechazado', 'credito-rechazado', 'rechazado-credito', 'perdido', 'cerrado-perdido']
+
+    let approvedCount = 0
+    let rejectedCount = 0
     let highPriorityCount = 0
     let leadsWithTasksCount = 0
     let urgentCount = 0
@@ -98,14 +112,52 @@ async function calculatePeriodMetrics(
     let stalledCount = 0
     let leadsWithTimeData = 0
 
+    // Contar aprobados y rechazados de TODOS los leads
+    for (const lead of allLeads) {
+      const leadId = lead.id as string
+      const pipelineInfo = pipelineMap.get(leadId)
+      
+      // Parsear tags
+      const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
+      const tagsArray = Array.isArray(tags) ? tags : []
+      const tagsLower = tagsArray.map(t => String(t).toLowerCase().trim())
+
+      // Determinar si está aprobado o rechazado
+      let isApproved = false
+      let isRejected = false
+
+      // Primero verificar por etapa del pipeline
+      if (pipelineInfo) {
+        const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || ''
+        if (stageId === 'cerrado-ganado' || pipelineInfo.current_stage === 'APROBADO' || pipelineInfo.current_stage === 'PREAPROBADO' || pipelineInfo.current_stage === 'CERRADO_GANADO') {
+          isApproved = true
+        } else if (stageId === 'cerrado-perdido' || pipelineInfo.current_stage === 'RECHAZADO' || pipelineInfo.current_stage === 'CIERRE_PERDIDO') {
+          isRejected = true
+        }
+      }
+
+      // Luego verificar por tags
+      if (!isApproved && !isRejected) {
+        for (const tag of tagsLower) {
+          if (approvedTags.includes(tag)) {
+            isApproved = true
+            break
+          }
+          if (rejectedTags.includes(tag)) {
+            isRejected = true
+            break
+          }
+        }
+      }
+
+      if (isApproved) approvedCount++
+      if (isRejected) rejectedCount++
+    }
+
+    // Calcular métricas del período para urgentes y estancados
     for (const lead of periodLeads) {
       const leadId = lead.id as string
       const pipelineInfo = pipelineMap.get(leadId)
-
-      // Calcular valor total
-      if (lead.monto) {
-        totalValue += lead.monto
-      }
 
       // Calcular score y urgencia
       if (pipelineInfo) {
@@ -134,13 +186,12 @@ async function calculatePeriodMetrics(
       }
     }
 
-    const averageDealSize = periodLeads.length > 0 ? totalValue / periodLeads.length : 0
     const averageTimeInStage = leadsWithTimeData > 0 ? totalTimeInStage / leadsWithTimeData : 0
 
     return {
-      totalLeads: periodLeads.length,
-      totalValue,
-      averageDealSize,
+      totalLeads: allLeads.length, // Total de TODOS los leads
+      approvedLeads: approvedCount,
+      rejectedLeads: rejectedCount,
       highPriorityLeads: highPriorityCount,
       leadsWithTasks: leadsWithTasksCount, // TODO: Implementar cuando haya sistema de tareas
       urgentLeads: urgentCount,
@@ -265,10 +316,38 @@ export async function GET(request: NextRequest) {
     ])
 
     // Construir respuesta con comparaciones
+    // Nota: totalLeads, approvedLeads y rejectedLeads son totales absolutos, no del período
     const response: PipelineMetricsResponse = {
-      totalLeads: calculateComparison(currentMetrics.totalLeads, previousMetrics.totalLeads),
-      totalValue: calculateComparison(currentMetrics.totalValue, previousMetrics.totalValue),
-      averageDealSize: calculateComparison(currentMetrics.averageDealSize, previousMetrics.averageDealSize),
+      totalLeads: {
+        current: currentMetrics.totalLeads,
+        previous: previousMetrics.totalLeads,
+        change: previousMetrics.totalLeads > 0 
+          ? ((currentMetrics.totalLeads - previousMetrics.totalLeads) / previousMetrics.totalLeads) * 100 
+          : currentMetrics.totalLeads > 0 ? 100 : 0,
+        trend: currentMetrics.totalLeads > previousMetrics.totalLeads ? 'up' 
+          : currentMetrics.totalLeads < previousMetrics.totalLeads ? 'down' 
+          : 'stable'
+      },
+      approvedLeads: {
+        current: currentMetrics.approvedLeads,
+        previous: previousMetrics.approvedLeads,
+        change: previousMetrics.approvedLeads > 0 
+          ? ((currentMetrics.approvedLeads - previousMetrics.approvedLeads) / previousMetrics.approvedLeads) * 100 
+          : currentMetrics.approvedLeads > 0 ? 100 : 0,
+        trend: currentMetrics.approvedLeads > previousMetrics.approvedLeads ? 'up' 
+          : currentMetrics.approvedLeads < previousMetrics.approvedLeads ? 'down' 
+          : 'stable'
+      },
+      rejectedLeads: {
+        current: currentMetrics.rejectedLeads,
+        previous: previousMetrics.rejectedLeads,
+        change: previousMetrics.rejectedLeads > 0 
+          ? ((currentMetrics.rejectedLeads - previousMetrics.rejectedLeads) / previousMetrics.rejectedLeads) * 100 
+          : currentMetrics.rejectedLeads > 0 ? 100 : 0,
+        trend: currentMetrics.rejectedLeads > previousMetrics.rejectedLeads ? 'up' 
+          : currentMetrics.rejectedLeads < previousMetrics.rejectedLeads ? 'down' 
+          : 'stable'
+      },
       highPriorityLeads: calculateComparison(currentMetrics.highPriorityLeads, previousMetrics.highPriorityLeads),
       leadsWithTasks: calculateComparison(currentMetrics.leadsWithTasks, previousMetrics.leadsWithTasks),
       urgentLeads: calculateComparison(currentMetrics.urgentLeads, previousMetrics.urgentLeads),

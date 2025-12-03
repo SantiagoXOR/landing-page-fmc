@@ -21,7 +21,9 @@ import {
   Filter,
   Download,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
 import { PipelineBoardAdvanced } from '@/components/pipeline/PipelineBoardAdvanced'
 import { LoadingSpinner } from '@/components/ui/loading-states'
@@ -299,19 +301,19 @@ function PipelinePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Aprobados</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(realMetrics ? realMetrics.totalValue.current : quickMetrics.totalValue)}
+            <div className="text-2xl font-bold text-green-600">
+              {realMetrics ? realMetrics.approvedLeads.current : 0}
             </div>
             {realMetrics && (
-              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.totalValue.trend)}`}>
-                {realMetrics.totalValue.trend === 'up' && <TrendingUp className="h-3 w-3" />}
-                {realMetrics.totalValue.trend === 'down' && <TrendingDown className="h-3 w-3" />}
-                {realMetrics.totalValue.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChange(realMetrics.totalValue.change)} desde el mes pasado</span>
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.approvedLeads.trend)}`}>
+                {realMetrics.approvedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.approvedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.approvedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>{formatChange(realMetrics.approvedLeads.change)} desde el mes pasado</span>
               </div>
             )}
             {!realMetrics && (
@@ -324,19 +326,19 @@ function PipelinePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ticket Promedio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Rechazados</CardTitle>
+            <XCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(realMetrics ? realMetrics.averageDealSize.current : quickMetrics.averageDealSize)}
+            <div className="text-2xl font-bold text-red-600">
+              {realMetrics ? realMetrics.rejectedLeads.current : 0}
             </div>
             {realMetrics && (
-              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.averageDealSize.trend)}`}>
-                {realMetrics.averageDealSize.trend === 'up' && <TrendingUp className="h-3 w-3" />}
-                {realMetrics.averageDealSize.trend === 'down' && <TrendingDown className="h-3 w-3" />}
-                {realMetrics.averageDealSize.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChange(realMetrics.averageDealSize.change)} desde el mes pasado</span>
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.rejectedLeads.trend)}`}>
+                {realMetrics.rejectedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.rejectedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.rejectedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>{formatChange(realMetrics.rejectedLeads.change)} desde el mes pasado</span>
               </div>
             )}
             {!realMetrics && (

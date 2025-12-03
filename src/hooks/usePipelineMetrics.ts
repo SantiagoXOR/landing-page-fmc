@@ -9,8 +9,8 @@ export interface MetricsComparison {
 
 export interface PipelineMetricsData {
   totalLeads: MetricsComparison
-  totalValue: MetricsComparison
-  averageDealSize: MetricsComparison
+  approvedLeads: MetricsComparison
+  rejectedLeads: MetricsComparison
   highPriorityLeads: MetricsComparison
   leadsWithTasks: MetricsComparison
   urgentLeads: MetricsComparison

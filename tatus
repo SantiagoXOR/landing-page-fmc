@@ -1,0 +1,21 @@
+warning: in the working copy of 'src/app/api/pipeline/leads/[leadId]/move/route.ts', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/app/api/pipeline/leads/[leadId]/move/route.ts b/src/app/api/pipeline/leads/[leadId]/move/route.ts[m
+[1mindex 5e53a45..568b5e0 100644[m
+[1m--- a/src/app/api/pipeline/leads/[leadId]/move/route.ts[m
+[1m+++ b/src/app/api/pipeline/leads/[leadId]/move/route.ts[m
+[36m@@ -1,7 +1,7 @@[m
+ import { NextRequest, NextResponse } from 'next/server'[m
+ import { getServerSession } from 'next-auth/next'[m
+ import { authOptions } from '@/lib/auth'[m
+[31m-import { checkPermission, checkUserPermission } from '@/lib/rbac'[m
+[32m+[m[32mimport { checkUserPermission } from '@/lib/rbac'[m
+ import { logger } from '@/lib/logger'[m
+ import { z } from 'zod'[m
+ import { automationService } from '@/services/automation-service'[m
+[36m@@ -532,4 +532,4 @@[m [masync function executeStageAutomations([m
+       error: error instanceof Error ? error.message : 'Unknown error'[m
+     })[m
+   }[m
+[31m-}[m
+[32m+[m[32m}[m
+\ No newline at end of file[m

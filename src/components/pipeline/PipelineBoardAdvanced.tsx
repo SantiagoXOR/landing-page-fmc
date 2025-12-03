@@ -681,18 +681,38 @@ function LeadCard({
         {/* Mostrar CUIL en lugar de Origen */}
         {/* Extraer CUIL también de customFields si no está disponible directamente */}
         {(() => {
-          const cuilValue = lead.cuil || 
-            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil)) ||
-            null
+          // Función helper para detectar si un valor parece ser un CUIL/CUIT
+          const looksLikeCUIL = (value: any): boolean => {
+            if (!value) return false
+            const strValue = String(value).replace(/\D/g, '') // Remover caracteres no numéricos
+            // CUIL/CUIT argentino tiene 11 dígitos (con o sin guiones)
+            return /^\d{11}$/.test(strValue) || /^\d{2}-\d{8}-\d{1}$/.test(String(value))
+          }
           
-          return cuilValue ? (
+          // Buscar CUIL en claves conocidas primero
+          let cuilValue = lead.cuil || 
+            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil))
+          
+          // Si no se encontró, buscar en todos los valores de customFields por patrón
+          if (!cuilValue && lead.customFields) {
+            for (const [key, value] of Object.entries(lead.customFields)) {
+              const normalizedValue = typeof value === 'object' && 'value' in value ? value.value : value
+              if (looksLikeCUIL(normalizedValue)) {
+                cuilValue = normalizedValue
+                break
+              }
+            }
+          }
+          
+          // Normalizar el valor si es un objeto
+          const displayValue = cuilValue 
+            ? (typeof cuilValue === 'object' && 'value' in cuilValue ? cuilValue.value : cuilValue)
+            : null
+          
+          return displayValue ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">CUIL:</span>
-              <span className="font-medium text-gray-900">
-                {typeof cuilValue === 'object' && 'value' in cuilValue 
-                  ? cuilValue.value 
-                  : cuilValue}
-              </span>
+              <span className="font-medium text-gray-900">{String(displayValue)}</span>
             </div>
           ) : (
             <div className="flex items-center justify-between text-xs">
@@ -818,18 +838,38 @@ function LeadCardDragging({
       <div className="space-y-1">
         {/* Mostrar CUIL en lugar de Origen */}
         {(() => {
-          const cuilValue = lead.cuil || 
-            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil)) ||
-            null
+          // Función helper para detectar si un valor parece ser un CUIL/CUIT
+          const looksLikeCUIL = (value: any): boolean => {
+            if (!value) return false
+            const strValue = String(value).replace(/\D/g, '') // Remover caracteres no numéricos
+            // CUIL/CUIT argentino tiene 11 dígitos (con o sin guiones)
+            return /^\d{11}$/.test(strValue) || /^\d{2}-\d{8}-\d{1}$/.test(String(value))
+          }
           
-          return cuilValue ? (
+          // Buscar CUIL en claves conocidas primero
+          let cuilValue = lead.cuil || 
+            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil))
+          
+          // Si no se encontró, buscar en todos los valores de customFields por patrón
+          if (!cuilValue && lead.customFields) {
+            for (const [key, value] of Object.entries(lead.customFields)) {
+              const normalizedValue = typeof value === 'object' && 'value' in value ? value.value : value
+              if (looksLikeCUIL(normalizedValue)) {
+                cuilValue = normalizedValue
+                break
+              }
+            }
+          }
+          
+          // Normalizar el valor si es un objeto
+          const displayValue = cuilValue 
+            ? (typeof cuilValue === 'object' && 'value' in cuilValue ? cuilValue.value : cuilValue)
+            : null
+          
+          return displayValue ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">CUIL:</span>
-              <span className="font-medium">
-                {typeof cuilValue === 'object' && 'value' in cuilValue 
-                  ? cuilValue.value 
-                  : cuilValue}
-              </span>
+              <span className="font-medium">{String(displayValue)}</span>
             </div>
           ) : (
             <div className="flex items-center justify-between text-xs">

@@ -215,8 +215,30 @@ function mapLeadToPipelineLead(
     }
   }
   
+  // Función helper para detectar si un valor parece ser un CUIL/CUIT
+  const looksLikeCUIL = (value: any): boolean => {
+    if (!value) return false
+    const strValue = String(value).replace(/\D/g, '') // Remover caracteres no numéricos
+    // CUIL/CUIT argentino tiene 11 dígitos (con o sin guiones)
+    return /^\d{11}$/.test(strValue) || /^\d{2}-\d{8}-\d{1}$/.test(String(value))
+  }
+  
   // Extraer CUIL de customFields si no está en el campo directo
-  const cuilValue = lead.cuil || customFields.cuit || customFields.cuil || undefined
+  // Buscar en claves conocidas primero
+  let cuilValue = lead.cuil || customFields.cuit || customFields.cuil
+  
+  // Si no se encontró, buscar en todos los valores de customFields por patrón
+  if (!cuilValue) {
+    for (const [key, value] of Object.entries(customFields)) {
+      const normalizedValue = typeof value === 'object' && 'value' in value ? value.value : value
+      if (looksLikeCUIL(normalizedValue)) {
+        cuilValue = String(normalizedValue)
+        break
+      }
+    }
+  }
+  
+  cuilValue = cuilValue || undefined
 
   // Calcular score basado en tiempo en etapa
   const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)

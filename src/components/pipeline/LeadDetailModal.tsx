@@ -165,8 +165,29 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
   const customFields = parseCustomFields()
   const tags = parseTags()
   
+  // Función helper para detectar si un valor parece ser un CUIL/CUIT
+  const looksLikeCUIL = (value: any): boolean => {
+    if (!value) return false
+    const strValue = String(value).replace(/\D/g, '') // Remover caracteres no numéricos
+    // CUIL/CUIT argentino tiene 11 dígitos (con o sin guiones)
+    return /^\d{11}$/.test(strValue) || /^\d{2}-\d{8}-\d{1}$/.test(String(value))
+  }
+  
   // Extraer CUIL de customFields si no está en el campo directo
-  const cuilValue = leadDetails?.cuil || customFields.cuit || customFields.cuil || null
+  // Buscar en claves conocidas primero
+  let cuilValue = leadDetails?.cuil || customFields.cuit || customFields.cuil
+  
+  // Si no se encontró, buscar en todos los valores de customFields por patrón
+  if (!cuilValue) {
+    for (const [key, value] of Object.entries(customFields)) {
+      if (looksLikeCUIL(value)) {
+        cuilValue = String(value)
+        break
+      }
+    }
+  }
+  
+  cuilValue = cuilValue || null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

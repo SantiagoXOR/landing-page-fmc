@@ -110,7 +110,7 @@ async function calculatePeriodMetrics(
       // Calcular score y urgencia
       if (pipelineInfo) {
         const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
-        const stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+        const stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt || new Date())
         const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
 
         // Contar urgentes (high o critical)

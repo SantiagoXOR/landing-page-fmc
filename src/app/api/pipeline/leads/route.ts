@@ -108,12 +108,36 @@ function mapLeadToPipelineLead(
   assignedTo?: string
 ): PipelineLead {
   // Parsear tags primero para poder usarlos en la lógica
-  const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
+  let tags: any[] = []
+  try {
+    if (lead.tags) {
+      if (typeof lead.tags === 'string') {
+        tags = JSON.parse(lead.tags)
+      } else {
+        tags = lead.tags
+      }
+    }
+  } catch (e) {
+    logger.warn(`Error parsing tags for lead ${lead.id}`, { error: e, tags: lead.tags })
+    tags = []
+  }
   const tagsArray = Array.isArray(tags) ? tags : []
 
   // Determinar stageId: priorizar tags si el pipeline está en etapa inicial, sino usar current_stage del pipeline
-  let stageId: string
-  let stageEntryDate: Date
+  let stageId: string = 'nuevo'
+  let stageEntryDate: Date = new Date()
+
+  // Helper para crear fecha válida
+  const createValidDate = (dateValue: any): Date => {
+    try {
+      if (!dateValue) return new Date()
+      const date = new Date(dateValue)
+      if (isNaN(date.getTime())) return new Date()
+      return date
+    } catch {
+      return new Date()
+    }
+  }
 
   // Etapas iniciales que pueden ser sobrescritas por tags
   const initialStages = ['LEAD_NUEVO', 'CLIENTE_NUEVO']
@@ -139,7 +163,7 @@ function mapLeadToPipelineLead(
       // Si el tag indica una etapa diferente a la del pipeline, o el pipeline está en etapa inicial, usar el tag
       if (tagStageId !== pipelineStageId || initialStages.includes(pipelineInfo.current_stage)) {
         stageId = tagStageId
-        stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+        stageEntryDate = createValidDate(pipelineInfo.stage_entered_at || lead.createdAt)
         logger.info(`Lead reasignado desde etapa "${pipelineInfo.current_stage}" (${pipelineStageId}) a "${tagStageId}" basado en tag`, {
           leadId: lead.id,
           tags: tagsArray,
@@ -150,12 +174,12 @@ function mapLeadToPipelineLead(
       } else {
         // El pipeline y el tag coinciden, usar el pipeline
         stageId = pipelineStageId
-        stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+        stageEntryDate = createValidDate(pipelineInfo.stage_entered_at || lead.createdAt)
       }
     } else {
       // No hay tag relevante, usar current_stage del pipeline como fuente de verdad
       stageId = pipelineStageId
-      stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+      stageEntryDate = createValidDate(pipelineInfo.stage_entered_at || lead.createdAt)
       
       // Log si el current_stage no está mapeado
       if (!pipelineStageToStageId[pipelineInfo.current_stage]) {
@@ -169,7 +193,7 @@ function mapLeadToPipelineLead(
     // No hay pipeline info: usar tags o estado del lead
     if (stageFromTag) {
       stageId = stageFromTag
-      stageEntryDate = new Date(lead.createdAt)
+      stageEntryDate = createValidDate(lead.createdAt)
       logger.info(`Lead asignado a etapa desde tag: "${stageId}"`, {
         leadId: lead.id,
         tags: tagsArray
@@ -178,7 +202,7 @@ function mapLeadToPipelineLead(
       // Fallback: mapear desde estado del lead
       const estadoNormalizado = lead.estado ? String(lead.estado).trim().toUpperCase() : 'NUEVO'
       stageId = estadoToStageId[estadoNormalizado] || 'nuevo'
-      stageEntryDate = new Date(lead.createdAt)
+      stageEntryDate = createValidDate(lead.createdAt)
       
       // Log para debugging si el estado no está mapeado
       if (!estadoToStageId[estadoNormalizado] && lead.estado) {
@@ -191,7 +215,25 @@ function mapLeadToPipelineLead(
   }
   
   // Usar el evento más reciente pasado como parámetro, o la fecha de creación del lead
-  const lastActivity = lastEvent ? new Date(lastEvent.createdAt) : new Date(lead.createdAt)
+  let lastActivity: Date
+  try {
+    if (lastEvent && lastEvent.createdAt) {
+      lastActivity = new Date(lastEvent.createdAt)
+      if (isNaN(lastActivity.getTime())) {
+        throw new Error('Invalid date')
+      }
+    } else if (lead.createdAt) {
+      lastActivity = new Date(lead.createdAt)
+      if (isNaN(lastActivity.getTime())) {
+        throw new Error('Invalid date')
+      }
+    } else {
+      lastActivity = new Date()
+    }
+  } catch (e) {
+    logger.warn(`Error parsing date for lead ${lead.id}`, { error: e, createdAt: lead.createdAt, lastEvent })
+    lastActivity = new Date()
+  }
   
   // Parsear custom fields si existen
   let customFields: Record<string, any> = {}
@@ -229,19 +271,47 @@ function mapLeadToPipelineLead(
   
   // Si no se encontró, buscar en todos los valores de customFields por patrón
   if (!cuilValue) {
-    for (const [key, value] of Object.entries(customFields)) {
-      const normalizedValue = typeof value === 'object' && 'value' in value ? value.value : value
-      if (looksLikeCUIL(normalizedValue)) {
-        cuilValue = String(normalizedValue)
-        break
+    try {
+      for (const [key, value] of Object.entries(customFields)) {
+        if (value === null || value === undefined) continue
+        let normalizedValue: any
+        try {
+          normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
+        } catch (e) {
+          normalizedValue = value
+        }
+        if (normalizedValue && looksLikeCUIL(normalizedValue)) {
+          cuilValue = String(normalizedValue)
+          break
+        }
       }
+    } catch (e) {
+      logger.warn(`Error searching for CUIL in customFields for lead ${lead.id}`, { error: e })
     }
   }
   
   cuilValue = cuilValue || undefined
 
   // Calcular score basado en tiempo en etapa
-  const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
+  let timeScore: any
+  try {
+    // Validar que stageEntryDate sea una fecha válida
+    if (!stageEntryDate || isNaN(stageEntryDate.getTime())) {
+      logger.warn(`Invalid stageEntryDate for lead ${lead.id}, using current date`, { stageEntryDate })
+      stageEntryDate = new Date()
+    }
+    timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
+  } catch (e) {
+    logger.error(`Error calculating time score for lead ${lead.id}`, { error: e, stageEntryDate, stageId })
+    // Usar valores por defecto si falla el cálculo
+    timeScore = {
+      score: 0,
+      daysInStage: 0,
+      urgency: 'low',
+      color: 'gray',
+      label: 'Sin datos'
+    }
+  }
   
   // Determinar prioridad basada en score de tiempo
   let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium'
@@ -389,14 +459,28 @@ export async function GET(request: NextRequest) {
 
     // Mapear leads a PipelineLead usando current_stage del pipeline como fuente de verdad
     // Filtrar leads sin id para evitar errores de tipo
-    let pipelineLeads = leads
-      .filter(lead => lead.id !== undefined)
-      .map(lead => {
-        const leadId = lead.id as string // Type assertion seguro después del filter
+    let pipelineLeads: PipelineLead[] = []
+    for (const lead of leads) {
+      if (!lead.id) {
+        logger.warn('Skipping lead without id', { lead })
+        continue
+      }
+      try {
+        const leadId = lead.id as string
         const pipelineInfo = pipelineMap.get(leadId) || null
         const lastEvent = eventsMap.get(leadId) || null
-        return mapLeadToPipelineLead(lead, pipelineInfo, lastEvent, assignmentMap.get(leadId))
-      })
+        const mappedLead = mapLeadToPipelineLead(lead, pipelineInfo, lastEvent, assignmentMap.get(leadId))
+        pipelineLeads.push(mappedLead)
+      } catch (error: any) {
+        logger.error(`Error mapping lead ${lead.id} to PipelineLead`, {
+          error: error.message,
+          stack: error.stack,
+          leadId: lead.id,
+          leadNombre: lead.nombre
+        })
+        // Continuar con el siguiente lead en lugar de fallar completamente
+      }
+    }
 
     // Aplicar filtro por stageId si se especificó
     if (stageId) {
@@ -482,15 +566,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(pipelineLeads)
 
   } catch (error: any) {
+    const session = await getServerSession(authOptions).catch(() => null)
     logger.error('Error getting pipeline leads', {
       error: error.message,
       stack: error.stack,
-      userId: (await getServerSession(authOptions))?.user?.id
+      userId: session?.user?.id,
+      errorName: error.name,
+      errorString: String(error)
     })
 
+    // En desarrollo, incluir más detalles del error
+    const isDevelopment = process.env.NODE_ENV === 'development'
     return NextResponse.json({
       error: 'Internal server error',
-      message: 'Error interno del servidor al obtener leads del pipeline'
+      message: 'Error interno del servidor al obtener leads del pipeline',
+      ...(isDevelopment && {
+        details: error.message,
+        stack: error.stack
+      })
     }, { status: 500 })
   }
 }

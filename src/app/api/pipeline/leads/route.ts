@@ -314,6 +314,12 @@ function mapLeadToPipelineLead(
         const extracted = extractCUILOrDNI(normalizedValue)
         if (extracted) {
           cuilValue = extracted
+          logger.debug(`CUIL/DNI encontrado en customField[${key}] para lead ${lead.id}`, {
+            leadId: lead.id,
+            customFieldKey: key,
+            customFieldValue: normalizedValue,
+            extractedCUIL: extracted
+          })
           break
         }
       }

@@ -147,8 +147,68 @@ export class ManychatSyncService {
       const customFields = subscriber.custom_fields || {}
       const tags = subscriber.tags?.map(t => t.name) || []
 
-      // Extraer CUIL/CUIT (mantener formato original con guiones)
-      const cuil = customFields.cuit || null
+      // Función helper para extraer CUIL/CUIT/DNI de un valor (puede estar dentro de texto)
+      const extractCUILOrDNI = (value: any): string | null => {
+        if (!value) return null
+        
+        const strValue = String(value)
+        
+        // Buscar patrón CUIL/CUIT con formato XX-XXXXXXXX-X
+        const cuilWithDashes = strValue.match(/\b\d{2}-\d{8}-\d{1}\b/)
+        if (cuilWithDashes) {
+          return cuilWithDashes[0]
+        }
+        
+        // Buscar patrón CUIL/CUIT sin guiones (11 dígitos consecutivos)
+        const cuilWithoutDashes = strValue.match(/\b\d{11}\b/)
+        if (cuilWithoutDashes) {
+          const digits = cuilWithoutDashes[0]
+          // Validar que tenga formato de CUIL/CUIT (XX-XXXXXXXX-X)
+          if (/^\d{2}\d{8}\d{1}$/.test(digits)) {
+            return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`
+          }
+        }
+        
+        // Buscar DNI (8 dígitos) - solo si no encontramos CUIL/CUIT
+        const dni = strValue.match(/\b\d{8}\b/)
+        if (dni && !cuilWithDashes && !cuilWithoutDashes) {
+          return dni[0]
+        }
+        
+        return null
+      }
+
+      // Extraer CUIL/CUIT/DNI de customFields
+      // Buscar en claves conocidas primero
+      let cuil = customFields.cuit || customFields.cuil || customFields.dni || null
+      
+      // Si ya tenemos un valor, intentar extraerlo en caso de que tenga formato incorrecto
+      if (cuil) {
+        const extracted = extractCUILOrDNI(cuil)
+        if (extracted) {
+          cuil = extracted
+        }
+      }
+      
+      // Si no se encontró, buscar en todos los valores de customFields por patrón
+      // Esto maneja el caso donde los customFields tienen índices numéricos (0, 1, 2, etc.)
+      if (!cuil) {
+        for (const [key, value] of Object.entries(customFields)) {
+          if (value === null || value === undefined) continue
+          
+          // Intentar extraer CUIL/DNI del valor (puede estar dentro de texto)
+          const extracted = extractCUILOrDNI(value)
+          if (extracted) {
+            cuil = extracted
+            logger.info(`CUIL/DNI encontrado en customField[${key}]: ${extracted}`, {
+              subscriberId: subscriber.id,
+              customFieldKey: key,
+              customFieldValue: value
+            })
+            break
+          }
+        }
+      }
 
       const leadData: any = {
         nombre,

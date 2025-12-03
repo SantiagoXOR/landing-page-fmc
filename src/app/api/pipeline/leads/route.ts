@@ -242,8 +242,9 @@ function mapLeadToPipelineLead(
     timeInStage: timeScore.daysInStage,
     urgency: timeScore.urgency,
     scoreColor: timeScore.color,
-    scoreLabel: timeScore.label
-  } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string }
+    scoreLabel: timeScore.label,
+    cuil: lead.cuil || undefined // Agregar CUIL
+  } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string; cuil?: string }
 }
 
 // Datos de ejemplo eliminados - Ahora se usan datos reales de la base de datos

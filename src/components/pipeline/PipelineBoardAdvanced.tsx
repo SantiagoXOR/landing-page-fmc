@@ -553,19 +553,13 @@ function PipelineStageColumn({
             </div>
           </div>
           
-          {/* Estadísticas de la etapa */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <DollarSign className="h-3 w-3" />
-              {formatCurrency(stats.totalValue)}
+          {/* Estadísticas de la etapa - Solo mostrar urgentes si hay */}
+          {stats.highPriorityCount > 0 && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+              <AlertCircle className="h-3 w-3 text-orange-500" />
+              <span>{stats.highPriorityCount} urgente{stats.highPriorityCount > 1 ? 's' : ''}</span>
             </div>
-            {stats.highPriorityCount > 0 && (
-              <div className="flex items-center gap-1">
-                <AlertCircle className="h-3 w-3 text-orange-500" />
-                {stats.highPriorityCount}
-              </div>
-            )}
-          </div>
+          )}
         </CardHeader>
         
         <CardContent className="space-y-3 max-h-96 overflow-y-auto">
@@ -626,6 +620,20 @@ function LeadCard({
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined
 
+  // Formatear tiempo en etapa de manera más clara
+  const formatTimeInStage = (days?: number) => {
+    if (days === undefined || days === null) return null
+    if (days === 0) return 'Hoy'
+    if (days === 1) return '1 día'
+    if (days < 7) return `${days} días`
+    if (days < 30) {
+      const weeks = Math.floor(days / 7)
+      return weeks === 1 ? '1 semana' : `${weeks} semanas`
+    }
+    const months = Math.floor(days / 30)
+    return months === 1 ? '1 mes' : `${months} meses`
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -669,39 +677,40 @@ function LeadCard({
         </div>
       </div>
 
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Origen:</span>
-          <Badge variant="outline" className="text-xs">
-            {lead.origen}
-          </Badge>
-        </div>
-
-        {lead.value && (
+      <div className="space-y-1.5">
+        {/* Mostrar CUIL en lugar de Origen */}
+        {lead.cuil ? (
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Valor:</span>
-            <span className="font-medium text-green-600">
-              {formatCurrency(lead.value)}
+            <span className="text-muted-foreground">CUIL:</span>
+            <span className="font-medium text-gray-900">{lead.cuil}</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Origen:</span>
+            <Badge variant="outline" className="text-xs">
+              {lead.origen}
+            </Badge>
+          </div>
+        )}
+
+        {/* Información de tiempo mejorada */}
+        {lead.timeInStage !== undefined && (
+          <div className="flex items-center justify-between text-xs bg-gray-50 px-2 py-1 rounded">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">En esta etapa:</span>
+            </div>
+            <span className="font-medium text-gray-900">
+              {formatTimeInStage(lead.timeInStage)}
             </span>
           </div>
         )}
 
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">En etapa:</span>
-          <span>{formatRelativeDate(lead.stageEntryDate)}</span>
-        </div>
-
-        {/* Mostrar tiempo en etapa si está disponible */}
-        {lead.timeInStage !== undefined && (
+        {/* Fecha de ingreso a la etapa */}
+        {lead.stageEntryDate && (
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Tiempo:</span>
-            <span className="font-medium">
-              {lead.timeInStage === 0 
-                ? 'Hoy' 
-                : lead.timeInStage === 1 
-                ? '1 día' 
-                : `${lead.timeInStage} días`}
-            </span>
+            <span className="text-muted-foreground">Ingresó:</span>
+            <span>{formatRelativeDate(lead.stageEntryDate)}</span>
           </div>
         )}
 
@@ -796,19 +805,18 @@ function LeadCardDragging({
       </div>
 
       <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Origen:</span>
-          <Badge variant="outline" className="text-xs">
-            {lead.origen}
-          </Badge>
-        </div>
-
-        {lead.value && (
+        {/* Mostrar CUIL en lugar de Origen */}
+        {lead.cuil ? (
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Valor:</span>
-            <span className="font-medium text-green-600">
-              {formatCurrency(lead.value)}
-            </span>
+            <span className="text-muted-foreground">CUIL:</span>
+            <span className="font-medium">{lead.cuil}</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Origen:</span>
+            <Badge variant="outline" className="text-xs">
+              {lead.origen}
+            </Badge>
           </div>
         )}
       </div>

@@ -72,6 +72,7 @@ export interface PipelineLead {
   urgency?: 'low' | 'medium' | 'high' | 'critical' // Nivel de urgencia
   scoreColor?: string // Color para visualización (hex)
   scoreLabel?: string // Etiqueta descriptiva del score
+  cuil?: string // CUIL/CUIT del lead
 }
 
 export interface LeadActivity {

@@ -445,6 +445,7 @@ export function PipelineBoardAdvanced({
                   formatCurrency={formatCurrency}
                   formatRelativeDate={formatRelativeDate}
                   getPriorityColor={getPriorityColor}
+                  getTagColor={getTagColor}
                 />
               )
             })}
@@ -491,6 +492,7 @@ interface PipelineStageColumnProps {
   formatCurrency: (value: number) => string
   formatRelativeDate: (date: Date | string) => string
   getPriorityColor: (priority: string) => string
+  getTagColor: (tag: string) => { bg: string; text: string; border: string }
 }
 
 function PipelineStageColumn({
@@ -504,7 +506,8 @@ function PipelineStageColumn({
   onAddLead,
   formatCurrency,
   formatRelativeDate,
-  getPriorityColor
+  getPriorityColor,
+  getTagColor
 }: PipelineStageColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
@@ -574,6 +577,7 @@ function PipelineStageColumn({
               formatCurrency={formatCurrency}
               formatRelativeDate={formatRelativeDate}
               getPriorityColor={getPriorityColor}
+              getTagColor={getTagColor}
             />
           ))}
           
@@ -597,6 +601,7 @@ interface LeadCardProps {
   formatCurrency: (value: number) => string
   formatRelativeDate: (date: Date | string) => string
   getPriorityColor: (priority: string) => string
+  getTagColor: (tag: string) => { bg: string; text: string; border: string }
 }
 
 function LeadCard({
@@ -604,7 +609,8 @@ function LeadCard({
   onClick,
   formatCurrency,
   formatRelativeDate,
-  getPriorityColor
+  getPriorityColor,
+  getTagColor
 }: LeadCardProps) {
   const {
     attributes,

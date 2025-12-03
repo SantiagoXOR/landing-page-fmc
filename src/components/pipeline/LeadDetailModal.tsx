@@ -321,7 +321,7 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
                     <div className="mb-4">
                       <label className="text-xs text-muted-foreground mb-2 block">Tags</label>
                       <div className="flex flex-wrap gap-2">
-                        {tags.map((tag, index) => (
+                        {tags.map((tag: string, index: number) => (
                           <Badge key={index} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>

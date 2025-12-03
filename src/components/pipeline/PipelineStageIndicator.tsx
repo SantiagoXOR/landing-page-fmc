@@ -52,27 +52,40 @@ export function PipelineStageIndicator({
   const [showLossReasonDialog, setShowLossReasonDialog] = useState(false)
   const [selectedStage, setSelectedStage] = useState<PipelineStage | null>(null)
 
-  const stage = currentStage || pipeline?.current_stage || 'LEAD_NUEVO'
+  const stage = currentStage || pipeline?.current_stage || 'CLIENTE_NUEVO'
   const canEdit = checkPermission('leads:write')
 
   // Obtener icono para la etapa
   const getStageIcon = (stageType: PipelineStage) => {
     switch (stageType) {
-      case 'LEAD_NUEVO':
+      case 'CLIENTE_NUEVO':
+      case 'LEAD_NUEVO': // Legacy
         return <Clock className="h-4 w-4" />
-      case 'CONTACTO_INICIAL':
-      case 'CALIFICACION':
-      case 'PRESENTACION':
+      case 'CONSULTANDO_CREDITO':
+      case 'SOLICITANDO_DOCS':
+      case 'LISTO_ANALISIS':
+      case 'CONTACTO_INICIAL': // Legacy
+      case 'CALIFICACION': // Legacy
+      case 'PRESENTACION': // Legacy
         return <TrendingUp className="h-4 w-4" />
-      case 'PROPUESTA':
-      case 'NEGOCIACION':
+      case 'PREAPROBADO':
+      case 'APROBADO':
+      case 'PROPUESTA': // Legacy
+      case 'NEGOCIACION': // Legacy
         return <ArrowRight className="h-4 w-4" />
-      case 'CIERRE_GANADO':
+      case 'EN_SEGUIMIENTO':
+      case 'SEGUIMIENTO': // Legacy
         return <CheckCircle className="h-4 w-4" />
-      case 'CIERRE_PERDIDO':
+      case 'CERRADO_GANADO':
+      case 'CIERRE_GANADO': // Legacy
+        return <CheckCircle className="h-4 w-4" />
+      case 'ENCUESTA':
+        return <TrendingUp className="h-4 w-4" />
+      case 'RECHAZADO':
+      case 'CIERRE_PERDIDO': // Legacy
         return <XCircle className="h-4 w-4" />
-      case 'SEGUIMIENTO':
-        return <CheckCircle className="h-4 w-4" />
+      case 'SOLICITAR_REFERIDO':
+        return <ArrowRight className="h-4 w-4" />
       default:
         return <Clock className="h-4 w-4" />
     }
@@ -89,7 +102,7 @@ export function PipelineStageIndicator({
 
   // Manejar click en transición que requiere motivo de pérdida
   const handleLossTransition = (newStage: PipelineStage) => {
-    if (newStage === 'CIERRE_PERDIDO') {
+    if (newStage === 'RECHAZADO' || newStage === 'CIERRE_PERDIDO') {
       setSelectedStage(newStage)
       setShowLossReasonDialog(true)
     } else {

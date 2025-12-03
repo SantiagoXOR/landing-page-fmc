@@ -8,8 +8,8 @@ import { PipelineStage } from '@/types/pipeline'
 // Etapas por defecto del pipeline
 const defaultStages: PipelineStage[] = [
   {
-    id: 'nuevo',
-    name: 'Nuevo Lead',
+    id: 'cliente-nuevo',
+    name: 'Cliente Nuevo',
     description: 'Leads recién ingresados al sistema',
     color: '#3B82F6',
     order: 1,
@@ -34,21 +34,13 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
-    id: 'contactado',
-    name: 'Contactado',
-    description: 'Lead ha sido contactado por primera vez',
+    id: 'consultando-credito',
+    name: 'Consultando Crédito',
+    description: 'Cliente está consultando opciones de crédito',
     color: '#10B981',
     order: 2,
     isActive: true,
-    rules: [
-      {
-        id: 'rule-2',
-        type: 'min_time',
-        value: 1,
-        message: 'Debe permanecer al menos 1 día en la etapa anterior',
-        isActive: true
-      }
-    ],
+    rules: [],
     automation: [
       {
         id: 'auto-1',
@@ -73,21 +65,13 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
-    id: 'calificado',
-    name: 'Calificado',
-    description: 'Lead calificado como oportunidad real',
+    id: 'solicitando-docs',
+    name: 'Solicitando Documentación',
+    description: 'Cliente está proporcionando documentación requerida',
     color: '#F59E0B',
     order: 3,
     isActive: true,
-    rules: [
-      {
-        id: 'rule-3',
-        type: 'required_field',
-        field: 'presupuesto',
-        message: 'El presupuesto estimado es requerido',
-        isActive: true
-      }
-    ],
+    rules: [],
     automation: [],
     metrics: {
       totalLeads: 0,
@@ -99,35 +83,14 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
-    id: 'propuesta',
-    name: 'Propuesta Enviada',
-    description: 'Propuesta comercial enviada al cliente',
+    id: 'listo-analisis',
+    name: 'Listo para Análisis',
+    description: 'Documentación completa, listo para análisis crediticio',
     color: '#8B5CF6',
     order: 4,
     isActive: true,
-    rules: [
-      {
-        id: 'rule-4',
-        type: 'required_field',
-        field: 'propuesta_url',
-        message: 'URL de la propuesta es requerida',
-        isActive: true
-      }
-    ],
-    automation: [
-      {
-        id: 'auto-2',
-        trigger: 'on_enter',
-        action: 'create_task',
-        conditions: [],
-        parameters: {
-          title: 'Seguimiento de propuesta',
-          type: 'follow_up',
-          dueInDays: 3
-        },
-        isActive: true
-      }
-    ],
+    rules: [],
+    automation: [],
     metrics: {
       totalLeads: 0,
       averageTimeInStage: 0,
@@ -138,11 +101,47 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
-    id: 'negociacion',
-    name: 'Negociación',
-    description: 'En proceso de negociación de términos',
-    color: '#EF4444',
+    id: 'preaprobado',
+    name: 'Preaprobado',
+    description: 'Crédito preaprobado, pendiente de documentación final',
+    color: '#6366F1',
     order: 5,
+    isActive: true,
+    rules: [],
+    automation: [],
+    metrics: {
+      totalLeads: 0,
+      averageTimeInStage: 0,
+      conversionRate: 0,
+      leadsThisWeek: 0,
+      leadsThisMonth: 0,
+      trend: 'stable'
+    }
+  },
+  {
+    id: 'aprobado',
+    name: 'Aprobado',
+    description: 'Crédito aprobado, proceso de desembolso',
+    color: '#06B6D4',
+    order: 6,
+    isActive: true,
+    rules: [],
+    automation: [],
+    metrics: {
+      totalLeads: 0,
+      averageTimeInStage: 0,
+      conversionRate: 0,
+      leadsThisWeek: 0,
+      leadsThisMonth: 0,
+      trend: 'stable'
+    }
+  },
+  {
+    id: 'en-seguimiento',
+    name: 'En Seguimiento',
+    description: 'Crédito activo, en seguimiento post-desembolso',
+    color: '#84CC16',
+    order: 7,
     isActive: true,
     rules: [],
     automation: [],
@@ -160,7 +159,7 @@ const defaultStages: PipelineStage[] = [
     name: 'Cerrado Ganado',
     description: 'Venta exitosa completada',
     color: '#059669',
-    order: 6,
+    order: 8,
     isActive: true,
     rules: [
       {
@@ -194,21 +193,57 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
-    id: 'cerrado-perdido',
-    name: 'Cerrado Perdido',
-    description: 'Oportunidad perdida',
+    id: 'encuesta',
+    name: 'Encuesta Satisfacción',
+    description: 'Encuesta de satisfacción post-venta',
+    color: '#A855F7',
+    order: 9,
+    isActive: true,
+    rules: [],
+    automation: [],
+    metrics: {
+      totalLeads: 0,
+      averageTimeInStage: 0,
+      conversionRate: 0,
+      leadsThisWeek: 0,
+      leadsThisMonth: 0,
+      trend: 'stable'
+    }
+  },
+  {
+    id: 'rechazado',
+    name: 'Rechazado',
+    description: 'Crédito rechazado o cliente desistió',
     color: '#DC2626',
-    order: 7,
+    order: 10,
     isActive: true,
     rules: [
       {
         id: 'rule-6',
         type: 'required_field',
         field: 'razon_perdida',
-        message: 'La razón de pérdida es requerida',
+        message: 'La razón de rechazo es requerida',
         isActive: true
       }
     ],
+    automation: [],
+    metrics: {
+      totalLeads: 0,
+      averageTimeInStage: 0,
+      conversionRate: 0,
+      leadsThisWeek: 0,
+      leadsThisMonth: 0,
+      trend: 'stable'
+    }
+  },
+  {
+    id: 'solicitar-referido',
+    name: 'Solicitar Referido',
+    description: 'Solicitar referidos al cliente',
+    color: '#EC4899',
+    order: 11,
+    isActive: true,
+    rules: [],
     automation: [],
     metrics: {
       totalLeads: 0,

@@ -109,15 +109,27 @@ export function PipelineMetrics() {
   // Obtener nombre de visualización de la etapa
   const getStageDisplayName = (stage: string): string => {
     const stageNames: Record<string, string> = {
-      'LEAD_NUEVO': 'Lead Nuevo',
-      'CONTACTO_INICIAL': 'Contacto Inicial',
-      'CALIFICACION': 'Calificación',
-      'PRESENTACION': 'Presentación',
-      'PROPUESTA': 'Propuesta',
-      'NEGOCIACION': 'Negociación',
-      'CIERRE_GANADO': 'Cierre Ganado',
-      'CIERRE_PERDIDO': 'Cierre Perdido',
-      'SEGUIMIENTO': 'Seguimiento'
+      'CLIENTE_NUEVO': 'Cliente Nuevo',
+      'CONSULTANDO_CREDITO': 'Consultando Crédito',
+      'SOLICITANDO_DOCS': 'Solicitando Documentación',
+      'LISTO_ANALISIS': 'Listo para Análisis',
+      'PREAPROBADO': 'Preaprobado',
+      'APROBADO': 'Aprobado',
+      'EN_SEGUIMIENTO': 'En Seguimiento',
+      'CERRADO_GANADO': 'Cerrado Ganado',
+      'ENCUESTA': 'Encuesta Satisfacción',
+      'RECHAZADO': 'Rechazado',
+      'SOLICITAR_REFERIDO': 'Solicitar Referido',
+      // Legacy support
+      'LEAD_NUEVO': 'Cliente Nuevo',
+      'CONTACTO_INICIAL': 'Consultando Crédito',
+      'CALIFICACION': 'Listo para Análisis',
+      'PRESENTACION': 'Preaprobado',
+      'PROPUESTA': 'Aprobado',
+      'NEGOCIACION': 'En Seguimiento',
+      'CIERRE_GANADO': 'Cerrado Ganado',
+      'CIERRE_PERDIDO': 'Rechazado',
+      'SEGUIMIENTO': 'En Seguimiento'
     }
     return stageNames[stage] || stage
   }

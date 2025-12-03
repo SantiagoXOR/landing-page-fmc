@@ -60,13 +60,17 @@ export class PipelineService {
   // Crear etapas por defecto
   async createDefaultStages(): Promise<PipelineStage[]> {
     const defaultStages = [
-      { name: 'Nuevo', order: 0, color: '#3B82F6' },
-      { name: 'Contactado', order: 1, color: '#8B5CF6' },
-      { name: 'Calificado', order: 2, color: '#6366F1' },
-      { name: 'Propuesta', order: 3, color: '#A855F7' },
-      { name: 'Negociación', order: 4, color: '#EC4899' },
-      { name: 'Ganado', order: 5, color: '#10B981' },
-      { name: 'Perdido', order: 6, color: '#EF4444' }
+      { name: 'Cliente Nuevo', order: 1, color: '#3B82F6' },
+      { name: 'Consultando Crédito', order: 2, color: '#10B981' },
+      { name: 'Solicitando Documentación', order: 3, color: '#F59E0B' },
+      { name: 'Listo para Análisis', order: 4, color: '#8B5CF6' },
+      { name: 'Preaprobado', order: 5, color: '#6366F1' },
+      { name: 'Aprobado', order: 6, color: '#06B6D4' },
+      { name: 'En Seguimiento', order: 7, color: '#84CC16' },
+      { name: 'Cerrado Ganado', order: 8, color: '#059669' },
+      { name: 'Encuesta Satisfacción', order: 9, color: '#A855F7' },
+      { name: 'Rechazado', order: 10, color: '#DC2626' },
+      { name: 'Solicitar Referido', order: 11, color: '#EC4899' }
     ]
 
     const response = await fetch(`${this.baseUrl}/pipeline/stages/batch`, {

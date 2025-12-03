@@ -183,15 +183,27 @@ export function usePipeline(leadId?: string) {
   // Obtener nombre de visualización de la etapa
   const getStageDisplayName = (stage: PipelineStage): string => {
     const stageNames: Record<PipelineStage, string> = {
-      'LEAD_NUEVO': 'Lead Nuevo',
-      'CONTACTO_INICIAL': 'Contacto Inicial',
-      'CALIFICACION': 'Calificación',
-      'PRESENTACION': 'Presentación',
-      'PROPUESTA': 'Propuesta',
-      'NEGOCIACION': 'Negociación',
-      'CIERRE_GANADO': 'Cierre Ganado',
-      'CIERRE_PERDIDO': 'Cierre Perdido',
-      'SEGUIMIENTO': 'Seguimiento'
+      'CLIENTE_NUEVO': 'Cliente Nuevo',
+      'CONSULTANDO_CREDITO': 'Consultando Crédito',
+      'SOLICITANDO_DOCS': 'Solicitando Documentación',
+      'LISTO_ANALISIS': 'Listo para Análisis',
+      'PREAPROBADO': 'Preaprobado',
+      'APROBADO': 'Aprobado',
+      'EN_SEGUIMIENTO': 'En Seguimiento',
+      'CERRADO_GANADO': 'Cerrado Ganado',
+      'ENCUESTA': 'Encuesta Satisfacción',
+      'RECHAZADO': 'Rechazado',
+      'SOLICITAR_REFERIDO': 'Solicitar Referido',
+      // Legacy support
+      'LEAD_NUEVO': 'Cliente Nuevo',
+      'CONTACTO_INICIAL': 'Consultando Crédito',
+      'CALIFICACION': 'Listo para Análisis',
+      'PRESENTACION': 'Preaprobado',
+      'PROPUESTA': 'Aprobado',
+      'NEGOCIACION': 'En Seguimiento',
+      'CIERRE_GANADO': 'Cerrado Ganado',
+      'CIERRE_PERDIDO': 'Rechazado',
+      'SEGUIMIENTO': 'En Seguimiento'
     }
     return stageNames[stage] || stage
   }
@@ -199,14 +211,26 @@ export function usePipeline(leadId?: string) {
   // Obtener color de la etapa
   const getStageColor = (stage: PipelineStage): string => {
     const stageColors: Record<PipelineStage, string> = {
-      'LEAD_NUEVO': '#6B7280',
-      'CONTACTO_INICIAL': '#3B82F6',
+      'CLIENTE_NUEVO': '#3B82F6',
+      'CONSULTANDO_CREDITO': '#10B981',
+      'SOLICITANDO_DOCS': '#F59E0B',
+      'LISTO_ANALISIS': '#8B5CF6',
+      'PREAPROBADO': '#6366F1',
+      'APROBADO': '#06B6D4',
+      'EN_SEGUIMIENTO': '#84CC16',
+      'CERRADO_GANADO': '#059669',
+      'ENCUESTA': '#A855F7',
+      'RECHAZADO': '#DC2626',
+      'SOLICITAR_REFERIDO': '#EC4899',
+      // Legacy support
+      'LEAD_NUEVO': '#3B82F6',
+      'CONTACTO_INICIAL': '#10B981',
       'CALIFICACION': '#8B5CF6',
-      'PRESENTACION': '#06B6D4',
-      'PROPUESTA': '#F59E0B',
-      'NEGOCIACION': '#F97316',
-      'CIERRE_GANADO': '#10B981',
-      'CIERRE_PERDIDO': '#EF4444',
+      'PRESENTACION': '#6366F1',
+      'PROPUESTA': '#06B6D4',
+      'NEGOCIACION': '#84CC16',
+      'CIERRE_GANADO': '#059669',
+      'CIERRE_PERDIDO': '#DC2626',
       'SEGUIMIENTO': '#84CC16'
     }
     return stageColors[stage] || '#6B7280'

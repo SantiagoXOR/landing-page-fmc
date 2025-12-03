@@ -294,17 +294,23 @@ export async function syncPipelineToManychat(
       try {
         logger.info(`Attempting to add tag '${tag}' to subscriber ${manychatId}`)
         
-        // Primero verificar si el tag existe en ManyChat
+        // Primero verificar si el tag existe en ManyChat (búsqueda case-insensitive)
         const allTags = await ManychatService.getTags()
-        const tagExists = allTags.find(t => t.name === tag)
+        const normalizedTag = tag.toLowerCase().trim()
+        const tagExists = allTags.find(t => 
+          t.name.toLowerCase().trim() === normalizedTag ||
+          t.name.trim() === tag
+        )
         
         if (!tagExists) {
           const errorMsg = `Tag "${tag}" no existe en ManyChat. Por favor créalo primero en ManyChat antes de sincronizar.`
           logger.error(errorMsg, {
             leadId,
             manychatId,
-            tag,
-            availableTags: allTags.slice(0, 10).map(t => t.name)
+            searchedTag: tag,
+            normalizedSearch: normalizedTag,
+            availableTags: allTags.slice(0, 20).map(t => ({ name: t.name, normalized: t.name.toLowerCase().trim() })),
+            totalTags: allTags.length
           })
           throw new Error(errorMsg)
         }

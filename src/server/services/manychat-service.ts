@@ -839,15 +839,31 @@ export class ManychatService {
     try {
       // Obtener todos los tags de Manychat para buscar el ID
       const allTags = await this.getTags()
-      const tag = allTags.find(t => t.name === trimmedTagName)
+      
+      // Buscar tag de forma case-insensitive y sin espacios
+      const normalizedTagName = trimmedTagName.toLowerCase().trim()
+      const tag = allTags.find(t => 
+        t.name.toLowerCase().trim() === normalizedTagName ||
+        t.name.trim() === trimmedTagName
+      )
 
       if (!tag) {
         logger.warn(`Tag "${trimmedTagName}" no encontrado en Manychat`, {
           subscriberId: subscriberIdStr,
-          availableTags: allTags.slice(0, 5).map(t => t.name) // Log primeros 5 para referencia
+          searchedTag: trimmedTagName,
+          normalizedSearch: normalizedTagName,
+          availableTags: allTags.slice(0, 20).map(t => ({ name: t.name, normalized: t.name.toLowerCase().trim() })), // Log primeros 20 para referencia
+          totalTags: allTags.length
         })
         return false
       }
+      
+      logger.info(`Tag encontrado en ManyChat`, {
+        searchedTag: trimmedTagName,
+        foundTag: tag.name,
+        tagId: tag.id,
+        subscriberId: subscriberIdStr
+      })
 
       // Usar el endpoint addTagById con el tag_id encontrado
       const response = await this.executeWithRateLimit(() =>

@@ -3,6 +3,18 @@ import { logger } from '@/lib/logger'
 
 // Tipos para el pipeline
 export type PipelineStage = 
+  | 'CLIENTE_NUEVO'
+  | 'CONSULTANDO_CREDITO'
+  | 'SOLICITANDO_DOCS'
+  | 'LISTO_ANALISIS'
+  | 'PREAPROBADO'
+  | 'APROBADO'
+  | 'EN_SEGUIMIENTO'
+  | 'CERRADO_GANADO'
+  | 'ENCUESTA'
+  | 'RECHAZADO'
+  | 'SOLICITAR_REFERIDO'
+  // Legacy support
   | 'LEAD_NUEVO'
   | 'CONTACTO_INICIAL'
   | 'CALIFICACION'

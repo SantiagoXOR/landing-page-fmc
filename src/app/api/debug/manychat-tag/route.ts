@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     // 3. Verificar si el tag ya está asignado
     if (diagnostics.subscriber?.exists && diagnostics.tag?.exists) {
       const tagAlreadyAssigned = diagnostics.subscriber.currentTags?.some(
-        t => t.id === diagnostics.tag.id || t.name.toLowerCase() === tagName.toLowerCase()
+        (t: { id: number; name: string }) => t.id === diagnostics.tag.id || t.name.toLowerCase() === tagName.toLowerCase()
       )
       diagnostics.tagAlreadyAssigned = tagAlreadyAssigned || false
     }

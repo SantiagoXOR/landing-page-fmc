@@ -317,14 +317,40 @@ export async function syncPipelineToManychat(
         
         logger.info(`Tag '${tag}' encontrado en ManyChat con ID ${tagExists.id}`)
         
+        // Verificar que el subscriber existe en ManyChat antes de agregar el tag
+        try {
+          const subscriber = await ManychatService.getSubscriberById(manychatId)
+          if (!subscriber) {
+            const errorMsg = `Subscriber ${manychatId} no existe en ManyChat. No se puede agregar el tag '${tag}'.`
+            logger.error(errorMsg, {
+              leadId,
+              manychatId,
+              tag,
+              tagId: tagExists.id
+            })
+            throw new Error(errorMsg)
+          }
+          
+          logger.info(`Subscriber ${manychatId} encontrado en ManyChat, procediendo a agregar tag`)
+        } catch (subscriberError: any) {
+          if (subscriberError.message.includes('no existe')) {
+            throw subscriberError
+          }
+          logger.warn(`No se pudo verificar subscriber, continuando de todas formas`, {
+            error: subscriberError.message,
+            manychatId
+          })
+        }
+        
         const added = await ManychatService.addTagToSubscriber(manychatId, tag)
         if (!added) {
-          const errorMsg = `No se pudo agregar el tag '${tag}' al subscriber ${manychatId} en ManyChat`
+          const errorMsg = `No se pudo agregar el tag '${tag}' al subscriber ${manychatId} en ManyChat. Verifica los logs del servidor para más detalles.`
           logger.error(errorMsg, {
             leadId,
             manychatId,
             tag,
-            tagId: tagExists.id
+            tagId: tagExists.id,
+            subscriberExists: true // Ya verificamos arriba
           })
           throw new Error(errorMsg)
         }

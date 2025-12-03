@@ -883,12 +883,26 @@ export class ManychatService {
           tagName: trimmedTagName,
           tagId: tag.id,
           error: response.error,
-          details: response.details
+          error_code: response.error_code,
+          details: response.details,
+          fullResponse: response
         })
         return false
       }
 
-      return response.status === 'success'
+      // Verificar que la respuesta sea exitosa
+      if (response.status !== 'success') {
+        logger.warn('Respuesta inesperada de ManyChat al agregar tag', {
+          subscriberId: subscriberIdStr,
+          tagName: trimmedTagName,
+          tagId: tag.id,
+          responseStatus: response.status,
+          fullResponse: response
+        })
+        return false
+      }
+
+      return true
     } catch (error: any) {
       logger.error('Error obteniendo tags de Manychat para agregar tag', {
         subscriberId: subscriberIdStr,

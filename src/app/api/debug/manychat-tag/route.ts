@@ -108,7 +108,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Intentar agregar el tag si ambos existen
+    // 3. Verificar si el tag ya está asignado
+    if (diagnostics.subscriber?.exists && diagnostics.tag?.exists) {
+      const tagAlreadyAssigned = diagnostics.subscriber.currentTags?.some(
+        t => t.id === diagnostics.tag.id || t.name.toLowerCase() === tagName.toLowerCase()
+      )
+      diagnostics.tagAlreadyAssigned = tagAlreadyAssigned || false
+    }
+
+    // 4. Intentar agregar el tag si ambos existen
     if (diagnostics.subscriber?.exists && diagnostics.tag?.exists) {
       try {
         const added = await ManychatService.addTagToSubscriber(subscriberId, tagName)
@@ -120,6 +128,9 @@ export async function GET(request: NextRequest) {
         diagnostics.addTagAttempt = {
           success: false,
           error: addError.message,
+          error_code: addError.error_code,
+          details: addError.details,
+          fullResponse: addError.fullResponse,
           stack: addError.stack
         }
       }

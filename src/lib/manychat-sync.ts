@@ -342,17 +342,45 @@ export async function syncPipelineToManychat(
           })
         }
         
-        const added = await ManychatService.addTagToSubscriber(manychatId, tag)
-        if (!added) {
-          const errorMsg = `No se pudo agregar el tag '${tag}' al subscriber ${manychatId} en ManyChat. Verifica los logs del servidor para más detalles.`
-          logger.error(errorMsg, {
-            leadId,
-            manychatId,
-            tag,
-            tagId: tagExists.id,
-            subscriberExists: true // Ya verificamos arriba
-          })
-          throw new Error(errorMsg)
+        try {
+          const added = await ManychatService.addTagToSubscriber(manychatId, tag)
+          if (!added) {
+            const errorMsg = `No se pudo agregar el tag '${tag}' al subscriber ${manychatId} en ManyChat. Verifica los logs del servidor para más detalles.`
+            logger.error(errorMsg, {
+              leadId,
+              manychatId,
+              tag,
+              tagId: tagExists.id,
+              subscriberExists: true // Ya verificamos arriba
+            })
+            throw new Error(errorMsg)
+          }
+        } catch (addError: any) {
+          // Si el error indica que el tag ya está asignado, considerarlo éxito
+          if (addError.message?.includes('ya está asignado') || addError.message?.includes('already')) {
+            logger.info(`Tag '${tag}' ya estaba asignado al subscriber ${manychatId}`, {
+              leadId,
+              manychatId,
+              tag
+            })
+            // Continuar como si fuera éxito
+          } else {
+            // Re-lanzar el error con más contexto
+            const errorMsg = addError.error_code 
+              ? `ManyChat API error ${addError.error_code}: ${addError.message || 'Error desconocido'}`
+              : `No se pudo agregar el tag '${tag}' al subscriber ${manychatId}: ${addError.message}`
+            
+            logger.error(errorMsg, {
+              leadId,
+              manychatId,
+              tag,
+              tagId: tagExists.id,
+              error_code: addError.error_code,
+              details: addError.details,
+              fullResponse: addError.fullResponse
+            })
+            throw new Error(errorMsg)
+          }
         }
         
         logger.info(`Tag '${tag}' agregado exitosamente a subscriber ${manychatId}`)

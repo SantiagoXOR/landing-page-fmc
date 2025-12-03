@@ -865,6 +865,25 @@ export class ManychatService {
         subscriberId: subscriberIdStr
       })
 
+      // Verificar si el tag ya está asignado al subscriber
+      try {
+        const subscriber = await this.getSubscriberById(subscriberIdStr)
+        if (subscriber?.tags?.some(t => t.id === tag.id || t.name.toLowerCase().trim() === normalizedTagName)) {
+          logger.info(`Tag "${trimmedTagName}" ya está asignado al subscriber ${subscriberIdStr}`, {
+            subscriberId: subscriberIdStr,
+            tagName: trimmedTagName,
+            tagId: tag.id
+          })
+          return true // Ya está asignado, consideramos éxito
+        }
+      } catch (checkError: any) {
+        // Si no podemos verificar, continuar de todas formas
+        logger.warn('No se pudo verificar tags existentes, continuando', {
+          error: checkError.message,
+          subscriberId: subscriberIdStr
+        })
+      }
+
       // Usar el endpoint addTagById con el tag_id encontrado
       const response = await this.executeWithRateLimit(() =>
         this.makeRequest({
@@ -878,29 +897,45 @@ export class ManychatService {
       )
 
       if (response.status === 'error') {
+        const errorMessage = response.error || 'Error desconocido'
+        const errorCode = response.error_code || 'UNKNOWN'
+        
         logger.error('Error agregando tag a subscriber', {
           subscriberId: subscriberIdStr,
           tagName: trimmedTagName,
           tagId: tag.id,
-          error: response.error,
-          error_code: response.error_code,
+          error: errorMessage,
+          error_code: errorCode,
           details: response.details,
-          fullResponse: response
+          fullResponse: JSON.stringify(response)
         })
-        return false
+        
+        // Lanzar error con más detalles para que pueda ser capturado
+        const detailedError = new Error(`ManyChat API error ${errorCode}: ${errorMessage}`)
+        ;(detailedError as any).error_code = errorCode
+        ;(detailedError as any).details = response.details
+        ;(detailedError as any).fullResponse = response
+        throw detailedError
       }
 
       // Verificar que la respuesta sea exitosa
       if (response.status !== 'success') {
+        const unexpectedError = new Error(`Respuesta inesperada de ManyChat: ${response.status}`)
         logger.warn('Respuesta inesperada de ManyChat al agregar tag', {
           subscriberId: subscriberIdStr,
           tagName: trimmedTagName,
           tagId: tag.id,
           responseStatus: response.status,
-          fullResponse: response
+          fullResponse: JSON.stringify(response)
         })
-        return false
+        throw unexpectedError
       }
+
+      logger.info(`Tag "${trimmedTagName}" agregado exitosamente a subscriber ${subscriberIdStr}`, {
+        subscriberId: subscriberIdStr,
+        tagName: trimmedTagName,
+        tagId: tag.id
+      })
 
       return true
     } catch (error: any) {

@@ -117,8 +117,9 @@ async function calculatePeriodMetrics(
       const leadId = lead.id as string
       const pipelineInfo = pipelineMap.get(leadId)
       
-      // Parsear tags
-      const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
+      // Parsear tags (los tags pueden venir como string JSON o array)
+      const leadWithTags = lead as any
+      const tags = leadWithTags.tags ? (typeof leadWithTags.tags === 'string' ? JSON.parse(leadWithTags.tags) : leadWithTags.tags) : []
       const tagsArray = Array.isArray(tags) ? tags : []
       const tagsLower = tagsArray.map(t => String(t).toLowerCase().trim())
 

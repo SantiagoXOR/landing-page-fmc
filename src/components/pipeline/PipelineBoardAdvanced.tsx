@@ -231,6 +231,59 @@ export function PipelineBoardAdvanced({
     }
   }
 
+  // Función para obtener colores de tags según su tipo
+  const getTagColor = (tag: string): { bg: string; text: string; border: string } => {
+    const tagLower = tag.toLowerCase().trim()
+    
+    // Tags relacionados con consultas
+    if (tagLower.includes('consultando') || tagLower.includes('consulta')) {
+      return { bg: '#DBEAFE', text: '#1E40AF', border: '#93C5FD' } // Azul claro
+    }
+    
+    // Tags relacionados con solicitudes y procesos
+    if (tagLower.includes('solicitud') || tagLower.includes('proceso') || tagLower.includes('en-proceso')) {
+      return { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' } // Amarillo claro
+    }
+    
+    // Tags relacionados con documentación
+    if (tagLower.includes('document') || tagLower.includes('docs')) {
+      return { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' } // Verde claro
+    }
+    
+    // Tags relacionados con análisis
+    if (tagLower.includes('analisis') || tagLower.includes('listo')) {
+      return { bg: '#E9D5FF', text: '#6B21A8', border: '#C084FC' } // Morado claro
+    }
+    
+    // Tags relacionados con aprobación
+    if (tagLower.includes('aprobado') || tagLower.includes('preaprobado')) {
+      return { bg: '#DCFCE7', text: '#166534', border: '#86EFAC' } // Verde más oscuro
+    }
+    
+    // Tags relacionados con cierre ganado
+    if (tagLower.includes('ganado') || tagLower.includes('concretada') || tagLower.includes('cerrado')) {
+      return { bg: '#D1FAE5', text: '#065F46', border: '#34D399' } // Verde éxito
+    }
+    
+    // Tags relacionados con rechazo
+    if (tagLower.includes('rechazado') || tagLower.includes('perdido')) {
+      return { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' } // Rojo claro
+    }
+    
+    // Tags relacionados con nuevo lead
+    if (tagLower.includes('nuevo') || tagLower.includes('nuevo-lead')) {
+      return { bg: '#E0E7FF', text: '#3730A3', border: '#A5B4FC' } // Índigo claro
+    }
+    
+    // Tags relacionados con contacto
+    if (tagLower.includes('contactado') || tagLower.includes('contacto')) {
+      return { bg: '#FCE7F3', text: '#9F1239', border: '#F9A8D4' } // Rosa claro
+    }
+    
+    // Default: gris neutro
+    return { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' }
+  }
+
   // Formatear valor monetario
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-AR', {
@@ -674,16 +727,24 @@ function LeadCard({
 
       {lead.tags && lead.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {lead.tags.slice(0, 3).map((tag, index) => (
-            <Badge 
-              key={index} 
-              variant="secondary" 
-              className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
-              title={`Click para filtrar por: ${tag}`}
-            >
-              {tag}
-            </Badge>
-          ))}
+          {lead.tags.slice(0, 3).map((tag, index) => {
+            const tagColor = getTagColor(tag)
+            return (
+              <Badge 
+                key={index} 
+                variant="secondary" 
+                className="text-xs cursor-pointer hover:opacity-80 transition-opacity font-medium"
+                style={{
+                  backgroundColor: tagColor.bg,
+                  color: tagColor.text,
+                  borderColor: tagColor.border
+                }}
+                title={`Click para filtrar por: ${tag}`}
+              >
+                {tag}
+              </Badge>
+            )
+          })}
           {lead.tags.length > 3 && (
             <Badge 
               variant="secondary" 

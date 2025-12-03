@@ -57,7 +57,14 @@ function PipelinePage() {
     'propuesta': 'listo-analisis',
     'negociacion': 'preaprobado',
     'cerrado-ganado': 'cerrado-ganado',
-    'cerrado-perdido': 'rechazado'
+    'cerrado-perdido': 'rechazado',
+    // Mapeos adicionales para compatibilidad
+    'cliente-nuevo': 'cliente-nuevo',
+    'consultando-credito': 'consultando-credito',
+    'solicitando-docs': 'solicitando-docs',
+    'listo-analisis': 'listo-analisis',
+    'preaprobado': 'preaprobado',
+    'rechazado': 'rechazado'
   }
 
   const loadPipelineData = async () => {

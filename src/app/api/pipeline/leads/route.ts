@@ -46,6 +46,33 @@ const estadoToStageId: Record<string, string> = {
   'DERIVADO': 'cerrado-ganado'
 }
 
+// Mapeo de tags a stageId interno (luego se mapea a ID real de etapa)
+const tagToStageId: Record<string, string> = {
+  // Tags de Manychat comunes
+  'lead-consultando': 'contactado', // Se mapeará a 'consultando-credito'
+  'consultando-credito': 'contactado',
+  'consultando': 'contactado',
+  'solicitud-en-proceso': 'propuesta', // Se mapeará a 'listo-analisis'
+  'solicitando-docs': 'calificado', // Se mapeará a 'solicitando-docs'
+  'solicitando-documentacion': 'calificado',
+  'documentacion': 'calificado',
+  'listo-para-analisis': 'propuesta',
+  'listo-analisis': 'propuesta',
+  'preaprobado': 'negociacion', // Se mapeará a 'preaprobado'
+  'pre-aprobado': 'negociacion',
+  'aprobado': 'negociacion',
+  'cerrado-ganado': 'cerrado-ganado',
+  'venta-concretada': 'cerrado-ganado',
+  'rechazado': 'cerrado-perdido', // Se mapeará a 'rechazado'
+  'perdido': 'cerrado-perdido',
+  'nuevo-lead': 'nuevo', // Se mapeará a 'cliente-nuevo'
+  'nuevo': 'nuevo',
+  'contactado': 'contactado',
+  'calificado': 'calificado',
+  'propuesta-enviada': 'propuesta',
+  'negociacion': 'negociacion'
+}
+
 // Función para obtener probabilidad por etapa
 function getProbabilityForStage(stageId: string): number {
   const probabilities: Record<string, number> = {
@@ -70,7 +97,11 @@ function mapLeadToPipelineLead(
   lastEvent: any = null, 
   assignedTo?: string
 ): PipelineLead {
-  // Determinar stageId: usar current_stage del pipeline si existe, sino mapear desde estado del lead
+  // Parsear tags primero para poder usarlos en la lógica
+  const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
+  const tagsArray = Array.isArray(tags) ? tags : []
+
+  // Determinar stageId: usar current_stage del pipeline si existe, sino mapear desde tags, luego desde estado del lead
   let stageId: string
   let stageEntryDate: Date
 
@@ -87,20 +118,38 @@ function mapLeadToPipelineLead(
       })
     }
   } else {
-    // Fallback: mapear desde estado del lead
-    const estadoNormalizado = lead.estado ? String(lead.estado).trim().toUpperCase() : 'NUEVO'
-    stageId = estadoToStageId[estadoNormalizado] || 'nuevo'
-    stageEntryDate = new Date(lead.createdAt)
-    
-    // Log para debugging si el estado no está mapeado
-    if (!estadoToStageId[estadoNormalizado] && lead.estado) {
-      logger.warn(`Estado no mapeado encontrado: "${lead.estado}" (normalizado: "${estadoNormalizado}") - Asignado a etapa "nuevo"`, {
-        leadId: lead.id
+    // Fallback 1: Intentar mapear desde tags
+    let stageFromTag: string | null = null
+    for (const tag of tagsArray) {
+      const tagLower = String(tag).toLowerCase().trim()
+      if (tagToStageId[tagLower]) {
+        stageFromTag = tagToStageId[tagLower]
+        break
+      }
+    }
+
+    if (stageFromTag) {
+      stageId = stageFromTag
+      stageEntryDate = new Date(lead.createdAt)
+      logger.info(`Lead asignado a etapa desde tag: "${stageId}"`, {
+        leadId: lead.id,
+        tags: tagsArray
       })
+    } else {
+      // Fallback 2: mapear desde estado del lead
+      const estadoNormalizado = lead.estado ? String(lead.estado).trim().toUpperCase() : 'NUEVO'
+      stageId = estadoToStageId[estadoNormalizado] || 'cliente-nuevo'
+      stageEntryDate = new Date(lead.createdAt)
+      
+      // Log para debugging si el estado no está mapeado
+      if (!estadoToStageId[estadoNormalizado] && lead.estado) {
+        logger.warn(`Estado no mapeado encontrado: "${lead.estado}" (normalizado: "${estadoNormalizado}") - Asignado a etapa "cliente-nuevo"`, {
+          leadId: lead.id,
+          tags: tagsArray
+        })
+      }
     }
   }
-
-  const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
   
   // Usar el evento más reciente pasado como parámetro, o la fecha de creación del lead
   const lastActivity = lastEvent ? new Date(lastEvent.createdAt) : new Date(lead.createdAt)
@@ -201,7 +250,7 @@ export async function GET(request: NextRequest) {
     // Construir filtros para la consulta de leads
     // Para el pipeline, necesitamos obtener todos los leads sin límite estricto
     const filters: any = {
-      limit: 1000, // Límite aumentado para incluir todos los leads del pipeline
+      limit: 10000, // Límite aumentado para incluir todos los leads del pipeline
       offset: 0
     }
 

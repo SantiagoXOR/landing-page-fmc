@@ -16,7 +16,8 @@ import {
   DollarSign,
   Users,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  HelpCircle
 } from 'lucide-react'
 import { usePipelineDragDrop } from '@/hooks/usePipelineDragDrop'
 import { PipelineStage, PipelineLead, DragDropResult, StageTransition } from '@/types/pipeline'

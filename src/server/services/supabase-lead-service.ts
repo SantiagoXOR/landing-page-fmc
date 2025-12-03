@@ -228,7 +228,9 @@ export class SupabaseLeadService {
       queryParams.append('order', `${sortBy}.${sortOrder}`)
 
       // Paginación
-      const limit = Math.min(filters.limit || 10, 100) // Máximo 100 por página
+      // Si el límite es mayor a 1000, probablemente viene del pipeline y necesitamos todos los leads
+      const maxLimit = filters.limit && filters.limit > 1000 ? filters.limit : 100
+      const limit = Math.min(filters.limit || 10, maxLimit)
       const offset = filters.offset || 0
 
       queryParams.append('limit', limit.toString())

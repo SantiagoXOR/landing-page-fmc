@@ -131,17 +131,29 @@ function mapLeadToPipelineLead(
   if (pipelineInfo && pipelineInfo.current_stage) {
     const pipelineStageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
     
-    // Si el pipeline está en etapa inicial Y hay un tag que indica otra etapa, usar el tag
-    if (initialStages.includes(pipelineInfo.current_stage) && stageFromTag) {
-      stageId = stageFromTag
-      stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
-      logger.info(`Lead reasignado desde etapa inicial "${pipelineInfo.current_stage}" a "${stageId}" basado en tag`, {
-        leadId: lead.id,
-        tags: tagsArray,
-        originalStage: pipelineInfo.current_stage
-      })
+    // Priorizar tags sobre pipeline: si hay un tag que indica una etapa, usar el tag
+    // Esto asegura que los leads se asignen correctamente según sus tags, incluso si tienen pipeline con otra etapa
+    if (stageFromTag) {
+      const tagStageId = stageFromTag
+      
+      // Si el tag indica una etapa diferente a la del pipeline, o el pipeline está en etapa inicial, usar el tag
+      if (tagStageId !== pipelineStageId || initialStages.includes(pipelineInfo.current_stage)) {
+        stageId = tagStageId
+        stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+        logger.info(`Lead reasignado desde etapa "${pipelineInfo.current_stage}" (${pipelineStageId}) a "${tagStageId}" basado en tag`, {
+          leadId: lead.id,
+          tags: tagsArray,
+          originalStage: pipelineInfo.current_stage,
+          originalStageId: pipelineStageId,
+          newStageId: tagStageId
+        })
+      } else {
+        // El pipeline y el tag coinciden, usar el pipeline
+        stageId = pipelineStageId
+        stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+      }
     } else {
-      // Usar current_stage del pipeline como fuente de verdad
+      // No hay tag relevante, usar current_stage del pipeline como fuente de verdad
       stageId = pipelineStageId
       stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
       

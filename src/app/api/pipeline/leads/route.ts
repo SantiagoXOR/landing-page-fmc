@@ -101,33 +101,50 @@ function mapLeadToPipelineLead(
   const tags = lead.tags ? (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) : []
   const tagsArray = Array.isArray(tags) ? tags : []
 
-  // Determinar stageId: usar current_stage del pipeline si existe, sino mapear desde tags, luego desde estado del lead
+  // Determinar stageId: priorizar tags si el pipeline está en etapa inicial, sino usar current_stage del pipeline
   let stageId: string
   let stageEntryDate: Date
 
-  if (pipelineInfo && pipelineInfo.current_stage) {
-    // Usar current_stage del pipeline como fuente de verdad
-    stageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
-    stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
-    
-    // Log si el current_stage no está mapeado
-    if (!pipelineStageToStageId[pipelineInfo.current_stage]) {
-      logger.warn(`Pipeline stage no mapeado: "${pipelineInfo.current_stage}" - Asignado a etapa "nuevo"`, {
-        leadId: lead.id,
-        currentStage: pipelineInfo.current_stage
-      })
+  // Etapas iniciales que pueden ser sobrescritas por tags
+  const initialStages = ['LEAD_NUEVO', 'CLIENTE_NUEVO']
+  
+  // Intentar mapear desde tags primero (tiene prioridad si hay tags relevantes)
+  let stageFromTag: string | null = null
+  for (const tag of tagsArray) {
+    const tagLower = String(tag).toLowerCase().trim()
+    if (tagToStageId[tagLower]) {
+      stageFromTag = tagToStageId[tagLower]
+      break
     }
-  } else {
-    // Fallback 1: Intentar mapear desde tags
-    let stageFromTag: string | null = null
-    for (const tag of tagsArray) {
-      const tagLower = String(tag).toLowerCase().trim()
-      if (tagToStageId[tagLower]) {
-        stageFromTag = tagToStageId[tagLower]
-        break
+  }
+
+  if (pipelineInfo && pipelineInfo.current_stage) {
+    const pipelineStageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
+    
+    // Si el pipeline está en etapa inicial Y hay un tag que indica otra etapa, usar el tag
+    if (initialStages.includes(pipelineInfo.current_stage) && stageFromTag) {
+      stageId = stageFromTag
+      stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+      logger.info(`Lead reasignado desde etapa inicial "${pipelineInfo.current_stage}" a "${stageId}" basado en tag`, {
+        leadId: lead.id,
+        tags: tagsArray,
+        originalStage: pipelineInfo.current_stage
+      })
+    } else {
+      // Usar current_stage del pipeline como fuente de verdad
+      stageId = pipelineStageId
+      stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt)
+      
+      // Log si el current_stage no está mapeado
+      if (!pipelineStageToStageId[pipelineInfo.current_stage]) {
+        logger.warn(`Pipeline stage no mapeado: "${pipelineInfo.current_stage}" - Asignado a etapa "nuevo"`, {
+          leadId: lead.id,
+          currentStage: pipelineInfo.current_stage
+        })
       }
     }
-
+  } else {
+    // No hay pipeline info: usar tags o estado del lead
     if (stageFromTag) {
       stageId = stageFromTag
       stageEntryDate = new Date(lead.createdAt)
@@ -136,14 +153,14 @@ function mapLeadToPipelineLead(
         tags: tagsArray
       })
     } else {
-      // Fallback 2: mapear desde estado del lead
+      // Fallback: mapear desde estado del lead
       const estadoNormalizado = lead.estado ? String(lead.estado).trim().toUpperCase() : 'NUEVO'
-      stageId = estadoToStageId[estadoNormalizado] || 'cliente-nuevo'
+      stageId = estadoToStageId[estadoNormalizado] || 'nuevo'
       stageEntryDate = new Date(lead.createdAt)
       
       // Log para debugging si el estado no está mapeado
       if (!estadoToStageId[estadoNormalizado] && lead.estado) {
-        logger.warn(`Estado no mapeado encontrado: "${lead.estado}" (normalizado: "${estadoNormalizado}") - Asignado a etapa "cliente-nuevo"`, {
+        logger.warn(`Estado no mapeado encontrado: "${lead.estado}" (normalizado: "${estadoNormalizado}") - Asignado a etapa "nuevo"`, {
           leadId: lead.id,
           tags: tagsArray
         })

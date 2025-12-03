@@ -326,15 +326,34 @@ export async function POST(
           throw new Error('No se retornó ningún pipeline después de la creación')
         }
       } catch (finalError: any) {
+        const errorMessage = finalError.message || 'Unknown error'
+        const errorDetails = finalError.response?.data || finalError.details || finalError
+        
         logger.error('Final fallback also failed', {
-          error: finalError.message,
+          error: errorMessage,
           stack: finalError.stack,
           leadId,
           toStageEnum,
           errorType: finalError.constructor?.name,
-          errorResponse: finalError.response?.data || finalError.details || finalError,
-          leadExists: !!lead
+          errorResponse: errorDetails,
+          leadExists: !!lead,
+          // Verificar si es un error de tipo/enum
+          isEnumError: errorMessage.includes('invalid input value for enum') || 
+                      errorMessage.includes('invalid value for enum') ||
+                      errorMessage.includes('PREAPROBADO') ||
+                      errorMessage.includes('pipeline_stage')
         })
+        
+        // Si es un error de enum, sugerir ejecutar la migración
+        if (errorMessage.includes('invalid input value for enum') || 
+            errorMessage.includes('invalid value for enum') ||
+            (errorMessage.includes('PREAPROBADO') && errorMessage.includes('does not exist'))) {
+          logger.error('ENUM ERROR DETECTED: El enum pipeline_stage no incluye PREAPROBADO', {
+            leadId,
+            toStageEnum,
+            suggestion: 'Ejecutar migración: scripts/migrations/002_update_pipeline_stages_manychat.sql'
+          })
+        }
       }
     }
 
@@ -342,12 +361,35 @@ export async function POST(
       logger.error('Failed to update pipeline in database after all attempts', { 
         leadId,
         toStageEnum,
-        fromStageEnum
+        fromStageEnum,
+        leadExists: !!lead,
+        leadIdValue: leadId
       })
+      
+      // Mensaje de error más específico
+      let errorMessage = 'No se pudo actualizar el pipeline en la base de datos.'
+      let errorDetails = 'El sistema intentó múltiples métodos pero todos fallaron.'
+      
+      // Si el lead no existe, mencionarlo
+      if (!lead) {
+        errorMessage = 'El lead no existe en la base de datos.'
+        errorDetails = `No se encontró un lead con ID: ${leadId}`
+      } else {
+        // Si el lead existe pero falló, podría ser un problema de enum o permisos
+        errorDetails = `El lead existe pero no se pudo crear/actualizar el pipeline. Posibles causas:
+        1. El enum pipeline_stage no incluye la etapa "${toStageEnum}" - Ejecutar migración: scripts/migrations/002_update_pipeline_stages_manychat.sql
+        2. Problemas de permisos (RLS) - Verificar políticas de seguridad en Supabase
+        3. Problemas de estructura de tabla - Verificar que la tabla lead_pipeline existe y tiene las columnas correctas
+        
+        Revise los logs del servidor para más detalles específicos.`
+      }
+      
       return NextResponse.json({
         error: 'Database update failed',
-        message: 'No se pudo actualizar el pipeline en la base de datos. Verifique que el lead existe y que tiene permisos.',
-        details: 'El sistema intentó múltiples métodos pero todos fallaron. Revise los logs del servidor para más detalles.'
+        message: errorMessage,
+        details: errorDetails,
+        leadId,
+        toStageEnum
       }, { status: 500 })
     }
 

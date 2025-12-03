@@ -681,25 +681,59 @@ function LeadCard({
         {/* Mostrar CUIL en lugar de Origen */}
         {/* Extraer CUIL también de customFields si no está disponible directamente */}
         {(() => {
-          // Función helper para detectar si un valor parece ser un CUIL/CUIT
-          const looksLikeCUIL = (value: any): boolean => {
-            if (!value) return false
-            const strValue = String(value).replace(/\D/g, '') // Remover caracteres no numéricos
-            // CUIL/CUIT argentino tiene 11 dígitos (con o sin guiones)
-            return /^\d{11}$/.test(strValue) || /^\d{2}-\d{8}-\d{1}$/.test(String(value))
+          // Función helper para extraer CUIL/CUIT/DNI de un valor (puede estar dentro de texto)
+          const extractCUILOrDNI = (value: any): string | null => {
+            if (!value) return null
+            
+            const strValue = String(value)
+            
+            // Buscar patrón CUIL/CUIT con formato XX-XXXXXXXX-X
+            const cuilWithDashes = strValue.match(/\b\d{2}-\d{8}-\d{1}\b/)
+            if (cuilWithDashes) {
+              return cuilWithDashes[0]
+            }
+            
+            // Buscar patrón CUIL/CUIT sin guiones (11 dígitos consecutivos)
+            const cuilWithoutDashes = strValue.match(/\b\d{11}\b/)
+            if (cuilWithoutDashes) {
+              const digits = cuilWithoutDashes[0]
+              // Validar que tenga formato de CUIL/CUIT (XX-XXXXXXXX-X)
+              if (/^\d{2}\d{8}\d{1}$/.test(digits)) {
+                return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`
+              }
+            }
+            
+            // Buscar DNI (8 dígitos) - solo si no encontramos CUIL/CUIT
+            const dni = strValue.match(/\b\d{8}\b/)
+            if (dni && !cuilWithDashes && !cuilWithoutDashes) {
+              return dni[0]
+            }
+            
+            return null
           }
           
-          // Buscar CUIL en claves conocidas primero
+          // Buscar CUIL/DNI en claves conocidas primero
           let cuilValue = lead.cuil || 
-            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil))
+            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil || lead.customFields.dni))
+          
+          // Si ya tenemos un valor, intentar extraerlo en caso de que tenga formato incorrecto
+          if (cuilValue) {
+            const extracted = extractCUILOrDNI(cuilValue)
+            if (extracted) {
+              cuilValue = extracted
+            }
+          }
           
           // Si no se encontró, buscar en todos los valores de customFields por patrón
           if (!cuilValue && lead.customFields) {
             for (const [key, value] of Object.entries(lead.customFields)) {
               if (value === null || value === undefined) continue
               const normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
-              if (looksLikeCUIL(normalizedValue)) {
-                cuilValue = normalizedValue
+              
+              // Intentar extraer CUIL/DNI del valor (puede estar dentro de texto)
+              const extracted = extractCUILOrDNI(normalizedValue)
+              if (extracted) {
+                cuilValue = extracted
                 break
               }
             }
@@ -839,25 +873,59 @@ function LeadCardDragging({
       <div className="space-y-1">
         {/* Mostrar CUIL en lugar de Origen */}
         {(() => {
-          // Función helper para detectar si un valor parece ser un CUIL/CUIT
-          const looksLikeCUIL = (value: any): boolean => {
-            if (!value) return false
-            const strValue = String(value).replace(/\D/g, '') // Remover caracteres no numéricos
-            // CUIL/CUIT argentino tiene 11 dígitos (con o sin guiones)
-            return /^\d{11}$/.test(strValue) || /^\d{2}-\d{8}-\d{1}$/.test(String(value))
+          // Función helper para extraer CUIL/CUIT/DNI de un valor (puede estar dentro de texto)
+          const extractCUILOrDNI = (value: any): string | null => {
+            if (!value) return null
+            
+            const strValue = String(value)
+            
+            // Buscar patrón CUIL/CUIT con formato XX-XXXXXXXX-X
+            const cuilWithDashes = strValue.match(/\b\d{2}-\d{8}-\d{1}\b/)
+            if (cuilWithDashes) {
+              return cuilWithDashes[0]
+            }
+            
+            // Buscar patrón CUIL/CUIT sin guiones (11 dígitos consecutivos)
+            const cuilWithoutDashes = strValue.match(/\b\d{11}\b/)
+            if (cuilWithoutDashes) {
+              const digits = cuilWithoutDashes[0]
+              // Validar que tenga formato de CUIL/CUIT (XX-XXXXXXXX-X)
+              if (/^\d{2}\d{8}\d{1}$/.test(digits)) {
+                return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`
+              }
+            }
+            
+            // Buscar DNI (8 dígitos) - solo si no encontramos CUIL/CUIT
+            const dni = strValue.match(/\b\d{8}\b/)
+            if (dni && !cuilWithDashes && !cuilWithoutDashes) {
+              return dni[0]
+            }
+            
+            return null
           }
           
-          // Buscar CUIL en claves conocidas primero
+          // Buscar CUIL/DNI en claves conocidas primero
           let cuilValue = lead.cuil || 
-            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil))
+            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil || lead.customFields.dni))
+          
+          // Si ya tenemos un valor, intentar extraerlo en caso de que tenga formato incorrecto
+          if (cuilValue) {
+            const extracted = extractCUILOrDNI(cuilValue)
+            if (extracted) {
+              cuilValue = extracted
+            }
+          }
           
           // Si no se encontró, buscar en todos los valores de customFields por patrón
           if (!cuilValue && lead.customFields) {
             for (const [key, value] of Object.entries(lead.customFields)) {
               if (value === null || value === undefined) continue
               const normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
-              if (looksLikeCUIL(normalizedValue)) {
-                cuilValue = normalizedValue
+              
+              // Intentar extraer CUIL/DNI del valor (puede estar dentro de texto)
+              const extracted = extractCUILOrDNI(normalizedValue)
+              if (extracted) {
+                cuilValue = extracted
                 break
               }
             }

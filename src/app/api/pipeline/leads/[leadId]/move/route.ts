@@ -86,6 +86,30 @@ export async function POST(
       userId: session.user.id
     })
 
+    // Verificar que el lead existe antes de continuar
+    let lead
+    try {
+      lead = await supabase.findLeadById(leadId)
+      if (!lead) {
+        logger.error('Lead not found', { leadId })
+        return NextResponse.json({
+          error: 'Lead not found',
+          message: `El lead con ID ${leadId} no existe en la base de datos`
+        }, { status: 404 })
+      }
+      logger.info('Lead found', { leadId, leadName: lead.nombre || 'Sin nombre' })
+    } catch (leadError: any) {
+      logger.error('Error verifying lead exists', {
+        error: leadError.message,
+        leadId
+      })
+      return NextResponse.json({
+        error: 'Error verifying lead',
+        message: 'No se pudo verificar que el lead existe',
+        details: leadError.message
+      }, { status: 500 })
+    }
+
     // Verificar que las etapas sean diferentes
     if (fromStageId === toStageId) {
       return NextResponse.json({
@@ -267,7 +291,19 @@ export async function POST(
     if (!pipelineUpdated) {
       // Intentar una última vez crear el pipeline de forma más simple
       try {
-        logger.info('Attempting final fallback: create minimal pipeline', { leadId })
+        logger.info('Attempting final fallback: create minimal pipeline', { 
+          leadId,
+          toStageEnum,
+          leadExists: !!lead,
+          leadIdType: typeof leadId,
+          leadIdLength: leadId?.length
+        })
+        
+        // Verificar nuevamente que el lead existe
+        if (!lead) {
+          throw new Error('Lead no encontrado en la verificación inicial')
+        }
+        
         const minimalPipeline = await supabase.request('/lead_pipeline', {
           method: 'POST',
           headers: { 'Prefer': 'return=representation' },
@@ -281,15 +317,23 @@ export async function POST(
         })
         
         if (minimalPipeline && minimalPipeline.length > 0) {
-          logger.info('Pipeline created successfully with minimal data', { leadId })
+          logger.info('Pipeline created successfully with minimal data', { 
+            leadId,
+            pipelineId: minimalPipeline[0]?.id 
+          })
           pipelineUpdated = true
+        } else {
+          throw new Error('No se retornó ningún pipeline después de la creación')
         }
       } catch (finalError: any) {
         logger.error('Final fallback also failed', {
           error: finalError.message,
           stack: finalError.stack,
           leadId,
-          errorDetails: finalError
+          toStageEnum,
+          errorType: finalError.constructor?.name,
+          errorResponse: finalError.response?.data || finalError.details || finalError,
+          leadExists: !!lead
         })
       }
     }
@@ -310,8 +354,7 @@ export async function POST(
     // Sincronizar cambio de etapa con ManyChat (no crítico si falla)
     let manychatSynced = false
     try {
-      // Obtener información del lead para ManyChat
-      const lead = await supabase.findLeadById(leadId)
+      // Usar el lead que ya verificamos anteriormente
       
       if (lead && lead.manychatId) {
         logger.info('Syncing pipeline change to ManyChat', {

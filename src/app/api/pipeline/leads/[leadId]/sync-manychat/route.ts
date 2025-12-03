@@ -93,6 +93,34 @@ export async function POST(
       }, { status: 400 })
     }
 
+    // Verificar subscriber antes de sincronizar
+    let subscriberInfo = null
+    try {
+      const subscriber = await ManychatService.getSubscriberById(lead.manychatId)
+      if (subscriber) {
+        subscriberInfo = {
+          id: subscriber.id,
+          firstName: subscriber.first_name,
+          lastName: subscriber.last_name,
+          phone: subscriber.phone,
+          currentTags: subscriber.tags?.map(t => t.name) || []
+        }
+        logger.info('Subscriber encontrado en ManyChat', {
+          subscriberId: lead.manychatId,
+          currentTags: subscriberInfo.currentTags
+        })
+      } else {
+        logger.warn('Subscriber no encontrado en ManyChat', {
+          subscriberId: lead.manychatId
+        })
+      }
+    } catch (subscriberError: any) {
+      logger.error('Error verificando subscriber', {
+        error: subscriberError.message,
+        subscriberId: lead.manychatId
+      })
+    }
+
     // Sincronizar
     try {
       const success = await syncPipelineToManychat({
@@ -109,25 +137,29 @@ export async function POST(
           message: 'Pipeline sincronizado exitosamente con ManyChat',
           stage: pipeline.current_stage,
           tag: stageTag,
-          tagId: tagExists.id
+          tagId: tagExists.id,
+          subscriberInfo
         })
       } else {
         return NextResponse.json({
           error: 'Sync failed',
-          message: 'No se pudo sincronizar con ManyChat'
+          message: 'No se pudo sincronizar con ManyChat',
+          subscriberInfo
         }, { status: 500 })
       }
     } catch (syncError: any) {
       logger.error('Error syncing pipeline to ManyChat', {
         error: syncError.message,
         leadId,
-        manychatId: lead.manychatId
+        manychatId: lead.manychatId,
+        stack: syncError.stack
       })
 
       return NextResponse.json({
         error: 'Sync error',
         message: syncError.message || 'Error al sincronizar con ManyChat',
-        details: syncError.details || syncError
+        details: syncError.details || syncError,
+        subscriberInfo
       }, { status: 500 })
     }
 

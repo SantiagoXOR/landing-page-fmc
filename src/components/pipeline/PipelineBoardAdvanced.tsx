@@ -685,7 +685,8 @@ function LeadCard({
           const extractCUILOrDNI = (value: any): string | null => {
             if (!value) return null
             
-            const strValue = String(value)
+            const strValue = String(value).trim()
+            if (!strValue) return null
             
             // Buscar patrón CUIL/CUIT con formato XX-XXXXXXXX-X
             const cuilWithDashes = strValue.match(/\b\d{2}-\d{8}-\d{1}\b/)
@@ -724,16 +725,31 @@ function LeadCard({
             }
           }
           
-          // Si no se encontró, buscar en todos los valores de customFields por patrón
+          // Si no se encontró, buscar en TODOS los valores de customFields por patrón
+          // Esto maneja el caso donde los customFields tienen índices numéricos (0, 1, 2, etc.)
           if (!cuilValue && lead.customFields) {
             for (const [key, value] of Object.entries(lead.customFields)) {
-              if (value === null || value === undefined) continue
-              const normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
+              if (value === null || value === undefined || value === '') continue
+              
+              let normalizedValue: any
+              try {
+                // Si el valor es un objeto Manychat con estructura {id, name, value, ...}
+                normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
+              } catch (e) {
+                normalizedValue = value
+              }
               
               // Intentar extraer CUIL/DNI del valor (puede estar dentro de texto)
               const extracted = extractCUILOrDNI(normalizedValue)
               if (extracted) {
                 cuilValue = extracted
+                console.log(`[LeadCard] CUIL encontrado en customField[${key}] para lead ${lead.id}:`, {
+                  leadId: lead.id,
+                  leadNombre: lead.nombre,
+                  customFieldKey: key,
+                  customFieldValue: normalizedValue,
+                  extractedCUIL: extracted
+                })
                 break
               }
             }
@@ -877,7 +893,8 @@ function LeadCardDragging({
           const extractCUILOrDNI = (value: any): string | null => {
             if (!value) return null
             
-            const strValue = String(value)
+            const strValue = String(value).trim()
+            if (!strValue) return null
             
             // Buscar patrón CUIL/CUIT con formato XX-XXXXXXXX-X
             const cuilWithDashes = strValue.match(/\b\d{2}-\d{8}-\d{1}\b/)
@@ -916,11 +933,19 @@ function LeadCardDragging({
             }
           }
           
-          // Si no se encontró, buscar en todos los valores de customFields por patrón
+          // Si no se encontró, buscar en TODOS los valores de customFields por patrón
+          // Esto maneja el caso donde los customFields tienen índices numéricos (0, 1, 2, etc.)
           if (!cuilValue && lead.customFields) {
             for (const [key, value] of Object.entries(lead.customFields)) {
-              if (value === null || value === undefined) continue
-              const normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
+              if (value === null || value === undefined || value === '') continue
+              
+              let normalizedValue: any
+              try {
+                // Si el valor es un objeto Manychat con estructura {id, name, value, ...}
+                normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
+              } catch (e) {
+                normalizedValue = value
+              }
               
               // Intentar extraer CUIL/DNI del valor (puede estar dentro de texto)
               const extracted = extractCUILOrDNI(normalizedValue)

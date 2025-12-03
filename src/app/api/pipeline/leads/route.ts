@@ -246,14 +246,33 @@ function mapLeadToPipelineLead(
       // Normalizar custom fields: si vienen como objetos Manychat con estructura {id, name, value, ...}
       // extraer solo el valor
       Object.entries(parsed).forEach(([key, value]) => {
-        if (value && typeof value === 'object' && 'value' in value) {
+        if (value === null || value === undefined) {
+          customFields[key] = value
+          return
+        }
+        
+        // Si es un objeto Manychat con estructura {id, name, type, description, value}
+        if (typeof value === 'object' && value !== null && 'value' in value) {
           customFields[key] = value.value
         } else {
           customFields[key] = value
         }
       })
+      
+      // Log para debugging si hay muchos customFields
+      if (Object.keys(customFields).length > 0) {
+        logger.debug(`CustomFields normalizados para lead ${lead.id}`, {
+          leadId: lead.id,
+          leadNombre: lead.nombre,
+          customFieldsKeys: Object.keys(customFields),
+          customFieldsSample: Object.fromEntries(Object.entries(customFields).slice(0, 3))
+        })
+      }
     } catch (e) {
-      // Ignorar errores de parsing
+      logger.warn(`Error parseando customFields para lead ${lead.id}`, { 
+        error: e instanceof Error ? e.message : String(e),
+        leadId: lead.id 
+      })
     }
   }
   
@@ -261,7 +280,8 @@ function mapLeadToPipelineLead(
   const extractCUILOrDNI = (value: any): string | null => {
     if (!value) return null
     
-    const strValue = String(value)
+    const strValue = String(value).trim()
+    if (!strValue || strValue === '') return null
     
     // Buscar patrón CUIL/CUIT con formato XX-XXXXXXXX-X
     const cuilWithDashes = strValue.match(/\b\d{2}-\d{8}-\d{1}\b/)
@@ -301,10 +321,11 @@ function mapLeadToPipelineLead(
   if (!cuilValue) {
     try {
       for (const [key, value] of Object.entries(customFields)) {
-        if (value === null || value === undefined) continue
+        if (value === null || value === undefined || value === '') continue
         
         let normalizedValue: any
         try {
+          // Si el valor es un objeto Manychat con estructura {id, name, value, ...}
           normalizedValue = typeof value === 'object' && value !== null && 'value' in value ? value.value : value
         } catch (e) {
           normalizedValue = value
@@ -314,8 +335,9 @@ function mapLeadToPipelineLead(
         const extracted = extractCUILOrDNI(normalizedValue)
         if (extracted) {
           cuilValue = extracted
-          logger.debug(`CUIL/DNI encontrado en customField[${key}] para lead ${lead.id}`, {
+          logger.info(`CUIL/DNI encontrado en customField[${key}] para lead ${lead.id}`, {
             leadId: lead.id,
+            leadNombre: lead.nombre,
             customFieldKey: key,
             customFieldValue: normalizedValue,
             extractedCUIL: extracted
@@ -335,6 +357,17 @@ function mapLeadToPipelineLead(
   }
   
   cuilValue = cuilValue || undefined
+  
+  // Log si no se encontró CUIL pero hay customFields (para debugging)
+  if (!cuilValue && Object.keys(customFields).length > 0) {
+    logger.debug(`No se encontró CUIL/DNI para lead ${lead.id}`, {
+      leadId: lead.id,
+      leadNombre: lead.nombre,
+      leadCuil: lead.cuil,
+      customFieldsKeys: Object.keys(customFields),
+      customFieldsValues: Object.values(customFields).slice(0, 5) // Primeros 5 valores para debugging
+    })
+  }
 
   // Calcular score basado en tiempo en etapa
   let timeScore: any

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { checkPermission, checkUserPermission } from '@/lib/rbac'
+import { checkUserPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 import { automationService } from '@/services/automation-service'
@@ -369,59 +369,83 @@ async function validateStageTransition(
   const errors: string[] = []
   const warnings: string[] = []
 
-  // Obtener configuración de etapas (simulado)
-  const stages = {
+  // Mapeo completo de todas las etapas del pipeline (nuevas y legacy)
+  const stages: Record<string, { order: number; name: string }> = {
+    // Etapas nuevas (ManyChat pipeline)
+    'cliente-nuevo': { order: 1, name: 'Cliente Nuevo' },
+    'consultando-credito': { order: 2, name: 'Consultando Crédito' },
+    'solicitando-docs': { order: 3, name: 'Solicitando Documentación' },
+    'solicitando-documentacion': { order: 3, name: 'Solicitando Documentación' },
+    'listo-analisis': { order: 4, name: 'Listo para Análisis' },
+    'preaprobado': { order: 5, name: 'Preaprobado' },
+    'aprobado': { order: 6, name: 'Aprobado' },
+    'en-seguimiento': { order: 7, name: 'En Seguimiento' },
+    'cerrado-ganado': { order: 8, name: 'Cerrado Ganado' },
+    'venta-cerrada': { order: 8, name: 'Cerrado Ganado' },
+    'cerrado_ganado': { order: 8, name: 'Cerrado Ganado' },
+    'rechazado': { order: 9, name: 'Rechazado' },
+    'credito-rechazado': { order: 9, name: 'Rechazado' },
+    'cerrado-perdido': { order: 9, name: 'Cerrado Perdido' },
+    'cerrado_perdido': { order: 9, name: 'Cerrado Perdido' },
+    'encuesta': { order: 10, name: 'Encuesta' },
+    'encuesta-pendiente': { order: 10, name: 'Encuesta Pendiente' },
+    'solicitar-referido': { order: 11, name: 'Solicitar Referido' },
+    
+    // Etapas legacy (soporte retrocompatibilidad)
     'nuevo': { order: 1, name: 'Nuevo Lead' },
     'contactado': { order: 2, name: 'Contactado' },
     'calificado': { order: 3, name: 'Calificado' },
     'propuesta': { order: 4, name: 'Propuesta Enviada' },
-    'negociacion': { order: 5, name: 'Negociación' },
-    'cerrado-ganado': { order: 6, name: 'Cerrado Ganado' },
-    'cerrado-perdido': { order: 7, name: 'Cerrado Perdido' }
+    'negociacion': { order: 5, name: 'Negociación' }
   }
 
-  const fromStage = stages[fromStageId as keyof typeof stages]
-  const toStage = stages[toStageId as keyof typeof stages]
+  const fromStage = stages[fromStageId]
+  const toStage = stages[toStageId]
 
+  // Si las etapas no están en el mapeo, permitir la transición pero con warning
   if (!fromStage || !toStage) {
-    errors.push('Etapa no válida')
-    return { isValid: false, errors, warnings }
+    // Permitir transiciones desconocidas (pueden ser etapas personalizadas)
+    warnings.push(`Transición entre etapas no estándar: ${fromStageId} → ${toStageId}`)
+    return { isValid: true, errors, warnings }
   }
 
-  // Validar salto de etapas
+  // Validar salto de etapas (solo warning, no bloquea)
   const orderDiff = Math.abs(toStage.order - fromStage.order)
-  if (orderDiff > 1 && !['cerrado-ganado', 'cerrado-perdido'].includes(toStageId)) {
+  if (orderDiff > 1 && !['cerrado-ganado', 'cerrado_ganado', 'venta-cerrada', 'rechazado', 'credito-rechazado', 'cerrado-perdido', 'cerrado_perdido'].includes(toStageId)) {
     warnings.push(`Se está saltando ${orderDiff - 1} etapa(s) del pipeline`)
   }
 
   // Permitir retrocesos (solo warning, no error)
-  if (toStage.order < fromStage.order && !['cerrado-perdido'].includes(toStageId)) {
+  if (toStage.order < fromStage.order && !['rechazado', 'credito-rechazado', 'cerrado-perdido', 'cerrado_perdido'].includes(toStageId)) {
     warnings.push('Se está retrocediendo en el pipeline')
     // No bloqueamos retrocesos, solo avisamos
   }
 
-  // Validaciones específicas por etapa
+  // Validaciones específicas por etapa (solo bloquean si es crítico)
   switch (toStageId) {
-    case 'calificado':
-      // Verificar que el lead tenga información mínima
-      // En una implementación real, verificaríamos la base de datos
+    case 'preaprobado':
+      // Permitir transición desde cualquier etapa anterior
+      // No hay restricciones críticas
       break
       
-    case 'propuesta':
-      // Verificar que el lead esté calificado
-      if (fromStageId === 'nuevo') {
-        errors.push('El lead debe estar calificado antes de enviar propuesta')
+    case 'aprobado':
+      // Recomendar que venga de preaprobado, pero no bloquear
+      if (!['preaprobado', 'listo-analisis'].includes(fromStageId)) {
+        warnings.push('Se recomienda pasar por Preaprobado antes de Aprobado')
       }
       break
       
     case 'cerrado-ganado':
-      // Verificar que haya pasado por negociación
-      if (!['negociacion', 'propuesta'].includes(fromStageId)) {
-        warnings.push('Se recomienda pasar por negociación antes de cerrar')
+    case 'cerrado_ganado':
+    case 'venta-cerrada':
+      // Recomendar que haya pasado por aprobación, pero no bloquear
+      if (!['aprobado', 'preaprobado', 'negociacion'].includes(fromStageId)) {
+        warnings.push('Se recomienda pasar por Aprobado o Preaprobado antes de cerrar')
       }
       break
   }
 
+  // Por defecto, permitir todas las transiciones
   return {
     isValid: errors.length === 0,
     errors,

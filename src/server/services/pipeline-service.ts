@@ -189,13 +189,32 @@ export class PipelineService {
   // Validar si una transición es permitida
   async isTransitionAllowed(fromStage: PipelineStage, toStage: PipelineStage): Promise<boolean> {
     try {
+      // Si las etapas son iguales, no permitir
+      if (fromStage === toStage) {
+        return false
+      }
+
+      // Intentar obtener transiciones configuradas en la base de datos
       const transitions = await supabase.request(
-        `/pipeline_transitions?from_stage=eq.${fromStage}&to_stage=eq.${toStage}&is_allowed=eq.true&limit=1`
+        `/pipeline_transitions?from_stage=eq.${fromStage}&to_stage=eq.${toStage}&limit=1`
       )
-      return transitions.length > 0
+      
+      // Si hay registros en la tabla, respetar la configuración
+      if (transitions && transitions.length > 0) {
+        return transitions[0].is_allowed !== false
+      }
+      
+      // Si NO hay registros en la tabla, permitir por defecto
+      // (asumimos que si no hay restricciones explícitas, está permitido)
+      logger.info('No transition rules found in database, allowing by default', {
+        fromStage,
+        toStage
+      })
+      return true
     } catch (error) {
-      logger.error('Error validating transition:', error)
-      return false
+      // Si hay error al consultar la tabla, permitir por defecto para no bloquear el flujo
+      logger.warn('Error validating transition, allowing by default:', error)
+      return true
     }
   }
 

@@ -55,6 +55,23 @@ interface LeadDetails {
   updatedAt?: string
 }
 
+// Función helper para extraer valor de custom field (puede venir como objeto Manychat o valor directo)
+const extractCustomFieldValue = (value: any): string => {
+  if (value === null || value === undefined) return 'No especificado'
+  
+  // Si es un objeto Manychat con estructura {id, name, type, description, value}
+  if (typeof value === 'object' && 'value' in value) {
+    return String(value.value || 'No especificado')
+  }
+  
+  // Si es un objeto pero no tiene estructura Manychat, convertir a string
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  
+  return String(value)
+}
+
 export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalProps) {
   const [leadDetails, setLeadDetails] = useState<LeadDetails | null>(null)
   const [loading, setLoading] = useState(false)
@@ -108,9 +125,24 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
     if (!leadDetails?.customFields) return {}
     
     try {
-      return typeof leadDetails.customFields === 'string'
+      const parsed = typeof leadDetails.customFields === 'string'
         ? JSON.parse(leadDetails.customFields)
         : leadDetails.customFields
+      
+      // Si los custom fields vienen como objetos Manychat con estructura {id, name, type, description, value}
+      // necesitamos extraer solo el valor
+      const normalized: Record<string, any> = {}
+      
+      Object.entries(parsed).forEach(([key, value]) => {
+        // Si el valor es un objeto con estructura Manychat, extraer solo el valor
+        if (value && typeof value === 'object' && 'value' in value) {
+          normalized[key] = value.value
+        } else {
+          normalized[key] = value
+        }
+      })
+      
+      return normalized
     } catch {
       return {}
     }
@@ -132,6 +164,9 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
 
   const customFields = parseCustomFields()
   const tags = parseTags()
+  
+  // Extraer CUIL de customFields si no está en el campo directo
+  const cuilValue = leadDetails?.cuil || customFields.cuit || customFields.cuil || null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -185,10 +220,10 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
                     </div>
                   )}
 
-                  {leadDetails.cuil && (
+                  {cuilValue && (
                     <div>
                       <label className="text-xs text-muted-foreground">CUIL/CUIT</label>
-                      <span className="text-sm font-medium block mt-1">{leadDetails.cuil}</span>
+                      <span className="text-sm font-medium block mt-1">{cuilValue}</span>
                     </div>
                   )}
 
@@ -334,16 +369,19 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
                     <div>
                       <label className="text-xs text-muted-foreground mb-2 block">Custom Fields</label>
                       <div className="space-y-2">
-                        {Object.entries(customFields).map(([key, value]) => (
-                          <div key={key} className="flex justify-between items-start py-2 border-b last:border-0">
-                            <span className="text-xs text-muted-foreground capitalize">
-                              {key.replace(/_/g, ' ')}:
-                            </span>
-                            <span className="text-xs font-medium text-right max-w-[60%] break-words">
-                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                            </span>
-                          </div>
-                        ))}
+                        {Object.entries(customFields).map(([key, value]) => {
+                          const displayValue = extractCustomFieldValue(value)
+                          return (
+                            <div key={key} className="flex justify-between items-start py-2 border-b last:border-0">
+                              <span className="text-xs text-muted-foreground capitalize">
+                                {key.replace(/_/g, ' ')}:
+                              </span>
+                              <span className="text-xs font-medium text-right max-w-[60%] break-words">
+                                {displayValue}
+                              </span>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   )}

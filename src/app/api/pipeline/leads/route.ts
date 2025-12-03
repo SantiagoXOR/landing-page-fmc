@@ -197,13 +197,26 @@ function mapLeadToPipelineLead(
   let customFields: Record<string, any> = {}
   if (lead.customFields) {
     try {
-      customFields = typeof lead.customFields === 'string' 
+      const parsed = typeof lead.customFields === 'string' 
         ? JSON.parse(lead.customFields) 
         : lead.customFields
+      
+      // Normalizar custom fields: si vienen como objetos Manychat con estructura {id, name, value, ...}
+      // extraer solo el valor
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (value && typeof value === 'object' && 'value' in value) {
+          customFields[key] = value.value
+        } else {
+          customFields[key] = value
+        }
+      })
     } catch (e) {
       // Ignorar errores de parsing
     }
   }
+  
+  // Extraer CUIL de customFields si no está en el campo directo
+  const cuilValue = lead.cuil || customFields.cuit || customFields.cuil || undefined
 
   // Calcular score basado en tiempo en etapa
   const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
@@ -243,7 +256,7 @@ function mapLeadToPipelineLead(
     urgency: timeScore.urgency,
     scoreColor: timeScore.color,
     scoreLabel: timeScore.label,
-    cuil: lead.cuil || undefined // Agregar CUIL
+    cuil: cuilValue // Agregar CUIL (puede venir del campo directo o de customFields)
   } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string; cuil?: string }
 }
 

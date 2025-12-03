@@ -679,19 +679,30 @@ function LeadCard({
 
       <div className="space-y-1.5">
         {/* Mostrar CUIL en lugar de Origen */}
-        {lead.cuil ? (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">CUIL:</span>
-            <span className="font-medium text-gray-900">{lead.cuil}</span>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Origen:</span>
-            <Badge variant="outline" className="text-xs">
-              {lead.origen}
-            </Badge>
-          </div>
-        )}
+        {/* Extraer CUIL también de customFields si no está disponible directamente */}
+        {(() => {
+          const cuilValue = lead.cuil || 
+            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil)) ||
+            null
+          
+          return cuilValue ? (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">CUIL:</span>
+              <span className="font-medium text-gray-900">
+                {typeof cuilValue === 'object' && 'value' in cuilValue 
+                  ? cuilValue.value 
+                  : cuilValue}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Origen:</span>
+              <Badge variant="outline" className="text-xs">
+                {lead.origen}
+              </Badge>
+            </div>
+          )
+        })()}
 
         {/* Información de tiempo mejorada */}
         {lead.timeInStage !== undefined && (
@@ -806,19 +817,29 @@ function LeadCardDragging({
 
       <div className="space-y-1">
         {/* Mostrar CUIL en lugar de Origen */}
-        {lead.cuil ? (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">CUIL:</span>
-            <span className="font-medium">{lead.cuil}</span>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Origen:</span>
-            <Badge variant="outline" className="text-xs">
-              {lead.origen}
-            </Badge>
-          </div>
-        )}
+        {(() => {
+          const cuilValue = lead.cuil || 
+            (lead.customFields && (lead.customFields.cuit || lead.customFields.cuil)) ||
+            null
+          
+          return cuilValue ? (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">CUIL:</span>
+              <span className="font-medium">
+                {typeof cuilValue === 'object' && 'value' in cuilValue 
+                  ? cuilValue.value 
+                  : cuilValue}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Origen:</span>
+              <Badge variant="outline" className="text-xs">
+                {lead.origen}
+              </Badge>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

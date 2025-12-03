@@ -62,26 +62,71 @@ export class ManychatService {
         body: body ? JSON.stringify(body) : undefined,
       })
 
-      const data = await response.json()
+      // Verificar Content-Type antes de parsear
+      const contentType = response.headers.get('content-type') || ''
+      const isJSON = contentType.includes('application/json')
+      
+      let data: any
+      
+      if (isJSON) {
+        try {
+          data = await response.json()
+        } catch (jsonError: any) {
+          // Si falla el parseo JSON, leer como texto para diagnóstico
+          const textResponse = await response.text()
+          logger.error('Error parseando JSON de ManyChat', {
+            endpoint,
+            status: response.status,
+            contentType,
+            responsePreview: textResponse.substring(0, 500),
+            error: jsonError.message
+          })
+          throw new Error(`ManyChat API devolvió JSON inválido: ${jsonError.message}`)
+        }
+      } else {
+        // Si no es JSON, leer como texto
+        const textResponse = await response.text()
+        logger.error('ManyChat API devolvió respuesta no-JSON', {
+          endpoint,
+          status: response.status,
+          contentType,
+          responsePreview: textResponse.substring(0, 500)
+        })
+        
+        // Intentar parsear como JSON de todas formas (por si el header está mal)
+        try {
+          data = JSON.parse(textResponse)
+        } catch {
+          // Si no es JSON válido, crear un error descriptivo
+          throw new Error(`ManyChat API devolvió HTML/texto en lugar de JSON. Status: ${response.status}. Respuesta: ${textResponse.substring(0, 200)}`)
+        }
+      }
 
       if (!response.ok) {
-        console.error('Manychat API Error:', {
+        logger.error('Manychat API Error', {
           status: response.status,
+          statusText: response.statusText,
           data,
           endpoint,
+          contentType
         })
         
         return {
           status: 'error',
-          error: data.error || data.message || 'Error desconocido',
-          error_code: data.error_code,
-          details: data.details,
+          error: data.error || data.message || `HTTP ${response.status}: ${response.statusText}`,
+          error_code: data.error_code || `HTTP_${response.status}`,
+          details: data.details || data,
         }
       }
 
       return data
-    } catch (error) {
-      console.error('Error en petición a Manychat:', error)
+    } catch (error: any) {
+      logger.error('Error en petición a Manychat', {
+        error: error.message,
+        stack: error.stack,
+        endpoint,
+        method
+      })
       throw error
     }
   }
@@ -885,14 +930,24 @@ export class ManychatService {
       }
 
       // Usar el endpoint addTagById con el tag_id encontrado
+      const requestBody = {
+        subscriber_id: subscriberIdStr,
+        tag_id: tag.id,
+      }
+      
+      logger.info('Intentando agregar tag a subscriber en ManyChat', {
+        subscriberId: subscriberIdStr,
+        tagId: tag.id,
+        tagName: trimmedTagName,
+        endpoint: '/fb/subscriber/addTagById',
+        body: requestBody
+      })
+      
       const response = await this.executeWithRateLimit(() =>
         this.makeRequest({
           method: 'POST',
           endpoint: `/fb/subscriber/addTagById`,
-          body: {
-            subscriber_id: subscriberIdStr,
-            tag_id: tag.id,
-          },
+          body: requestBody,
         })
       )
 

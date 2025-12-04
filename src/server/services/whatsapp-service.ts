@@ -302,8 +302,7 @@ export class WhatsAppService {
             logger.error('Error enviando mensaje usando teléfono directamente', {
               phone: data.to.substring(0, 5) + '***',
               error: phoneResponse.error,
-              errorCode: phoneResponse.error_code,
-              details: phoneResponse.details
+              errorCode: phoneResponse.error_code
             })
             
             // Si el error es sobre permisos, proporcionar mensaje más específico

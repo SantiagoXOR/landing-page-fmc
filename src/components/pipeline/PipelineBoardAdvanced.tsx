@@ -115,15 +115,8 @@ export function PipelineBoardAdvanced({
         throw new Error(errorData.error || 'Error al mover el lead')
       }
 
-      // Usar el callback onLeadMove si existe para actualizar el estado
-      if (onLeadMove) {
-        await onLeadMove({
-          leadId,
-          fromStageId,
-          toStageId,
-          lead,
-        })
-      }
+      // Recargar los datos del pipeline después de mover el lead
+      // El callback onLeadMove es para drag & drop, no para el dropdown
     } catch (error: any) {
       throw error
     }

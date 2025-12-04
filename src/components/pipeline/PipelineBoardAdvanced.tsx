@@ -758,15 +758,45 @@ function LeadCard({
 
   // Función para mover el lead a una etapa
   const handleMoveToStage = async (toStageId: string) => {
-    if (!onLeadMove || isMoving) return
+    if (isMoving) {
+      console.log('handleMoveToStage: Ya hay un movimiento en proceso', { isMoving })
+      return
+    }
     
     try {
+      console.log('handleMoveToStage: Iniciando movimiento', { leadId: lead.id, leadName: lead.nombre, fromStageId: lead.stageId, toStageId })
       setIsMoving(true)
-      await onLeadMove(lead.id, toStageId)
+      
+      // Llamar directamente a la API en lugar de usar onLeadMove (que es para drag & drop)
+      const fromStageId = lead.stageId || ''
+      
+      const response = await fetch(`/api/pipeline/leads/${lead.id}/move`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromStageId,
+          toStageId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || errorData.error || 'Error al mover el lead')
+      }
+
+      const result = await response.json()
+      console.log('handleMoveToStage: Movimiento exitoso', result)
+      
       setShowDropdown(false)
       const stageName = stages.find(s => s.id === toStageId)?.name || toStageId
       toast.success(`Lead movido a ${stageName}`)
+      
+      // Recargar la página para actualizar los datos
+      window.location.reload()
     } catch (error: any) {
+      console.error('handleMoveToStage: Error al mover', error)
       toast.error(error.message || 'Error al mover el lead')
     } finally {
       setIsMoving(false)

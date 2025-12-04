@@ -326,7 +326,7 @@ export class WhatsAppService {
 
       // Si el subscriber no tiene teléfono configurado, intentar actualizarlo usando createOrUpdateSubscriber
       // ManyChat requiere que el subscriber tenga teléfono en su perfil para enviar mensajes por WhatsApp
-      if (!subscriber.whatsapp_phone && !subscriber.phone) {
+      if (subscriber && !subscriber.whatsapp_phone && !subscriber.phone) {
         logger.info('Subscriber sin teléfono configurado, intentando actualizar usando createOrUpdateSubscriber', {
           subscriberId: subscriber.id,
           phone: data.to.substring(0, 5) + '***'

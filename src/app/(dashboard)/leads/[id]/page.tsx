@@ -419,14 +419,14 @@ export default function LeadDetailPage() {
                   {hasValue(lead.monto) && (
                     <div className="p-3 rounded-lg hover:bg-gray-50 transition-colors">
                       <p className="text-xs text-gray-500 mb-1">Monto Solicitado</p>
-                      <p className="text-sm font-medium text-green-600">{formatCurrency(lead.monto)}</p>
+                      <p className="text-sm font-medium text-green-600">{formatCurrency(lead.monto ?? 0)}</p>
                     </div>
                   )}
 
                   {hasValue(lead.ingresos) && (
                     <div className="p-3 rounded-lg hover:bg-gray-50 transition-colors">
                       <p className="text-xs text-gray-500 mb-1">Ingresos</p>
-                      <p className="text-sm font-medium">{formatCurrency(lead.ingresos)}</p>
+                      <p className="text-sm font-medium">{formatCurrency(lead.ingresos ?? 0)}</p>
                     </div>
                   )}
 

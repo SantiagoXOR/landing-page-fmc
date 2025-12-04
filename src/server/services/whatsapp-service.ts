@@ -268,7 +268,7 @@ export class WhatsAppService {
               url: data.mediaUrl,
               caption: data.message || undefined
             })
-          } else if (messageType === 'file' || messageType === 'document') {
+          } else if (messageType === 'file') {
             messages.push({
               type: 'file',
               url: data.mediaUrl,

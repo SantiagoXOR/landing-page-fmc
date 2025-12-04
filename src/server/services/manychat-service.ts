@@ -301,7 +301,17 @@ export class ManychatService {
             page_id: subscriber.page_id
           }
         })
-        return null // Retornar null si no tiene ID válido
+        
+        // Si tiene key, retornarlo para que el código pueda intentar obtener el ID después
+        if (subscriber.key) {
+          logger.info('Subscriber tiene key, retornando para intentar obtener ID', {
+            phone: normalizedPhone.substring(0, 5) + '***',
+            key: subscriber.key.substring(0, 20) + '...'
+          })
+          return subscriber
+        }
+        
+        return null // Retornar null solo si no tiene key ni ID válido
       }
 
       logger.info('Subscriber encontrado por teléfono', {

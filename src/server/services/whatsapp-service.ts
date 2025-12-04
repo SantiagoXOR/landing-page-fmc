@@ -238,13 +238,112 @@ export class WhatsAppService {
       }
       
       // Si aún no hay subscriber o no tiene ID válido después de todos los intentos,
-      // intentar usar teléfono directamente como último recurso
+      // intentar obtener el subscriber_id usando otras estrategias
       if (!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
-        logger.warn('Subscriber no encontrado o sin ID válido, intentando usar teléfono directamente como último recurso', {
+        logger.warn('Subscriber no encontrado o sin ID válido, intentando obtener ID usando otras estrategias', {
           phone: data.to.substring(0, 5) + '***',
           hasSubscriber: !!subscriber,
           subscriberKey: subscriber?.key
         })
+
+        // Estrategia 1: Usar manychatId guardado en el lead
+        if (data.leadId) {
+          const lead = await supabase.findLeadById(data.leadId)
+          
+          if (lead && lead.manychatId) {
+            logger.info('Intentando usar manychatId del lead para obtener subscriber', {
+              leadId: data.leadId,
+              manychatId: lead.manychatId,
+              phone: data.to.substring(0, 5) + '***'
+            })
+            
+            try {
+              // Intentar obtener subscriber usando el manychatId guardado
+              const subscriberById = await ManychatService.getSubscriberById(lead.manychatId)
+              
+              if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
+                logger.info('Subscriber válido obtenido usando manychatId del lead', {
+                  subscriberId: subscriberById.id,
+                  manychatId: lead.manychatId
+                })
+                subscriber = subscriberById
+              }
+            } catch (error: any) {
+              logger.warn('Error obteniendo subscriber por manychatId', {
+                error: error.message,
+                manychatId: lead.manychatId
+              })
+            }
+          }
+        }
+
+        // Estrategia 2: Intentar extraer subscriber_id del key si tiene formato específico
+        if ((!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) && subscriber?.key) {
+          // Intentar extraer subscriber_id del key si tiene formato "user:123456789" o similar
+          const keyMatch = subscriber.key.match(/user[:_](\d+)/i)
+          if (keyMatch && keyMatch[1]) {
+            const extractedId = parseInt(keyMatch[1])
+            if (extractedId && extractedId > 0) {
+              logger.info('Intentando usar ID extraído del key del subscriber', {
+                extractedId,
+                key: subscriber.key.substring(0, 30) + '...',
+                phone: data.to.substring(0, 5) + '***'
+              })
+              
+              try {
+                const subscriberById = await ManychatService.getSubscriberById(extractedId)
+                if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
+                  logger.info('Subscriber válido obtenido usando ID extraído del key', {
+                    subscriberId: subscriberById.id
+                  })
+                  subscriber = subscriberById
+                }
+              } catch (error: any) {
+                logger.warn('Error obteniendo subscriber por ID extraído del key', {
+                  error: error.message,
+                  extractedId
+                })
+              }
+            }
+          }
+
+          // Estrategia 3: Intentar usar el key directamente como subscriber_id (algunos formatos de ManyChat aceptan esto)
+          if ((!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) && subscriber.key) {
+            // Intentar parsear el key como número si es posible
+            const keyAsNumber = parseInt(subscriber.key)
+            if (!isNaN(keyAsNumber) && keyAsNumber > 0) {
+              logger.info('Intentando usar key como subscriber_id numérico', {
+                keyAsNumber,
+                key: subscriber.key.substring(0, 30) + '...',
+                phone: data.to.substring(0, 5) + '***'
+              })
+              
+              try {
+                const subscriberById = await ManychatService.getSubscriberById(keyAsNumber)
+                if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
+                  logger.info('Subscriber válido obtenido usando key como subscriber_id', {
+                    subscriberId: subscriberById.id
+                  })
+                  subscriber = subscriberById
+                }
+              } catch (error: any) {
+                logger.warn('Error obteniendo subscriber usando key como subscriber_id', {
+                  error: error.message,
+                  keyAsNumber
+                })
+              }
+            }
+          }
+        }
+
+        // Si después de todas las estrategias aún no tenemos un subscriber válido,
+        // intentar usar teléfono directamente como último recurso
+        if (!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
+          logger.warn('Subscriber no encontrado o sin ID válido después de todas las estrategias, intentando usar teléfono directamente como último recurso', {
+            phone: data.to.substring(0, 5) + '***',
+            hasSubscriber: !!subscriber,
+            subscriberKey: subscriber?.key
+          })
 
         // Preparar mensaje según el tipo
         const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
@@ -321,10 +420,14 @@ export class WhatsAppService {
           }
           
           // Si falla el envío por teléfono, lanzar error descriptivo
-          const errorMessage = `El contacto con teléfono ${data.to.substring(0, 5)}*** no está sincronizado con ManyChat. Por favor, sincroniza el contacto primero desde la página del lead.`
+          // ManyChat requiere subscriber_id y no acepta solo phone
+          const errorMessage = `No se puede enviar el mensaje porque ManyChat requiere un subscriber_id válido y el contacto no está completamente sincronizado. Por favor, sincroniza el contacto primero desde la página del lead usando el botón "Actualizar sincronización".`
           logger.error('No se puede enviar mensaje: subscriber no encontrado y falló envío por teléfono', {
             phone: data.to.substring(0, 5) + '***',
-            phoneError: phoneError.message
+            phoneError: phoneError.message,
+            hasSubscriber: !!subscriber,
+            subscriberKey: subscriber?.key,
+            leadId: data.leadId
           })
           throw new Error(errorMessage)
         }

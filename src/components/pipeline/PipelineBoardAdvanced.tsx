@@ -671,6 +671,22 @@ function LeadCard({
   } = useDraggable({
     id: lead.id,
   })
+  
+  // Parsear tags si vienen como string JSON
+  const parseTags = (): string[] => {
+    if (!lead.tags) return []
+    try {
+      if (typeof lead.tags === 'string') {
+        const parsed = JSON.parse(lead.tags)
+        return Array.isArray(parsed) ? parsed : []
+      }
+      return Array.isArray(lead.tags) ? lead.tags : []
+    } catch {
+      return Array.isArray(lead.tags) ? lead.tags : []
+    }
+  }
+  
+  const parsedTags = parseTags()
 
   const [isMoving, setIsMoving] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -1020,7 +1036,7 @@ function LeadCard({
 
       {parsedTags && parsedTags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {parsedTags.slice(0, 3).map((tag, index) => {
+          {parsedTags.slice(0, 3).map((tag: string, index: number) => {
             const tagColor = getTagColor(tag)
             return (
               <Badge 

@@ -3,7 +3,7 @@ import { ConversationService } from './conversation-service'
 import { ManychatService } from './manychat-service'
 import { ManychatSyncService } from './manychat-sync-service'
 import { MessagingService } from './messaging-service'
-import { ManychatMessage } from '@/types/manychat'
+import { ManychatMessage, ManychatSendMessageResponse } from '@/types/manychat'
 import { WhatsAppBusinessAPI, WhatsAppAPIError, formatWhatsAppNumber, isValidWhatsAppNumber } from '@/lib/integrations/whatsapp-business-api'
 import { logger } from '@/lib/logger'
 
@@ -59,6 +59,29 @@ export class WhatsAppService {
    */
   static isConfigured(): boolean {
     return this.USE_MANYCHAT || !!this.whatsappClient
+  }
+
+  /**
+   * Detectar si el error es de ventana de 24 horas (código 3011)
+   */
+  private static is24HourWindowError(response: ManychatSendMessageResponse): boolean {
+    // Detectar código 3011 en details (puede estar en details.code o details.details.code)
+    if (response.details) {
+      const code = response.details.code || (response.details as any).details?.code
+      if (code === 3011 || code === '3011') {
+        return true
+      }
+    }
+    
+    // Detectar por mensaje de error
+    const errorMessage = response.error?.toLowerCase() || ''
+    const detailsMessage = (response.details as any)?.message?.toLowerCase() || ''
+    return errorMessage.includes('24 hour') || 
+           errorMessage.includes('message tag') ||
+           errorMessage.includes('last interaction') ||
+           detailsMessage.includes('24 hour') ||
+           detailsMessage.includes('message tag') ||
+           detailsMessage.includes('last interaction')
   }
 
   /**
@@ -339,6 +362,22 @@ export class WhatsAppService {
                       channel: 'whatsapp',
                     }
                   } else {
+                    // Detectar error de ventana de 24 horas
+                    if (this.is24HourWindowError(sendResponse)) {
+                      logger.warn('Error de ventana de 24 horas detectado', {
+                        manychatId: manychatIdAsNumber,
+                        error: sendResponse.error,
+                        errorCode: sendResponse.error_code,
+                        details: sendResponse.details
+                      })
+                      
+                      throw new Error(
+                        'No se puede enviar el mensaje porque el contacto no ha interactuado en las últimas 24 horas. ' +
+                        'Para enviar mensajes fuera de la ventana de 24 horas, ManyChat requiere usar un template de WhatsApp aprobado. ' +
+                        'Por favor, contacta al soporte para configurar templates o espera a que el contacto envíe un mensaje primero.'
+                      )
+                    }
+                    
                     logger.warn('Error enviando mensaje usando manychatId directamente', {
                       manychatId: manychatIdAsNumber,
                       error: sendResponse.error,
@@ -418,6 +457,22 @@ export class WhatsAppService {
                       channel: 'whatsapp',
                     }
                   } else {
+                    // Detectar error de ventana de 24 horas
+                    if (this.is24HourWindowError(sendResponse)) {
+                      logger.warn('Error de ventana de 24 horas detectado después de error', {
+                        manychatId: manychatIdAsNumber,
+                        error: sendResponse.error,
+                        errorCode: sendResponse.error_code,
+                        details: sendResponse.details
+                      })
+                      
+                      throw new Error(
+                        'No se puede enviar el mensaje porque el contacto no ha interactuado en las últimas 24 horas. ' +
+                        'Para enviar mensajes fuera de la ventana de 24 horas, ManyChat requiere usar un template de WhatsApp aprobado. ' +
+                        'Por favor, contacta al soporte para configurar templates o espera a que el contacto envíe un mensaje primero.'
+                      )
+                    }
+                    
                     logger.warn('Error enviando mensaje usando manychatId directamente después de error', {
                       manychatId: manychatIdAsNumber,
                       error: sendResponse.error,
@@ -560,8 +615,26 @@ export class WhatsAppService {
               logger.error('Error enviando mensaje usando teléfono directamente', {
                 phone: data.to.substring(0, 5) + '***',
                 error: phoneResponse.error,
-                errorCode: phoneResponse.error_code
+                errorCode: phoneResponse.error_code,
+                details: phoneResponse.details
               })
+              
+              // Detectar error específico de subscriber_id requerido
+              const errorMessage = phoneResponse.error?.toLowerCase() || ''
+              const errorDetails = phoneResponse.details as any
+              const hasSubscriberIdError = errorMessage.includes('subscriber_id cannot be blank') ||
+                                         errorMessage.includes('subscriber_id') && errorMessage.includes('blank') ||
+                                         (errorDetails?.messages && Array.isArray(errorDetails.messages) &&
+                                          errorDetails.messages.some((m: any) => 
+                                            m.message?.toLowerCase().includes('subscriber_id cannot be blank')
+                                          ))
+              
+              if (hasSubscriberIdError) {
+                throw new Error(
+                  'ManyChat requiere un subscriber_id válido para enviar mensajes. Por favor, sincroniza el contacto primero desde la página del lead usando el botón "Actualizar sincronización". ' +
+                  'Si el problema persiste, contacta al soporte.'
+                )
+              }
               
               // Si el error es sobre permisos, proporcionar mensaje más específico
               if (phoneResponse.error_code?.includes('PERMISSION') || 

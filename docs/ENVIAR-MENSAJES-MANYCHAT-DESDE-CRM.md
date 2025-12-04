@@ -305,7 +305,62 @@ const result = await ManychatService.sendMessage(subscriber.id, messages)
 - Usar un template aprobado para WhatsApp/Instagram
 - O esperar a que el usuario envíe un mensaje primero
 
-#### 4. Rate Limit Excedido
+#### 3.1. Error de Ventana de 24 Horas - Código 3011
+
+Este es un error específico de ManyChat que ocurre cuando intentas enviar un mensaje a un contacto que no ha interactuado en las últimas 24 horas:
+
+```json
+{
+  "status": "error",
+  "message": "Content can't be sent to the subscriber without a message tag. Subscriber's last interaction was over 22h ago (more than 24 hours ago)",
+  "code": 3011,
+  "details": {
+    "code": 3011,
+    "message": "Content can't be sent to the subscriber without a message tag..."
+  }
+}
+```
+
+**Causa:**
+- WhatsApp Business API solo permite enviar mensajes libres dentro de las 24 horas posteriores al último mensaje del usuario
+- Fuera de esta ventana, ManyChat requiere usar un template de WhatsApp aprobado por Meta
+
+**Solución:**
+1. **Usar un template de WhatsApp aprobado**: Configura templates en ManyChat y úsalos cuando el contacto esté fuera de la ventana de 24 horas
+2. **Esperar interacción del usuario**: Si el usuario envía un mensaje, se abre la ventana de 24 horas nuevamente
+3. **Contactar soporte**: Si necesitas enviar mensajes fuera de la ventana frecuentemente, contacta al soporte para configurar templates aprobados
+
+**Nota:** El sistema detecta automáticamente este error y muestra un mensaje descriptivo al usuario explicando la situación.
+
+#### 4. Subscriber ID Requerido
+
+```json
+{
+  "status": "error",
+  "message": "Validation error",
+  "details": {
+    "messages": [
+      {
+        "message": "subscriber_id cannot be blank."
+      }
+    ]
+  }
+}
+```
+
+**Causa:**
+- ManyChat siempre requiere un `subscriber_id` válido para enviar mensajes
+- No es posible enviar mensajes usando solo el número de teléfono sin un `subscriber_id` asociado
+- El contacto puede existir en ManyChat pero no tener un ID válido asignado
+
+**Solución:**
+1. **Sincronizar el contacto**: Usa el botón "Actualizar sincronización" en la página del lead para sincronizar el contacto con ManyChat
+2. **Verificar manychatId**: Asegúrate de que el lead tenga un `manychatId` válido guardado en la base de datos
+3. **Contactar soporte**: Si el problema persiste después de sincronizar, puede haber un problema de permisos en ManyChat
+
+**Nota:** El sistema intenta automáticamente múltiples estrategias para obtener un `subscriber_id` válido antes de mostrar este error.
+
+#### 5. Rate Limit Excedido
 
 ```json
 {
@@ -319,6 +374,34 @@ const result = await ManychatService.sendMessage(subscriber.id, messages)
 - Implementar retry con backoff exponencial
 - Respetar los límites de rate limiting (100 req/s para ManyChat)
 - Esperar antes de reintentar
+
+#### 4. Subscriber ID Requerido
+
+```json
+{
+  "status": "error",
+  "message": "Validation error",
+  "details": {
+    "messages": [
+      {
+        "message": "subscriber_id cannot be blank."
+      }
+    ]
+  }
+}
+```
+
+**Causa:**
+- ManyChat siempre requiere un `subscriber_id` válido para enviar mensajes
+- No es posible enviar mensajes usando solo el número de teléfono sin un `subscriber_id` asociado
+- El contacto puede existir en ManyChat pero no tener un ID válido asignado
+
+**Solución:**
+1. **Sincronizar el contacto**: Usa el botón "Actualizar sincronización" en la página del lead para sincronizar el contacto con ManyChat
+2. **Verificar manychatId**: Asegúrate de que el lead tenga un `manychatId` válido guardado en la base de datos
+3. **Contactar soporte**: Si el problema persiste después de sincronizar, puede haber un problema de permisos en ManyChat
+
+**Nota:** El sistema intenta automáticamente múltiples estrategias para obtener un `subscriber_id` válido antes de mostrar este error.
 
 ### Código de Ejemplo con Manejo de Errores
 

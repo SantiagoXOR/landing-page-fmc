@@ -142,6 +142,11 @@ export interface ManychatSendMessageResponse {
   }
   error?: string
   error_code?: string
+  details?: {
+    code?: number | string
+    message?: string
+    [key: string]: any
+  }
 }
 
 // ============================================================================

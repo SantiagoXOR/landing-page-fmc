@@ -52,6 +52,8 @@ function LeadsPage() {
   const { checkPermission } = usePermissions()
   const [leads, setLeads] = useState<Lead[]>([])
   const [allLeads, setAllLeads] = useState<Lead[]>([]) // Para contadores dinámicos exactos
+  const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string }>>([])
+  const [selectedTag, setSelectedTag] = useState<string>('')
 
   // Estados de carga usando el hook personalizado
   const {
@@ -100,6 +102,19 @@ function LeadsPage() {
     }
   }
 
+  // Función para obtener tags disponibles de Manychat
+  const fetchAvailableTags = async () => {
+    try {
+      const response = await fetch('/api/manychat/tags')
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableTags(data.tags || [])
+      }
+    } catch (error) {
+      console.error('Error fetching tags:', error)
+    }
+  }
+
   const fetchLeads = async () => {
     await apiCall(
       async () => {
@@ -124,7 +139,7 @@ function LeadsPage() {
         const data: LeadsResponse = await response.json()
         setLeads(data.leads)
         setTotalPages(data.totalPages)
-        setTotalLeads(data.total)
+        setTotalLeads(data.total) // Usar el total real de la API
 
         return data
       },
@@ -146,6 +161,7 @@ function LeadsPage() {
     setIngresoMax(filters.ingresoMax)
     setFechaDesde(filters.fechaDesde)
     setFechaHasta(filters.fechaHasta)
+    setSelectedTag('') // Limpiar tag seleccionado al usar búsqueda avanzada
     setPage(1) // Reset to first page
   }
 
@@ -159,7 +175,21 @@ function LeadsPage() {
     setIngresoMax('')
     setFechaDesde('')
     setFechaHasta('')
+    setSelectedTag('')
     setPage(1)
+  }
+
+  // Función para obtener conteo de leads por tag
+  const getTagCount = (tagName: string) => {
+    return allLeads.filter(lead => {
+      if (!lead.tags) return false
+      try {
+        const leadTags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
+        return Array.isArray(leadTags) && leadTags.includes(tagName)
+      } catch {
+        return false
+      }
+    }).length
   }
 
   // Función para abrir modal de eliminación
@@ -276,10 +306,11 @@ function LeadsPage() {
 
   useEffect(() => {
     fetchLeads()
-  }, [page, search, estado, origen, zona, ingresoMin, ingresoMax, fechaDesde, fechaHasta])
+  }, [page, search, estado, origen, zona, ingresoMin, ingresoMax, fechaDesde, fechaHasta, selectedTag])
 
   useEffect(() => {
     fetchAllLeads() // Cargar todos los leads para contadores dinámicos
+    fetchAvailableTags() // Cargar tags disponibles
   }, [])
 
   // Funciones para contadores dinámicos exactos
@@ -292,41 +323,51 @@ function LeadsPage() {
   }
 
   const getFilteredCount = () => {
-    let filtered = allLeads
-
-    if (estado) {
-      filtered = filtered.filter(lead => lead.estado === estado)
-    }
-    if (origen) {
-      filtered = filtered.filter(lead => lead.origen === origen)
-    }
-    if (search) {
-      const searchLower = search.toLowerCase()
-      filtered = filtered.filter(lead =>
-        lead.nombre?.toLowerCase().includes(searchLower) ||
-        lead.telefono?.toLowerCase().includes(searchLower) ||
-        lead.email?.toLowerCase().includes(searchLower)
-      )
-    }
-
-    return filtered.length
+    // Usar totalLeads de la API que tiene el conteo real
+    return totalLeads
   }
+
+  // Obtener el total de leads filtrados por tag (para paginación)
+  const getFilteredTotalByTag = () => {
+    if (!selectedTag) return totalLeads
+    return allLeads.filter(lead => {
+      if (!lead.tags) return false
+      try {
+        const leadTags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
+        return Array.isArray(leadTags) && leadTags.includes(selectedTag)
+      } catch {
+        return false
+      }
+    }).length
+  }
+
+  // Filtrar leads por tag seleccionado (se aplica después de obtener los leads de la página actual)
+  const filteredLeadsByTag = selectedTag ? leads.filter(lead => {
+    if (!lead.tags) return false
+    try {
+      const leadTags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
+      return Array.isArray(leadTags) && leadTags.includes(selectedTag)
+    } catch {
+      return false
+    }
+  }) : leads
 
   // Función para generar título con contadores dinámicos exactos
   const getPageTitle = () => {
-    const totalCount = allLeads.length
+    const totalCount = totalLeads || allLeads.length // Usar totalLeads de la API primero
     const filteredCount = getFilteredCount()
 
-    if (!estado && !origen && !search) {
+    if (!estado && !origen && !search && !selectedTag) {
       return `Leads de Formosa (${totalCount})`
     }
 
     let filterText = ''
     if (estado) filterText += ` por estado: ${estado}`
     if (origen) filterText += ` por origen: ${origen}`
+    if (selectedTag) filterText += ` por tag: ${selectedTag}`
     if (search) filterText += ` por búsqueda: &quot;${search}&quot;`
 
-    return `Leads (${filteredCount})(filtrado${filterText})`
+    return `Leads (${filteredCount})${filterText ? ` - Filtrado${filterText}` : ''}`
   }
 
   const getEstadoBadge = (estado: string) => {
@@ -425,7 +466,7 @@ function LeadsPage() {
                       <Users className="h-6 w-6 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{allLeads.length}</p>
+                      <p className="text-2xl font-bold">{totalLeads || allLeads.length}</p>
                       <p className="text-sm text-muted-foreground">Total Leads</p>
                     </div>
                   </div>
@@ -491,35 +532,48 @@ function LeadsPage() {
           totalResults={totalLeads}
         />
 
-        {/* Filtros rápidos con badges */}
+        {/* Filtros rápidos con tags */}
         <Card className="formosa-card">
           <CardContent className="p-6">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold mb-3">Filtros Rápidos</h3>
+              <h3 className="text-lg font-semibold mb-3">Filtros Rápidos por Tags</h3>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setEstado('')}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                    !estado
+                  onClick={() => {
+                    setSelectedTag('')
+                    setEstado('')
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    !selectedTag && !estado
                       ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  Todos ({allLeads.length})
+                  Todos ({totalLeads || allLeads.length})
                 </button>
-                {['NUEVO', 'EN_REVISION', 'PREAPROBADO', 'RECHAZADO', 'DOC_PENDIENTE', 'DERIVADO'].map((est) => (
-                  <button
-                    key={est}
-                    onClick={() => setEstado(est)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                      estado === est
-                        ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {est.replace('_', ' ')} ({getEstadoCount(est)})
-                  </button>
-                ))}
+                {availableTags.length > 0 ? (
+                  availableTags.slice(0, 10).map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        setSelectedTag(tag.name)
+                        setEstado('') // Limpiar filtro de estado al seleccionar tag
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1 ${
+                        selectedTag === tag.name
+                          ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <Tag className="w-3 h-3" />
+                      {tag.name} ({getTagCount(tag.name)})
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-500 italic">
+                    Cargando tags...
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -533,11 +587,16 @@ function LeadsPage() {
                 <CardTitle className="text-xl font-semibold">
                   {getPageTitle()}
                 </CardTitle>
-                {(estado || origen || search) && (
-                  <div className="flex items-center space-x-2 mt-2">
+                {(estado || origen || search || selectedTag) && (
+                  <div className="flex items-center space-x-2 mt-2 flex-wrap">
                     <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                       Filtros aplicados
                     </Badge>
+                    {selectedTag && (
+                      <Badge className="bg-purple-100 text-purple-800">
+                        Tag: {selectedTag}
+                      </Badge>
+                    )}
                     {estado && (
                       <Badge className="formosa-badge-nuevo">
                         Estado: {estado}
@@ -574,15 +633,16 @@ function LeadsPage() {
                   Reintentar
                 </Button>
               </div>
-            ) : leads.length === 0 ? (
-              search ? (
+            ) : (selectedTag ? filteredLeadsByTag : leads).length === 0 ? (
+              search || selectedTag ? (
                 <EmptySearchState
-                  query={search}
+                  query={search || selectedTag || ''}
                   onClear={() => {
                     setSearch('')
                     setEstado('')
                     setOrigen('')
                     setZona('')
+                    setSelectedTag('')
                     setPage(1)
                   }}
                   type="leads"
@@ -606,229 +666,235 @@ function LeadsPage() {
               )
             ) : (
               <div className="space-y-3">
-                {leads.map((lead, index) => (
-                  <div
-                    key={lead.id}
-                    className="formosa-card hover-lift p-4 transition-all duration-200 animate-fade-in"
-                    style={{ animationDelay: `${index * 0.05}s` }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                            <Users className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <Link
-                              href={`/leads/${lead.id}`}
-                              className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
-                            >
-                              {lead.nombre}
-                            </Link>
-                            <div className="flex items-center space-x-2 mt-1">
-                              {/* Estado editable */}
-                              {editingField?.leadId === lead.id && editingField?.field === 'estado' ? (
-                                <div className="flex items-center space-x-2">
-                                  <select
-                                    value={editingField.value}
-                                    onChange={(e) => setEditingField({...editingField, value: e.target.value})}
-                                    className="text-xs border rounded px-2 py-1"
-                                    disabled={updatingId === lead.id}
-                                  >
-                                    <option value="NUEVO">Nuevo</option>
-                                    <option value="EN_REVISION">En Revisión</option>
-                                    <option value="PREAPROBADO">Preaprobado</option>
-                                    <option value="RECHAZADO">Rechazado</option>
-                                    <option value="DOC_PENDIENTE">Doc. Pendiente</option>
-                                    <option value="DERIVADO">Derivado</option>
-                                  </select>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={saveQuickEdit}
-                                    disabled={updatingId === lead.id}
-                                    className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
-                                  >
-                                    ✓
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={cancelQuickEdit}
-                                    disabled={updatingId === lead.id}
-                                    className="h-6 w-6 p-0 text-red-600 hover:bg-red-50"
-                                  >
-                                    ✕
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div
-                                  className="cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => startQuickEdit(lead.id, 'estado', lead.estado)}
-                                  title="Click para editar estado"
-                                >
-                                  {getEstadoBadge(lead.estado)}
-                                </div>
-                              )}
-                              {lead.origen && (
-                                <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700">
-                                  {lead.origen}
-                                </Badge>
-                              )}
+                {(selectedTag ? filteredLeadsByTag : leads).map((lead, index) => {
+                  // Parsear tags del lead
+                  let leadTags: string[] = []
+                  if (lead.tags) {
+                    try {
+                      leadTags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
+                    } catch (e) {
+                      leadTags = []
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={lead.id}
+                      className="formosa-card hover-lift p-3 sm:p-4 transition-all duration-200 animate-fade-in"
+                      style={{ animationDelay: `${index * 0.05}s` }}
+                    >
+                      {/* Mobile-first layout: Stack en móvil, flex en desktop */}
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        {/* Contenido principal */}
+                        <div className="flex-1 min-w-0">
+                          {/* Header con nombre y avatar */}
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <Users className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                             </div>
-                          </div>
-                        </div>
-
-                        <div className="ml-13 space-y-1">
-                          <div className="flex items-center space-x-4 text-sm text-gray-600">
-                            <span>📞 {lead.telefono}</span>
-                            <span>✉️ {lead.email || 'Sin email'}</span>
-                            {lead.zona && <span>📍 {lead.zona}</span>}
-                          </div>
-
-                          {lead.ingresos && (
-                            <div className="text-sm text-green-600 font-medium">
-                              💰 {formatCurrency(lead.ingresos)}
-                            </div>
-                          )}
-
-                          <div className="text-xs text-gray-400">
-                            📅 {formatDate(lead.createdAt)}
-                          </div>
-
-                          {/* Tags de Manychat */}
-                          {(() => {
-                            let leadTags: string[] = []
-                            if (lead.tags) {
-                              try {
-                                leadTags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
-                              } catch (e) {
-                                leadTags = []
-                              }
-                            }
-                            
-                            return leadTags.length > 0 ? (
-                              <div className="flex items-center gap-1 flex-wrap mt-2">
-                                <Tag className="w-3 h-3 text-gray-400" />
-                                {leadTags.slice(0, 3).map((tag) => (
-                                  <TagPill key={tag} tag={tag} readonly />
-                                ))}
-                                {leadTags.length > 3 && (
-                                  <span className="text-xs text-gray-500">
-                                    +{leadTags.length - 3}
-                                  </span>
-                                )}
-                              </div>
-                            ) : null
-                          })()}
-
-                          {/* Notas editables */}
-                          <div className="mt-2">
-                            {editingField?.leadId === lead.id && editingField?.field === 'notas' ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={editingField.value}
-                                  onChange={(e) => setEditingField({...editingField, value: e.target.value})}
-                                  className="w-full text-xs border rounded px-2 py-1 resize-none"
-                                  rows={2}
-                                  placeholder="Agregar notas..."
-                                  disabled={updatingId === lead.id}
-                                />
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={saveQuickEdit}
-                                    disabled={updatingId === lead.id}
-                                    className="h-6 px-2 text-green-600 hover:bg-green-50"
-                                  >
-                                    ✓ Guardar
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={cancelQuickEdit}
-                                    disabled={updatingId === lead.id}
-                                    className="h-6 px-2 text-red-600 hover:bg-red-50"
-                                  >
-                                    ✕ Cancelar
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                className="cursor-pointer hover:bg-gray-50 rounded px-2 py-1 transition-colors"
-                                onClick={() => startQuickEdit(lead.id, 'notas', lead.notas || '')}
-                                title="Click para editar notas"
+                            <div className="flex-1 min-w-0">
+                              <Link
+                                href={`/leads/${lead.id}`}
+                                className="font-semibold text-base sm:text-lg text-gray-900 hover:text-blue-600 transition-colors block truncate"
                               >
-                                {lead.notas ? (
-                                  <div className="text-xs text-gray-600">
-                                    📝 {lead.notas.length > 50 ? `${lead.notas.substring(0, 50)}...` : lead.notas}
+                                {lead.nombre}
+                              </Link>
+                              {/* Estado y origen en una línea compacta */}
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {editingField?.leadId === lead.id && editingField?.field === 'estado' ? (
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      value={editingField.value}
+                                      onChange={(e) => setEditingField({...editingField, value: e.target.value})}
+                                      className="text-xs border rounded px-2 py-1"
+                                      disabled={updatingId === lead.id}
+                                    >
+                                      <option value="NUEVO">Nuevo</option>
+                                      <option value="EN_REVISION">En Revisión</option>
+                                      <option value="PREAPROBADO">Preaprobado</option>
+                                      <option value="RECHAZADO">Rechazado</option>
+                                      <option value="DOC_PENDIENTE">Doc. Pendiente</option>
+                                      <option value="DERIVADO">Derivado</option>
+                                    </select>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={saveQuickEdit}
+                                      disabled={updatingId === lead.id}
+                                      className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
+                                    >
+                                      ✓
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={cancelQuickEdit}
+                                      disabled={updatingId === lead.id}
+                                      className="h-6 w-6 p-0 text-red-600 hover:bg-red-50"
+                                    >
+                                      ✕
+                                    </Button>
                                   </div>
                                 ) : (
-                                  <div className="text-xs text-gray-400 italic">
-                                    📝 Click para agregar notas
+                                  <div
+                                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => startQuickEdit(lead.id, 'estado', lead.estado)}
+                                    title="Click para editar estado"
+                                  >
+                                    {getEstadoBadge(lead.estado)}
                                   </div>
                                 )}
+                                {lead.origen && (
+                                  <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700">
+                                    {lead.origen}
+                                  </Badge>
+                                )}
+                                {lead.manychatId && (
+                                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    MC
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Información de contacto compacta */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400">📞</span>
+                              <a href={`tel:${lead.telefono}`} className="hover:text-blue-600 truncate">
+                                {lead.telefono}
+                              </a>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400">✉️</span>
+                              {lead.email ? (
+                                <a href={`mailto:${lead.email}`} className="hover:text-blue-600 truncate">
+                                  {lead.email}
+                                </a>
+                              ) : (
+                                <span className="text-gray-400">Sin email</span>
+                              )}
+                            </div>
+                            {lead.zona && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400">📍</span>
+                                <span className="truncate">{lead.zona}</span>
+                              </div>
+                            )}
+                            {lead.ingresos && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400">💰</span>
+                                <span className="text-green-600 font-medium">{formatCurrency(lead.ingresos)}</span>
                               </div>
                             )}
                           </div>
 
-                          {/* Estado simplificado */}
-                          {lead.estado && (
-                            <div className="mt-2">
-                              <div className="flex items-center space-x-2 text-xs">
-                                <span className="text-gray-500">Proceso:</span>
-                                <Badge variant="outline" className="text-xs bg-gray-50">
-                                  {lead.estado.replace('_', ' ')}
+                          {/* Tags compactos */}
+                          {leadTags.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mb-2">
+                              {leadTags.slice(0, 3).map((tag) => (
+                                <TagPill key={tag} tag={tag} readonly />
+                              ))}
+                              {leadTags.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{leadTags.length - 3}
                                 </Badge>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Fecha y notas en una línea compacta */}
+                          <div className="flex items-center justify-between text-xs text-gray-400 mt-2">
+                            <span>📅 {formatDate(lead.createdAt)}</span>
+                            {lead.notas && (
+                              <span className="text-gray-500 truncate ml-2" title={lead.notas}>
+                                📝 {lead.notas.length > 30 ? `${lead.notas.substring(0, 30)}...` : lead.notas}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Notas editables */}
+                          {editingField?.leadId === lead.id && editingField?.field === 'notas' && (
+                            <div className="mt-2 space-y-2">
+                              <textarea
+                                value={editingField.value}
+                                onChange={(e) => setEditingField({...editingField, value: e.target.value})}
+                                className="w-full text-xs border rounded px-2 py-1 resize-none"
+                                rows={2}
+                                placeholder="Agregar notas..."
+                                disabled={updatingId === lead.id}
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={saveQuickEdit}
+                                  disabled={updatingId === lead.id}
+                                  className="h-6 px-2 text-green-600 hover:bg-green-50"
+                                >
+                                  ✓ Guardar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={cancelQuickEdit}
+                                  disabled={updatingId === lead.id}
+                                  className="h-6 px-2 text-red-600 hover:bg-red-50"
+                                >
+                                  ✕ Cancelar
+                                </Button>
                               </div>
                             </div>
                           )}
-                        </div>
-                      </div>
 
-                      <div className="flex items-center space-x-2">
-                        {/* Indicador de sincronización con el chatbot */}
-                        {lead.manychatId && (
-                          <div className="flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded" title="Sincronizado con el chatbot">
-                            <CheckCircle2 className="w-3 h-3 text-green-600" />
-                            <span className="text-xs text-green-700">MC</span>
-                          </div>
-                        )}
-                        
-                        <Button asChild variant="ghost" size="sm" className="hover:bg-blue-50" title="Ver detalles">
-                          <Link href={`/leads/${lead.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <ConditionalRender permission="leads:write">
-                          <Button asChild variant="ghost" size="sm" className="hover:bg-green-50" title="Editar lead">
-                            <Link href={`/leads/${lead.id}/edit`}>
-                              <Edit className="h-4 w-4 text-green-600" />
+                          {/* Botón para agregar notas si no hay */}
+                          {!lead.notas && editingField?.leadId !== lead.id && (
+                            <button
+                              onClick={() => startQuickEdit(lead.id, 'notas', '')}
+                              className="text-xs text-gray-400 hover:text-gray-600 mt-1 italic"
+                            >
+                              📝 Click para agregar notas
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Acciones - Botones compactos en móvil */}
+                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                          <Button asChild variant="ghost" size="sm" className="hover:bg-blue-50" title="Ver detalles">
+                            <Link href={`/leads/${lead.id}`}>
+                              <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                             </Link>
                           </Button>
-                        </ConditionalRender>
-                        <ConditionalRender permission="leads:delete">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-red-50"
-                            title="Eliminar lead"
-                            onClick={() => openDeleteModal(lead.id, lead.nombre)}
-                            disabled={deletingId === lead.id}
-                          >
-                            {deletingId === lead.id ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                            ) : (
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            )}
-                          </Button>
-                        </ConditionalRender>
+                          <ConditionalRender permission="leads:write">
+                            <Button asChild variant="ghost" size="sm" className="hover:bg-green-50" title="Editar lead">
+                              <Link href={`/leads/${lead.id}/edit`}>
+                                <Edit className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                              </Link>
+                            </Button>
+                          </ConditionalRender>
+                          <ConditionalRender permission="leads:delete">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:bg-red-50"
+                              title="Eliminar lead"
+                              onClick={() => openDeleteModal(lead.id, lead.nombre)}
+                              disabled={deletingId === lead.id}
+                            >
+                              {deletingId === lead.id ? (
+                                <div className="h-4 w-4 sm:h-5 sm:w-5 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+                              )}
+                            </Button>
+                          </ConditionalRender>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -836,7 +902,7 @@ function LeadsPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
                 <div className="text-sm text-muted-foreground">
-                  Mostrando {((page - 1) * 10) + 1} - {Math.min(page * 10, totalLeads)} de {totalLeads} leads
+                  Mostrando {((page - 1) * 10) + 1} - {Math.min(page * 10, selectedTag ? getFilteredTotalByTag() : totalLeads)} de {selectedTag ? getFilteredTotalByTag() : totalLeads} leads
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button

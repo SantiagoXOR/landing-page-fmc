@@ -17,13 +17,24 @@ import {
   Users,
   AlertCircle,
   CheckCircle,
-  HelpCircle
+  HelpCircle,
+  ArrowRight,
+  Loader2
 } from 'lucide-react'
 import { usePipelineDragDrop } from '@/hooks/usePipelineDragDrop'
 import { PipelineStage, PipelineLead, DragDropResult, StageTransition } from '@/types/pipeline'
 import { LoadingSpinner } from '@/components/ui/loading-states'
 import { toast } from 'sonner'
 import { PipelineFiltersDrawer, PipelineFilters } from '@/components/pipeline/PipelineFiltersDrawer'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
+import { useLongPress } from '@/hooks/useLongPress'
 
 interface PipelineBoardAdvancedProps {
   stages: PipelineStage[]
@@ -77,6 +88,46 @@ export function PipelineBoardAdvanced({
     stageIds: stages.map(s => s.id),
     leadStageIds: leads.map(l => l.stageId)
   })
+
+  // Función para mover lead usando el endpoint correcto
+  const handleLeadMoveToStage = async (leadId: string, toStageId: string) => {
+    try {
+      const lead = leads.find(l => l.id === leadId)
+      if (!lead) {
+        throw new Error('Lead no encontrado')
+      }
+
+      const fromStageId = lead.stageId || lead.currentStageId || ''
+      
+      const response = await fetch(`/api/pipeline/leads/${leadId}/move`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromStageId,
+          toStageId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al mover el lead')
+      }
+
+      // Usar el callback onLeadMove si existe para actualizar el estado
+      if (onLeadMove) {
+        await onLeadMove({
+          leadId,
+          fromStageId,
+          toStageId,
+          lead,
+        })
+      }
+    } catch (error: any) {
+      throw error
+    }
+  }
 
   // Hook para drag & drop
   const {
@@ -446,6 +497,8 @@ export function PipelineBoardAdvanced({
                   formatRelativeDate={formatRelativeDate}
                   getPriorityColor={getPriorityColor}
                   getTagColor={getTagColor}
+                  stages={stages}
+                  onLeadMove={handleLeadMoveToStage}
                 />
               )
             })}
@@ -493,6 +546,8 @@ interface PipelineStageColumnProps {
   formatRelativeDate: (date: Date | string) => string
   getPriorityColor: (priority: string) => string
   getTagColor: (tag: string) => { bg: string; text: string; border: string }
+  stages: PipelineStage[]
+  onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
 }
 
 function PipelineStageColumn({
@@ -507,7 +562,9 @@ function PipelineStageColumn({
   formatCurrency,
   formatRelativeDate,
   getPriorityColor,
-  getTagColor
+  getTagColor,
+  stages,
+  onLeadMove
 }: PipelineStageColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
@@ -572,6 +629,8 @@ function PipelineStageColumn({
               formatRelativeDate={formatRelativeDate}
               getPriorityColor={getPriorityColor}
               getTagColor={getTagColor}
+              stages={stages}
+              onLeadMove={onLeadMove}
             />
           ))}
           
@@ -596,6 +655,8 @@ interface LeadCardProps {
   formatRelativeDate: (date: Date | string) => string
   getPriorityColor: (priority: string) => string
   getTagColor: (tag: string) => { bg: string; text: string; border: string }
+  stages: PipelineStage[]
+  onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
 }
 
 function LeadCard({
@@ -604,7 +665,9 @@ function LeadCard({
   formatCurrency,
   formatRelativeDate,
   getPriorityColor,
-  getTagColor
+  getTagColor,
+  stages,
+  onLeadMove
 }: LeadCardProps) {
   const {
     attributes,
@@ -616,9 +679,56 @@ function LeadCard({
     id: lead.id,
   })
 
+  const [isMoving, setIsMoving] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 })
+  const cardRef = useRef<HTMLDivElement | null>(null)
+
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined
+
+  // Hook para detectar long press
+  const longPressHandlers = useLongPress({
+    onLongPress: (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      
+      // Obtener posición del card para posicionar el dropdown
+      if (cardRef.current) {
+        const rect = cardRef.current.getBoundingClientRect()
+        setDropdownPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top
+        })
+      }
+      
+      setShowDropdown(true)
+    },
+    onClick: onClick,
+    delay: 500
+  })
+
+  // Función para mover el lead a una etapa
+  const handleMoveToStage = async (toStageId: string) => {
+    if (!onLeadMove || isMoving) return
+    
+    try {
+      setIsMoving(true)
+      await onLeadMove(lead.id, toStageId)
+      setShowDropdown(false)
+      const stageName = stages.find(s => s.id === toStageId)?.name || toStageId
+      toast.success(`Lead movido a ${stageName}`)
+    } catch (error: any) {
+      toast.error(error.message || 'Error al mover el lead')
+    } finally {
+      setIsMoving(false)
+    }
+  }
+
+  // Obtener etapas disponibles (excluyendo la actual)
+  const currentStageId = lead.stageId || lead.currentStageId
+  const availableStages = stages.filter(s => s.id !== currentStageId)
 
   // Formatear tiempo en etapa de manera más clara
   const formatTimeInStage = (days?: number) => {
@@ -635,16 +745,30 @@ function LeadCard({
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
-        isDragging ? 'opacity-50' : ''
-      }`}
-      onClick={onClick}
-    >
+    <>
+      <div
+        ref={(node) => {
+          setNodeRef(node)
+          cardRef.current = node
+        }}
+        style={style}
+        {...attributes}
+        className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer relative ${
+          isDragging ? 'opacity-50' : ''
+        } ${showDropdown ? 'ring-2 ring-blue-500' : ''}`}
+        {...longPressHandlers}
+        onMouseDown={(e) => {
+          // Permitir drag solo si no hay dropdown abierto
+          if (!showDropdown) {
+            listeners.onMouseDown?.(e)
+          }
+        }}
+        onTouchStart={(e) => {
+          if (!showDropdown) {
+            listeners.onTouchStart?.(e)
+          }
+        }}
+      >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -853,7 +977,87 @@ function LeadCard({
           )}
         </div>
       )}
-    </div>
+
+        {/* Indicador visual cuando se muestra el dropdown */}
+        {showDropdown && (
+          <div className="absolute inset-0 bg-blue-50/50 border-2 border-blue-500 rounded-lg flex items-center justify-center z-10 pointer-events-none">
+            <div className="text-xs text-blue-600 font-medium bg-white px-2 py-1 rounded shadow">
+              Selecciona una etapa...
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dropdown Menu */}
+      {showDropdown && (
+        <DropdownMenu open={showDropdown} onOpenChange={setShowDropdown}>
+          <DropdownMenuTrigger asChild>
+            <div 
+              className="fixed pointer-events-none"
+              style={{
+                left: dropdownPosition.x,
+                top: dropdownPosition.y + 10,
+                transform: 'translateX(-50%)',
+              }}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent 
+            align="start"
+            side="bottom"
+            className="w-56 max-h-96 overflow-y-auto z-[100]"
+            onCloseAutoFocus={(e) => {
+              e.preventDefault()
+              setShowDropdown(false)
+            }}
+            onEscapeKeyDown={() => setShowDropdown(false)}
+            onInteractOutside={() => setShowDropdown(false)}
+          >
+            <DropdownMenuLabel>
+              Mover a etapa
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {availableStages.length === 0 ? (
+              <DropdownMenuItem disabled>
+                No hay etapas disponibles
+              </DropdownMenuItem>
+            ) : (
+              availableStages
+                .sort((a, b) => a.order - b.order)
+                .map((stage) => (
+                  <DropdownMenuItem
+                    key={stage.id}
+                    onClick={() => handleMoveToStage(stage.id)}
+                    disabled={isMoving}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: stage.color }}
+                        />
+                        <span>{stage.name}</span>
+                      </div>
+                      {isMoving ? (
+                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                      ) : (
+                        <ArrowRight className="h-4 w-4 ml-2 text-muted-foreground" />
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                ))
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setShowDropdown(false)}
+              className="text-muted-foreground"
+            >
+              Cancelar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </>
   )
 }
 

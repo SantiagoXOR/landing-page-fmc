@@ -97,7 +97,7 @@ export function PipelineBoardAdvanced({
         throw new Error('Lead no encontrado')
       }
 
-      const fromStageId = lead.stageId || lead.currentStageId || ''
+      const fromStageId = lead.stageId || ''
       
       const response = await fetch(`/api/pipeline/leads/${leadId}/move`, {
         method: 'POST',
@@ -727,7 +727,7 @@ function LeadCard({
   }
 
   // Obtener etapas disponibles (excluyendo la actual)
-  const currentStageId = lead.stageId || lead.currentStageId
+  const currentStageId = lead.stageId
   const availableStages = stages.filter(s => s.id !== currentStageId)
 
   // Formatear tiempo en etapa de manera más clara

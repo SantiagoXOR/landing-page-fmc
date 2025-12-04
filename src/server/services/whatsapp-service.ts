@@ -166,15 +166,35 @@ export class WhatsAppService {
         hasMedia: !!data.mediaUrl
       })
 
-      // Intentar sincronizar lead si no existe el subscriber
+      // Intentar obtener subscriber primero
       let subscriber = await ManychatService.getSubscriberByPhone(data.to)
       
-      if (!subscriber) {
-        logger.debug('Subscriber no encontrado, intentando sincronizar lead', {
-          phone: data.to.substring(0, 5) + '***'
+      // Si no hay subscriber o no tiene ID válido, intentar sincronizar usando leadId
+      if (!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
+        logger.debug('Subscriber no encontrado o sin ID válido, intentando sincronizar lead', {
+          phone: data.to.substring(0, 5) + '***',
+          hasLeadId: !!data.leadId,
+          subscriberHasKey: subscriber?.key ? true : false
         })
         
-        const lead = await supabase.findLeadByPhoneOrDni(data.to)
+        // Usar leadId directamente si está disponible, de lo contrario buscar por teléfono
+        let lead = null
+        if (data.leadId) {
+          lead = await supabase.findLeadById(data.leadId)
+          logger.info('Lead obtenido por ID', {
+            leadId: data.leadId,
+            found: !!lead
+          })
+        }
+        
+        // Si no se encontró por ID, intentar por teléfono
+        if (!lead) {
+          lead = await supabase.findLeadByPhoneOrDni(data.to)
+          logger.info('Lead obtenido por teléfono', {
+            phone: data.to.substring(0, 5) + '***',
+            found: !!lead
+          })
+        }
 
         if (lead) {
           logger.info('Lead encontrado, sincronizando a ManyChat', {
@@ -186,17 +206,19 @@ export class WhatsAppService {
             // Sincronizar lead a Manychat
             await ManychatSyncService.syncLeadToManychat(lead.id)
             
-            // Intentar obtener subscriber nuevamente
+            // Intentar obtener subscriber nuevamente después de sincronizar
             subscriber = await ManychatService.getSubscriberByPhone(data.to)
             
-            if (subscriber) {
-              logger.info('Subscriber creado después de sincronización', {
+            if (subscriber && subscriber.id && typeof subscriber.id === 'number' && subscriber.id > 0) {
+              logger.info('Subscriber válido obtenido después de sincronización', {
                 subscriberId: subscriber.id
               })
             } else {
-              logger.warn('Subscriber no encontrado después de sincronización', {
+              logger.warn('Subscriber no encontrado o sin ID válido después de sincronización', {
                 leadId: lead.id,
-                phone: data.to.substring(0, 5) + '***'
+                phone: data.to.substring(0, 5) + '***',
+                hasSubscriber: !!subscriber,
+                subscriberId: subscriber?.id
               })
             }
           } catch (syncError: any) {
@@ -209,7 +231,8 @@ export class WhatsAppService {
           }
         } else {
           logger.warn('Lead no encontrado para sincronizar', {
-            phone: data.to.substring(0, 5) + '***'
+            phone: data.to.substring(0, 5) + '***',
+            leadId: data.leadId
           })
         }
       }

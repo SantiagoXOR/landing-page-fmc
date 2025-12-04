@@ -103,12 +103,6 @@ export default function ManychatMessageSender({
   }
 
   const handleDocumentSelect = async (documentId: string) => {
-    if (!documentId) {
-      setMediaUrl('')
-      setSelectedDocumentId('')
-      return
-    }
-
     try {
       // Obtener la URL firmada del documento
       const response = await fetch(`/api/documents/${documentId}`)
@@ -126,6 +120,11 @@ export default function ManychatMessageSender({
         type: 'error',
       })
     }
+  }
+
+  const handleClearSelection = () => {
+    setSelectedDocumentId('')
+    setMediaUrl('')
   }
 
   const formatFileSize = (bytes: number) => {
@@ -386,29 +385,42 @@ export default function ManychatMessageSender({
                   <span className="text-sm text-gray-500">Cargando documentos...</span>
                 </div>
               ) : documents.length > 0 ? (
-                <Select value={selectedDocumentId} onValueChange={handleDocumentSelect}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona un documento para enviar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">
-                      <span className="text-gray-500">Ninguno (usar URL manual)</span>
-                    </SelectItem>
-                    {documents.map((doc) => (
-                      <SelectItem key={doc.id} value={doc.id}>
-                        <div className="flex items-center gap-2 py-1">
-                          <FileText className="w-4 h-4 text-purple-600 flex-shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-medium truncate">{doc.original_filename}</span>
-                            <span className="text-xs text-gray-500">
-                              {doc.category} • {formatFileSize(doc.file_size)}
-                            </span>
+                <div className="space-y-2">
+                  <Select value={selectedDocumentId || undefined} onValueChange={handleDocumentSelect}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecciona un documento para enviar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {documents.map((doc) => (
+                        <SelectItem key={doc.id} value={doc.id}>
+                          <div className="flex items-center gap-2 py-1">
+                            <FileText className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate">{doc.original_filename}</span>
+                              <span className="text-xs text-gray-500">
+                                {doc.category} • {formatFileSize(doc.file_size)}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedDocumentId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedDocumentId('')
+                        setMediaUrl('')
+                      }}
+                      className="w-full text-xs"
+                    >
+                      Limpiar selección
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <div className="text-sm text-gray-500 py-2 px-3 border rounded-md bg-gray-50">
                   No hay documentos disponibles para este lead

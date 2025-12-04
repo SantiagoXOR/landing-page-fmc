@@ -267,12 +267,172 @@ export class WhatsAppService {
                   manychatId: lead.manychatId
                 })
                 subscriber = subscriberById
+              } else {
+                // Si getSubscriberById retorna null o subscriber sin ID válido, intentar usar manychatId directamente
+                logger.warn('Subscriber obtenido por manychatId pero sin ID válido o retornó null, intentando usar manychatId directamente', {
+                  manychatId: lead.manychatId,
+                  hasSubscriber: !!subscriberById,
+                  subscriberId: subscriberById?.id,
+                  subscriberKey: subscriberById?.key
+                })
+                
+                // Intentar usar el manychatId directamente como subscriber_id
+                const manychatIdAsNumber = typeof lead.manychatId === 'string' 
+                  ? parseInt(lead.manychatId) 
+                  : lead.manychatId
+                
+                if (manychatIdAsNumber && !isNaN(manychatIdAsNumber) && manychatIdAsNumber > 0) {
+                  logger.info('Intentando enviar mensaje usando manychatId directamente como subscriber_id', {
+                    manychatId: manychatIdAsNumber,
+                    phone: data.to.substring(0, 5) + '***'
+                  })
+                  
+                  // Preparar mensaje según el tipo
+                  const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
+                  const messages: any[] = []
+
+                  if (messageType === 'text') {
+                    messages.push({
+                      type: 'text',
+                      text: data.message
+                    })
+                  } else if (data.mediaUrl) {
+                    if (messageType === 'image') {
+                      messages.push({
+                        type: 'image',
+                        url: data.mediaUrl,
+                        caption: data.message || undefined
+                      })
+                    } else if (messageType === 'video') {
+                      messages.push({
+                        type: 'video',
+                        url: data.mediaUrl,
+                        caption: data.message || undefined
+                      })
+                    } else if (messageType === 'file') {
+                      messages.push({
+                        type: 'file',
+                        url: data.mediaUrl,
+                        filename: data.message || 'document'
+                      })
+                    } else if (messageType === 'audio') {
+                      messages.push({
+                        type: 'audio',
+                        url: data.mediaUrl
+                      })
+                    }
+                  }
+
+                  // Intentar enviar mensaje usando manychatId directamente
+                  const sendResponse = await ManychatService.sendMessage(manychatIdAsNumber, messages)
+                  
+                  if (sendResponse.status === 'success') {
+                    logger.info('Mensaje enviado exitosamente usando manychatId directamente como subscriber_id', {
+                      manychatId: manychatIdAsNumber,
+                      messageId: sendResponse.data?.message_id
+                    })
+                    
+                    return {
+                      success: true,
+                      messageId: sendResponse.data?.message_id || 'sent_by_manychat_id',
+                      provider: 'manychat',
+                      channel: 'whatsapp',
+                    }
+                  } else {
+                    logger.warn('Error enviando mensaje usando manychatId directamente', {
+                      manychatId: manychatIdAsNumber,
+                      error: sendResponse.error,
+                      errorCode: sendResponse.error_code,
+                      details: sendResponse.details
+                    })
+                    // Continuar con las otras estrategias
+                  }
+                }
               }
             } catch (error: any) {
-              logger.warn('Error obteniendo subscriber por manychatId', {
+              logger.error('Error obteniendo subscriber por manychatId', {
                 error: error.message,
+                stack: error.stack,
                 manychatId: lead.manychatId
               })
+              
+              // Si hay un error pero tenemos manychatId, intentar usarlo directamente
+              const manychatIdAsNumber = typeof lead.manychatId === 'string' 
+                ? parseInt(lead.manychatId) 
+                : lead.manychatId
+              
+              if (manychatIdAsNumber && !isNaN(manychatIdAsNumber) && manychatIdAsNumber > 0) {
+                logger.info('Error obteniendo subscriber, intentando usar manychatId directamente como último recurso', {
+                  manychatId: manychatIdAsNumber,
+                  error: error.message
+                })
+                
+                try {
+                  // Preparar mensaje según el tipo
+                  const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
+                  const messages: any[] = []
+
+                  if (messageType === 'text') {
+                    messages.push({
+                      type: 'text',
+                      text: data.message
+                    })
+                  } else if (data.mediaUrl) {
+                    if (messageType === 'image') {
+                      messages.push({
+                        type: 'image',
+                        url: data.mediaUrl,
+                        caption: data.message || undefined
+                      })
+                    } else if (messageType === 'video') {
+                      messages.push({
+                        type: 'video',
+                        url: data.mediaUrl,
+                        caption: data.message || undefined
+                      })
+                    } else if (messageType === 'file') {
+                      messages.push({
+                        type: 'file',
+                        url: data.mediaUrl,
+                        filename: data.message || 'document'
+                      })
+                    } else if (messageType === 'audio') {
+                      messages.push({
+                        type: 'audio',
+                        url: data.mediaUrl
+                      })
+                    }
+                  }
+
+                  const sendResponse = await ManychatService.sendMessage(manychatIdAsNumber, messages)
+                  
+                  if (sendResponse.status === 'success') {
+                    logger.info('Mensaje enviado exitosamente usando manychatId directamente después de error', {
+                      manychatId: manychatIdAsNumber,
+                      messageId: sendResponse.data?.message_id
+                    })
+                    
+                    return {
+                      success: true,
+                      messageId: sendResponse.data?.message_id || 'sent_by_manychat_id',
+                      provider: 'manychat',
+                      channel: 'whatsapp',
+                    }
+                  } else {
+                    logger.warn('Error enviando mensaje usando manychatId directamente después de error', {
+                      manychatId: manychatIdAsNumber,
+                      error: sendResponse.error,
+                      errorCode: sendResponse.error_code
+                    })
+                  }
+                } catch (sendError: any) {
+                  logger.error('Error enviando mensaje usando manychatId directamente después de error', {
+                    error: sendError.message,
+                    stack: sendError.stack,
+                    manychatId: manychatIdAsNumber
+                  })
+                }
+              }
             }
           }
         }

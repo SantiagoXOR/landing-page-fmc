@@ -1446,7 +1446,7 @@ export class ManychatService {
     } else {
       logger.info('Mensaje enviado exitosamente usando teléfono', {
         phone: normalizedPhone.substring(0, 5) + '***',
-        messageId: response.data?.message_id
+        messageId: response.data && 'message_id' in response.data ? response.data.message_id : undefined
       })
     }
 

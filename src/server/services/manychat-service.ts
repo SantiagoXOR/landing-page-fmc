@@ -285,7 +285,31 @@ export class ManychatService {
     )
 
     if (response.status === 'success' && response.data) {
-      return response.data
+      const subscriber = response.data
+      
+      // Validar que el subscriber tenga un ID válido
+      if (!subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
+        logger.warn('Subscriber encontrado pero sin ID válido', {
+          phone: normalizedPhone.substring(0, 5) + '***',
+          subscriberData: {
+            hasId: !!subscriber.id,
+            id: subscriber.id,
+            hasPhone: !!subscriber.phone,
+            hasWhatsAppPhone: !!subscriber.whatsapp_phone,
+            hasEmail: !!subscriber.email,
+            key: subscriber.key,
+            page_id: subscriber.page_id
+          }
+        })
+        return null // Retornar null si no tiene ID válido
+      }
+
+      logger.info('Subscriber encontrado por teléfono', {
+        subscriberId: subscriber.id,
+        phone: normalizedPhone.substring(0, 5) + '***'
+      })
+      
+      return subscriber
     }
 
     // Log detallado del error para debugging
@@ -751,14 +775,51 @@ export class ManychatService {
       if (response.error && (
         response.error.toLowerCase().includes('already exists') ||
         response.error.toLowerCase().includes('duplicate') ||
-        response.error_code === 'subscriber_exists'
+        response.error_code === 'subscriber_exists' ||
+        (response.details && response.details.messages && 
+         response.details.messages.wa_id &&
+         Array.isArray(response.details.messages.wa_id.message) &&
+         response.details.messages.wa_id.message.some((msg: string) => 
+           msg.toLowerCase().includes('already exists')
+         ))
       )) {
         logger.info('Contacto ya existe en ManyChat, intentando obtenerlo', {
-          phone: normalizedPhone
+          phone: normalizedPhone,
+          errorDetails: response.details
         })
 
         // Intentar obtener el subscriber existente por teléfono
-        const existingSubscriber = await this.getSubscriberByPhone(normalizedPhone)
+        let existingSubscriber = await this.getSubscriberByPhone(normalizedPhone)
+        
+        // Si no se encontró por teléfono, intentar con whatsapp_phone
+        if (!existingSubscriber && normalizedWhatsappPhone !== normalizedPhone) {
+          existingSubscriber = await this.getSubscriberByPhone(normalizedWhatsappPhone)
+        }
+        
+        // Si aún no se encontró pero ManyChat dice que existe, puede ser un problema de permisos
+        if (!existingSubscriber) {
+          logger.warn('Subscriber existe según ManyChat pero no se puede obtener', {
+            phone: normalizedPhone,
+            errorDetails: response.details
+          })
+          
+          // Si hay un warning sobre permisos, informar al usuario
+          if (response.details && response.details.messages && 
+              response.details.messages.warning &&
+              Array.isArray(response.details.messages.warning.message) &&
+              response.details.messages.warning.message.some((msg: string) => 
+                msg.includes('Permission denied')
+              )) {
+            logger.error('ManyChat requiere permisos adicionales para importar contactos', {
+              phone: normalizedPhone
+            })
+            // No lanzar error aquí, retornar null para que el código pueda manejar esto
+            return null
+          }
+          
+          // Retornar null en lugar de lanzar error para que el código pueda manejar esto
+          return null
+        }
         
         if (existingSubscriber) {
           logger.info('Subscriber existente encontrado en ManyChat', {
@@ -797,18 +858,6 @@ export class ManychatService {
           }
 
           return existingSubscriber
-        }
-
-        // Si no se pudo encontrar, intentar con whatsapp_phone
-        if (normalizedWhatsappPhone !== normalizedPhone) {
-          const existingByWhatsapp = await this.getSubscriberByPhone(normalizedWhatsappPhone)
-          if (existingByWhatsapp) {
-            logger.info('Subscriber existente encontrado por WhatsApp', {
-              subscriberId: existingByWhatsapp.id,
-              whatsappPhone: normalizedWhatsappPhone
-            })
-            return existingByWhatsapp
-          }
         }
       }
 

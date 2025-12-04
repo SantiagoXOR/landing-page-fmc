@@ -228,9 +228,12 @@ export class WhatsAppService {
         logger.error('Subscriber encontrado pero sin ID válido', {
           subscriber: {
             hasId: !!subscriber.id,
+            id: subscriber.id,
             hasPhone: !!subscriber.phone,
             hasWhatsAppPhone: !!subscriber.whatsapp_phone,
-            hasEmail: !!subscriber.email
+            hasEmail: !!subscriber.email,
+            key: subscriber.key,
+            page_id: subscriber.page_id
           },
           identifier: {
             hasPhone: true,
@@ -240,6 +243,7 @@ export class WhatsAppService {
           }
         })
 
+        // Si ManyChat retornó el subscriber pero sin ID, puede ser un problema de permisos
         // Intentar sincronizar el lead nuevamente si tenemos leadId
         if (data.leadId) {
           logger.info('Intentando sincronizar lead nuevamente para obtener subscriber válido', {
@@ -258,17 +262,24 @@ export class WhatsAppService {
                 subscriberId: subscriber.id
               })
             } else {
-              throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente.')
+              // Si aún no tiene ID válido después de sincronizar, puede ser problema de permisos
+              throw new Error('El contacto existe en ManyChat pero no se puede acceder debido a restricciones de permisos. Por favor, contacta al soporte de ManyChat para habilitar la importación de contactos, o sincroniza el contacto manualmente desde ManyChat.')
             }
           } catch (syncError: any) {
             logger.error('Error sincronizando lead para obtener subscriber válido', {
               error: syncError.message,
               leadId: data.leadId
             })
-            throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente.')
+            
+            // Si el error menciona permisos, proporcionar mensaje más específico
+            if (syncError.message && syncError.message.includes('Permission denied')) {
+              throw new Error('ManyChat requiere permisos adicionales para importar contactos. Por favor, contacta al soporte de ManyChat para habilitar esta funcionalidad.')
+            }
+            
+            throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente o contacta al soporte de ManyChat si el problema persiste.')
           }
         } else {
-          throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente.')
+          throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto primero desde la página del lead.')
         }
       }
 

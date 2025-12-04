@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
@@ -15,7 +15,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 import { 
   ArrowLeft, CheckCircle, XCircle, Clock, RefreshCw, Tag, Bot, Phone, Mail, 
   MapPin, DollarSign, Building2, Briefcase, FileText, MessageSquare, History,
-  User, Sparkles, AlertCircle, Info
+  Sparkles, AlertCircle, Info, ExternalLink
 } from 'lucide-react'
 import WhatsAppHistory from '@/components/whatsapp/WhatsAppHistory'
 import ManychatMessageSender from '@/components/manychat/ManychatMessageSender'
@@ -75,7 +75,7 @@ export default function LeadDetailPage() {
   // Hook debe estar al principio, antes de cualquier return condicional
   const { isSynced, syncNow, syncStatus } = useManychatSync(params.id as string)
 
-  const fetchLead = async () => {
+  const fetchLead = useCallback(async () => {
     try {
       const response = await fetch(`/api/leads/${params.id}`)
       if (response.ok) {
@@ -89,7 +89,7 @@ export default function LeadDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router])
 
   const evaluateLead = async () => {
     try {
@@ -147,7 +147,24 @@ export default function LeadDetailPage() {
 
   useEffect(() => {
     fetchLead()
-  }, [params.id])
+  }, [params.id, fetchLead])
+
+  // Función helper para extraer valor de custom field (igual que en el modal)
+  const extractCustomFieldValue = (value: any): string => {
+    if (value === null || value === undefined) return 'No especificado'
+    
+    // Si es un objeto Manychat con estructura {id, name, type, description, value}
+    if (typeof value === 'object' && value !== null && 'value' in value) {
+      return String(value.value || 'No especificado')
+    }
+    
+    // Si es un objeto pero no tiene estructura Manychat, convertir a string
+    if (typeof value === 'object') {
+      return JSON.stringify(value)
+    }
+    
+    return String(value)
+  }
 
   // Función helper para obtener iniciales
   const getInitials = (name: string) => {
@@ -273,36 +290,22 @@ export default function LeadDetailPage() {
   let customFields: Record<string, any> = {}
   if (lead.customFields) {
     try {
-      customFields = typeof lead.customFields === 'string' 
+      const parsed = typeof lead.customFields === 'string' 
         ? JSON.parse(lead.customFields) 
         : lead.customFields
+      
+      // Normalizar custom fields (extraer valores si vienen como objetos Manychat)
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (value && typeof value === 'object' && value !== null && 'value' in value) {
+          customFields[key] = value.value
+        } else {
+          customFields[key] = value
+        }
+      })
     } catch (e) {
       customFields = {}
     }
   }
-
-  // Campos que ya están mapeados en el schema y no necesitan mostrarse en customFields
-  const mappedFields = new Set([
-    'dni', 'cuil', 'ingresos', 'zona', 'producto', 'monto', 
-    'origen', 'estado', 'agencia', 'banco', 'trabajo_actual'
-  ])
-
-  // Filtrar solo los campos personalizados que NO están mapeados y tienen valor
-  const additionalCustomFields = Object.entries(customFields)
-    .filter(([key, value]) => 
-      !mappedFields.has(key) && 
-      value !== null && 
-      value !== undefined && 
-      value !== '' &&
-      (typeof value !== 'object' || (typeof value === 'object' && value.value))
-    )
-    .reduce((acc, [key, value]) => {
-      // Extraer valor si es objeto Manychat
-      acc[key] = typeof value === 'object' && value !== null && 'value' in value 
-        ? value.value 
-        : value
-      return acc
-    }, {} as Record<string, any>)
 
   return (
     <TooltipProvider>
@@ -526,28 +529,69 @@ export default function LeadDetailPage() {
               </Card>
             )}
 
-            {/* Campos personalizados de ManyChat - Solo si hay datos relevantes */}
-            {Object.keys(additionalCustomFields).length > 0 && (
+            {/* Datos de Manychat - Similar al modal del pipeline */}
+            {(lead.manychatId || Object.keys(customFields).length > 0 || leadTags.length > 0) && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-indigo-600" />
-                    Información Adicional
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(additionalCustomFields).map(([key, value]) => (
-                      <div key={key} className="p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                        <p className="text-xs text-gray-500 mb-1 capitalize">
-                          {key.replace(/_/g, ' ')}
-                        </p>
-                        <p className="text-sm font-medium">
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </p>
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Tag className="w-5 h-5 text-indigo-600" />
+                      Datos de Manychat
+                    </CardTitle>
+                    {lead.manychatId && (
+                      <Button
+                        onClick={() => window.open(`https://manychat.com/subscribers/${lead.manychatId}`, '_blank')}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                      >
+                        Ver en Manychat
+                        <ExternalLink className="h-3 w-3 ml-1" />
+                      </Button>
+                    )}
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {lead.manychatId && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">ID Manychat</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm font-mono">{lead.manychatId}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {leadTags.length > 0 && (
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-2 block">Tags</label>
+                      <div className="flex flex-wrap gap-2">
+                        {leadTags.map((tag: string, index: number) => (
+                          <TagPill key={index} tag={tag} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {Object.keys(customFields).length > 0 && (
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-2 block">Custom Fields</label>
+                      <div className="space-y-2">
+                        {Object.entries(customFields).map(([key, value]) => {
+                          const displayValue = extractCustomFieldValue(value)
+                          return (
+                            <div key={key} className="flex justify-between items-start py-2 border-b last:border-0">
+                              <span className="text-xs text-muted-foreground capitalize">
+                                {key.replace(/_/g, ' ')}:
+                              </span>
+                              <span className="text-xs font-medium text-right max-w-[60%] break-words">
+                                {displayValue}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

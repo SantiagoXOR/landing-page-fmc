@@ -306,32 +306,32 @@ export class WhatsAppService {
               }
             }
           }
+        }
 
-          // Estrategia 3: Intentar usar el key directamente como subscriber_id (algunos formatos de ManyChat aceptan esto)
-          if ((!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) && subscriber.key) {
-            // Intentar parsear el key como número si es posible
-            const keyAsNumber = parseInt(subscriber.key)
-            if (!isNaN(keyAsNumber) && keyAsNumber > 0) {
-              logger.info('Intentando usar key como subscriber_id numérico', {
-                keyAsNumber,
-                key: subscriber.key.substring(0, 30) + '...',
-                phone: data.to.substring(0, 5) + '***'
-              })
-              
-              try {
-                const subscriberById = await ManychatService.getSubscriberById(keyAsNumber)
-                if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
-                  logger.info('Subscriber válido obtenido usando key como subscriber_id', {
-                    subscriberId: subscriberById.id
-                  })
-                  subscriber = subscriberById
-                }
-              } catch (error: any) {
-                logger.warn('Error obteniendo subscriber usando key como subscriber_id', {
-                  error: error.message,
-                  keyAsNumber
+        // Estrategia 3: Intentar usar el key directamente como subscriber_id (algunos formatos de ManyChat aceptan esto)
+        if ((!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) && subscriber?.key) {
+          // Intentar parsear el key como número si es posible
+          const keyAsNumber = parseInt(subscriber.key)
+          if (!isNaN(keyAsNumber) && keyAsNumber > 0) {
+            logger.info('Intentando usar key como subscriber_id numérico', {
+              keyAsNumber,
+              key: subscriber.key.substring(0, 30) + '...',
+              phone: data.to.substring(0, 5) + '***'
+            })
+            
+            try {
+              const subscriberById = await ManychatService.getSubscriberById(keyAsNumber)
+              if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
+                logger.info('Subscriber válido obtenido usando key como subscriber_id', {
+                  subscriberId: subscriberById.id
                 })
+                subscriber = subscriberById
               }
+            } catch (error: any) {
+              logger.warn('Error obteniendo subscriber usando key como subscriber_id', {
+                error: error.message,
+                keyAsNumber
+              })
             }
           }
         }

@@ -342,8 +342,7 @@ export class WhatsAppService {
                     logger.warn('Error enviando mensaje usando manychatId directamente', {
                       manychatId: manychatIdAsNumber,
                       error: sendResponse.error,
-                      errorCode: sendResponse.error_code,
-                      details: sendResponse.details
+                      errorCode: sendResponse.error_code
                     })
                     // Continuar con las otras estrategias
                   }

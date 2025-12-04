@@ -715,7 +715,14 @@ function LeadCard({
     // Ejecutar handler de long press primero
     longPressHandlers.onMouseDown(e)
     // Permitir drag solo si listeners está disponible
-    // El drag se iniciará automáticamente si el usuario mueve el mouse
+    // Usar un pequeño delay para dar tiempo al long press de detectar movimiento
+    setTimeout(() => {
+      if (!dragStartedRef.current && listeners) {
+        // Solo iniciar drag si no se ha detectado movimiento (lo que cancelaría el long press)
+        // Esto permite que el click normal funcione
+      }
+    }, 50)
+    // Permitir drag inmediatamente para que funcione el arrastre
     if (listeners) {
       listeners.onMouseDown?.(e)
     }

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar permiso granular
-    const hasCreatePermission = await checkUserPermission(session.user.id, 'documents', 'create')
+    const hasCreatePermission = await checkUserPermission(session.user.id, 'documents', 'write')
     
     if (!hasCreatePermission) {
       return NextResponse.json({ 

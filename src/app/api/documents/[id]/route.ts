@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const hasUpdatePermission = await checkUserPermission(session.user.id, 'documents', 'update')
+    const hasUpdatePermission = await checkUserPermission(session.user.id, 'documents', 'write')
     
     if (!hasUpdatePermission) {
       return NextResponse.json({ 

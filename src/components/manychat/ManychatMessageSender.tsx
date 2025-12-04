@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
 import { 
-  MessageCircle, Send, FileText, AlertCircle, CheckCircle, Image as ImageIcon,
-  Video, File, Loader2
+  MessageCircle, Send, AlertCircle, Image as ImageIcon,
+  Video, File, Loader2, Bot
 } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -33,7 +35,6 @@ export default function ManychatMessageSender({
   const [loading, setLoading] = useState(false)
   const [messageType, setMessageType] = useState<'text' | 'image' | 'video' | 'file'>('text')
   const [mediaUrl, setMediaUrl] = useState('')
-  const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isManychatConfigured, setIsManychatConfigured] = useState(false)
   const [isSynced, setIsSynced] = useState(false)
@@ -60,21 +61,19 @@ export default function ManychatMessageSender({
 
   const handleSendMessage = async () => {
     if (!message.trim() && messageType === 'text') {
-      setError('El mensaje no puede estar vacío')
+      setError('Escribe un mensaje antes de enviar')
       return
     }
 
     if (messageType !== 'text' && !mediaUrl.trim()) {
-      setError('Debes proporcionar una URL de media')
+      setError('Ingresa la URL del archivo multimedia')
       return
     }
 
     setLoading(true)
     setError(null)
-    setSuccess(null)
 
     try {
-      // Enviar mensaje vía API de WhatsApp (que internamente usa el chatbot si está configurado)
       const response = await fetch('/api/whatsapp/send-message', {
         method: 'POST',
         headers: {
@@ -94,23 +93,18 @@ export default function ManychatMessageSender({
       }
 
       const result = await response.json()
-      
-      setSuccess(`Mensaje enviado exitosamente`)
       setMessage('')
       setMediaUrl('')
       
       addToast({
         title: 'Mensaje enviado',
-        description: `Mensaje enviado a ${telefono} ${isManychatConfigured ? 'vía chatbot' : ''}`,
+        description: `Mensaje enviado exitosamente a ${telefono}`,
         type: 'success',
       })
 
       if (onMessageSent && result.messageId) {
         onMessageSent(result.messageId)
       }
-
-      // Limpiar mensaje de éxito después de 3 segundos
-      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
       setError(errorMessage)
@@ -141,17 +135,13 @@ export default function ManychatMessageSender({
           </div>
           {isManychatConfigured && (
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              <Bot className="w-3 h-3 mr-1" />
               Chatbot
             </Badge>
           )}
         </div>
         <CardDescription>
           Enviar mensaje a {telefono}
-          {!isSynced && isManychatConfigured && (
-            <span className="block text-yellow-600 text-xs mt-1">
-              ⚠️ Lead no sincronizado con el chatbot. Se sincronizará al enviar.
-            </span>
-          )}
         </CardDescription>
       </CardHeader>
 
@@ -159,25 +149,25 @@ export default function ManychatMessageSender({
         {/* Tabs para tipo de mensaje */}
         <Tabs value={messageType} onValueChange={(value: any) => setMessageType(value)}>
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="text" className="flex items-center gap-1">
+            <TabsTrigger value="text" className="flex items-center gap-1 text-xs">
               <MessageCircle className="w-3 h-3" />
               <span className="hidden sm:inline">Texto</span>
             </TabsTrigger>
-            <TabsTrigger value="image" className="flex items-center gap-1">
+            <TabsTrigger value="image" className="flex items-center gap-1 text-xs">
               <ImageIcon className="w-3 h-3" />
               <span className="hidden sm:inline">Imagen</span>
             </TabsTrigger>
-            <TabsTrigger value="video" className="flex items-center gap-1">
+            <TabsTrigger value="video" className="flex items-center gap-1 text-xs">
               <Video className="w-3 h-3" />
               <span className="hidden sm:inline">Video</span>
             </TabsTrigger>
-            <TabsTrigger value="file" className="flex items-center gap-1">
+            <TabsTrigger value="file" className="flex items-center gap-1 text-xs">
               <File className="w-3 h-3" />
               <span className="hidden sm:inline">Archivo</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="text" className="space-y-3">
+          <TabsContent value="text" className="space-y-3 mt-4">
             <div>
               <Label htmlFor="message">Mensaje</Label>
               <Textarea
@@ -262,26 +252,22 @@ export default function ManychatMessageSender({
           </TabsContent>
         </Tabs>
 
-        {/* Mensajes de estado */}
+        {/* Mensajes de error */}
         {error && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-            <span className="text-red-700 text-sm">{error}</span>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-sm">{error}</AlertDescription>
+          </Alert>
         )}
 
-        {success && (
-          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-            <span className="text-green-700 text-sm">{success}</span>
-          </div>
-        )}
+        <Separator />
 
         {/* Botón de envío */}
         <Button 
           onClick={handleSendMessage} 
           disabled={loading || (!message.trim() && messageType === 'text') || (messageType !== 'text' && !mediaUrl.trim())}
           className="w-full"
+          size="lg"
         >
           {loading ? (
             <>
@@ -297,17 +283,24 @@ export default function ManychatMessageSender({
         </Button>
 
         {/* Info footer */}
-        <div className="pt-3 border-t">
+        <div className="pt-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Método de envío:</span>
+            <span className="text-gray-500">Método:</span>
             <Badge variant="outline" className={cn(
-              isManychatConfigured ? 'text-blue-600 border-blue-200' : 'text-gray-600'
+              isManychatConfigured ? 'text-blue-600 border-blue-200 bg-blue-50' : 'text-gray-600'
             )}>
-              {isManychatConfigured ? 'Chatbot API' : 'WhatsApp Business API'}
+              {isManychatConfigured ? (
+                <>
+                  <Bot className="w-3 h-3 mr-1" />
+                  Chatbot
+                </>
+              ) : (
+                'WhatsApp Directo'
+              )}
             </Badge>
           </div>
           {isManychatConfigured && isSynced && (
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-gray-500 mt-2 text-center">
               ✓ Contacto sincronizado con el chatbot
             </p>
           )}

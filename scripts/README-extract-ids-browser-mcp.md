@@ -269,3 +269,4 @@ Si tienes problemas:
 4. Revisa que ManyChat esté cargado correctamente
 
 
+

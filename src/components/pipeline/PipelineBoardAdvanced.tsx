@@ -676,6 +676,7 @@ function LeadCard({
   const [showDropdown, setShowDropdown] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 })
   const cardRef = useRef<HTMLDivElement | null>(null)
+  const dragStartedRef = useRef(false)
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -701,6 +702,52 @@ function LeadCard({
     onClick: onClick,
     delay: 500
   })
+
+  // Combinar handlers de long press con drag and drop
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Si hay dropdown abierto, no permitir drag
+    if (showDropdown) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    dragStartedRef.current = false
+    // Ejecutar handler de long press primero
+    longPressHandlers.onMouseDown(e)
+    // Permitir drag solo si listeners está disponible
+    // El drag se iniciará automáticamente si el usuario mueve el mouse
+    if (listeners) {
+      listeners.onMouseDown?.(e)
+    }
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Si hay dropdown abierto, no permitir drag
+    if (showDropdown) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    dragStartedRef.current = false
+    // Ejecutar handler de long press primero
+    longPressHandlers.onTouchStart(e)
+    // Permitir drag solo si listeners está disponible
+    if (listeners) {
+      listeners.onTouchStart?.(e)
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    // Si detectamos movimiento, marcar que el drag ha comenzado
+    dragStartedRef.current = true
+    longPressHandlers.onMouseMove?.(e)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    // Si detectamos movimiento, marcar que el drag ha comenzado
+    dragStartedRef.current = true
+    longPressHandlers.onTouchMove?.(e)
+  }
 
   // Función para mover el lead a una etapa
   const handleMoveToStage = async (toStageId: string) => {
@@ -749,18 +796,13 @@ function LeadCard({
         className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer relative ${
           isDragging ? 'opacity-50' : ''
         } ${showDropdown ? 'ring-2 ring-blue-500' : ''}`}
-        {...longPressHandlers}
-        onMouseDown={(e) => {
-          // Permitir drag solo si no hay dropdown abierto
-          if (!showDropdown && listeners) {
-            listeners.onMouseDown?.(e)
-          }
-        }}
-        onTouchStart={(e) => {
-          if (!showDropdown && listeners) {
-            listeners.onTouchStart?.(e)
-          }
-        }}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        onMouseMove={handleMouseMove}
+        onTouchMove={handleTouchMove}
+        onMouseUp={longPressHandlers.onMouseUp}
+        onMouseLeave={longPressHandlers.onMouseLeave}
+        onTouchEnd={longPressHandlers.onTouchEnd}
       >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">

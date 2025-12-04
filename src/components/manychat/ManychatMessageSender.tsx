@@ -84,29 +84,93 @@ export default function ManychatMessageSender({
           message: message.trim(),
           messageType,
           mediaUrl: messageType !== 'text' ? mediaUrl : undefined,
+          leadId, // Incluir leadId si está disponible
         }),
       })
 
+      // Verificar si la respuesta es OK
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al enviar mensaje')
+        let errorData
+        try {
+          errorData = await response.json()
+        } catch (parseError) {
+          // Si no se puede parsear el JSON, usar el texto de la respuesta
+          const text = await response.text()
+          throw new Error(`Error ${response.status}: ${text || 'Error desconocido'}`)
+        }
+        
+        // Extraer mensaje de error de la respuesta
+        const errorMessage = errorData?.error || errorData?.message || `Error ${response.status}: Error al enviar mensaje`
+        
+        // Si hay detalles adicionales, incluirlos en desarrollo
+        if (errorData?.details && process.env.NODE_ENV === 'development') {
+          console.error('Error details:', errorData.details)
+        }
+        
+        throw new Error(errorMessage)
       }
 
-      const result = await response.json()
-      setMessage('')
-      setMediaUrl('')
-      
-      addToast({
-        title: 'Mensaje enviado',
-        description: `Mensaje enviado exitosamente a ${telefono}`,
-        type: 'success',
-      })
+      // Parsear respuesta
+      let result
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        throw new Error('Error al procesar la respuesta del servidor')
+      }
 
-      if (onMessageSent && result.messageId) {
-        onMessageSent(result.messageId)
+      // Validar que la respuesta tenga el formato esperado
+      if (!result || typeof result !== 'object') {
+        throw new Error('Respuesta inválida del servidor')
+      }
+
+      // Validar que tenga messageId si fue exitoso
+      if (result.success && !result.messageId) {
+        console.warn('Response marked as success but missing messageId', result)
+      }
+
+      // Limpiar formulario solo si fue exitoso
+      if (result.success !== false) {
+        setMessage('')
+        setMediaUrl('')
+        
+        addToast({
+          title: 'Mensaje enviado',
+          description: `Mensaje enviado exitosamente a ${telefono}`,
+          type: 'success',
+        })
+
+        // Llamar callback solo si tenemos messageId válido
+        if (onMessageSent && result.messageId) {
+          onMessageSent(result.messageId)
+        }
+      } else {
+        throw new Error(result.error || 'Error al enviar mensaje')
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+      // Manejar diferentes tipos de errores
+      let errorMessage = 'Error desconocido'
+      
+      if (err instanceof Error) {
+        errorMessage = err.message
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String(err.message)
+      }
+
+      // Mensajes más amigables para errores comunes
+      if (errorMessage.includes('fetch')) {
+        errorMessage = 'Error de conexión. Verifica tu conexión a internet e intenta nuevamente.'
+      } else if (errorMessage.includes('401') || errorMessage.includes('No autorizado')) {
+        errorMessage = 'Tu sesión ha expirado. Por favor, recarga la página e intenta nuevamente.'
+      } else if (errorMessage.includes('403') || errorMessage.includes('Sin permisos')) {
+        errorMessage = 'No tienes permisos para enviar mensajes. Contacta al administrador.'
+      } else if (errorMessage.includes('503') || errorMessage.includes('no está configurado')) {
+        errorMessage = 'WhatsApp no está configurado. Contacta al administrador.'
+      } else if (errorMessage.includes('sincronizado')) {
+        errorMessage = 'El contacto no está sincronizado. Por favor, sincroniza el contacto primero.'
+      }
+
       setError(errorMessage)
       addToast({
         title: 'Error al enviar mensaje',

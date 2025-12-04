@@ -95,13 +95,19 @@ export async function POST(request: NextRequest) {
       document 
     }, { status: 201 })
   } catch (error) {
-    console.error('[Documents API] Error uploading file:', error)
+    console.error('[Documents API] Error uploading file:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId: session?.user?.id,
+      timestamp: new Date().toISOString()
+    })
     
     if (error instanceof Error) {
-      if (error.message.includes('File size exceeds')) {
+      // Errores de tamaño de archivo
+      if (error.message.includes('File size exceeds') || error.message.includes('exceeded the maximum')) {
         return NextResponse.json({
           error: 'File too large',
-          message: error.message
+          message: 'El archivo excede el tamaño máximo permitido (100MB). Por favor, comprime el archivo o usa uno más pequeño.'
         }, { status: 413 })
       }
       
@@ -109,15 +115,39 @@ export async function POST(request: NextRequest) {
       if (error.message.includes('413') || error.message.includes('Payload Too Large')) {
         return NextResponse.json({
           error: 'File too large',
-          message: 'El archivo es demasiado grande para subir directamente. Por favor, usa la opción de subida directa a Supabase Storage.',
+          message: 'El archivo es demasiado grande para subir directamente. El límite máximo es 4.5MB para subida directa. Por favor, comprime el archivo o usa un archivo más pequeño.',
           requiresDirectUpload: true
         }, { status: 413 })
+      }
+
+      // Errores de Storage de Supabase
+      if (error.message.includes('Bucket') || error.message.includes('storage')) {
+        return NextResponse.json({
+          error: 'Storage error',
+          message: 'Error al acceder al almacenamiento. Por favor, intenta nuevamente o contacta al administrador.'
+        }, { status: 500 })
+      }
+
+      // Errores de base de datos
+      if (error.message.includes('database') || error.message.includes('relation') || error.message.includes('constraint')) {
+        return NextResponse.json({
+          error: 'Database error',
+          message: 'Error al guardar la información del documento. Por favor, verifica que el lead existe e intenta nuevamente.'
+        }, { status: 500 })
+      }
+
+      // Errores de permisos
+      if (error.message.includes('permission') || error.message.includes('Forbidden') || error.message.includes('RLS')) {
+        return NextResponse.json({
+          error: 'Permission error',
+          message: 'No tienes permisos para realizar esta acción. Por favor, contacta al administrador.'
+        }, { status: 403 })
       }
     }
 
     return NextResponse.json({ 
       error: 'Failed to upload document',
-      message: error instanceof Error ? error.message : 'Error al subir el documento'
+      message: 'Error al subir el documento. Por favor, intenta nuevamente o contacta al administrador si el problema persiste.'
     }, { status: 500 })
   }
 }

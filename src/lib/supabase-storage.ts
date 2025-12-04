@@ -74,7 +74,12 @@ export class SupabaseStorageService {
       console.log('[Storage] Bucket already exists:', this.BUCKET_NAME)
       return true
     } catch (error) {
-      console.error('[Storage] Error initializing bucket:', error)
+      console.error('[Storage] Error initializing bucket:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        bucketName: this.BUCKET_NAME,
+        timestamp: new Date().toISOString()
+      })
       throw error
     }
   }
@@ -145,7 +150,16 @@ export class SupabaseStorageService {
 
       return docData
     } catch (error) {
-      console.error('[Storage] Error uploading file:', error)
+      console.error('[Storage] Error uploading file:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        leadId: params.leadId,
+        category: params.category,
+        fileName: params.file.name,
+        fileSize: params.file.size,
+        userId,
+        timestamp: new Date().toISOString()
+      })
       throw error
     }
   }

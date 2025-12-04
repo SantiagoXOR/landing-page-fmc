@@ -94,20 +94,52 @@ export default function LeadDetailPage() {
   const evaluateLead = async () => {
     try {
       setScoring(true)
+      setScoringResult(null) // Limpiar resultado anterior
+      
       const response = await fetch('/api/scoring/eval', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId: params.id }),
       })
       
-      if (response.ok) {
-        const result = await response.json()
-        setScoringResult(result)
-        // Refrescar lead para ver el estado actualizado
-        await fetchLead()
+      if (!response.ok) {
+        let errorData
+        try {
+          errorData = await response.json()
+        } catch {
+          errorData = { error: `Error ${response.status}: Error al evaluar el lead` }
+        }
+        throw new Error(errorData.error || errorData.message || 'Error al evaluar el lead')
       }
+      
+      const result = await response.json()
+      
+      // Validar formato de respuesta
+      if (!result || typeof result !== 'object') {
+        throw new Error('Respuesta inválida del servidor')
+      }
+      
+      // Validar que tenga los campos esperados
+      if (typeof result.score === 'undefined' && typeof result.total_score === 'undefined') {
+        console.warn('Scoring result missing score field', result)
+      }
+      
+      // Formatear resultado para compatibilidad
+      const formattedResult: ScoringResult = {
+        score: result.score ?? result.total_score ?? 0,
+        decision: result.decision ?? result.recommendation ?? 'NUEVO',
+        motivos: Array.isArray(result.motivos) ? result.motivos : (result.reasons || [])
+      }
+      
+      setScoringResult(formattedResult)
+      
+      // Refrescar lead para ver el estado actualizado
+      await fetchLead()
     } catch (error) {
       console.error('Error evaluating lead:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al evaluar el lead'
+      // Mostrar error al usuario (podrías usar un toast aquí)
+      alert(`Error: ${errorMessage}`)
     } finally {
       setScoring(false)
     }

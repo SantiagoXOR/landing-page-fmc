@@ -228,22 +228,37 @@ export default function DocumentsPage() {
         setFileDescription('')
         setUploadError(null)
       } else {
-        const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }))
+        const errorData = await response.json().catch(() => ({ 
+          message: 'Error desconocido al subir el archivo',
+          error: 'Unknown error'
+        }))
         
-        // Manejar error 413 específicamente
+        console.error('Upload error:', {
+          status: response.status,
+          error: errorData.error,
+          message: errorData.message
+        })
+        
+        // Manejar diferentes tipos de errores
         if (response.status === 413) {
           const fileSizeMB = selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : '0'
           setUploadError(
             errorData.message || 
             `El archivo es demasiado grande (${fileSizeMB}MB). El límite máximo es 4.5MB para subida directa. Por favor, comprime el archivo o usa un archivo más pequeño.`
           )
+        } else if (response.status === 403) {
+          setUploadError(errorData.message || 'No tienes permisos para subir documentos. Por favor, contacta al administrador.')
+        } else if (response.status === 400) {
+          setUploadError(errorData.message || 'Datos inválidos. Por favor, verifica que hayas seleccionado un lead y una categoría válida.')
+        } else if (response.status === 500) {
+          setUploadError(errorData.message || 'Error del servidor al subir el archivo. Por favor, intenta nuevamente o contacta al administrador.')
         } else {
-          setUploadError(errorData.message || 'Error al subir el archivo')
+          setUploadError(errorData.message || 'Error al subir el archivo. Por favor, intenta nuevamente.')
         }
       }
     } catch (error) {
       console.error('Error uploading file:', error)
-      setUploadError('Error al subir el archivo')
+      setUploadError('Error de conexión al subir el archivo. Por favor, verifica tu conexión a internet e intenta nuevamente.')
     } finally {
       setUploading(false)
       setUploadProgress(0)

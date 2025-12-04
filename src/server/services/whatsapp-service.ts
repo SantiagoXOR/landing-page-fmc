@@ -388,6 +388,15 @@ export class WhatsAppService {
                 }
               }
             } catch (error: any) {
+              // Si el error es de ventana de 24 horas, propagarlo inmediatamente sin intentar otras estrategias
+              if (error.message && (
+                error.message.includes('24 horas') ||
+                error.message.includes('ventana de 24') ||
+                error.message.includes('template de WhatsApp')
+              )) {
+                throw error
+              }
+              
               logger.error('Error obteniendo subscriber por manychatId', {
                 error: error.message,
                 stack: error.stack,
@@ -480,6 +489,15 @@ export class WhatsAppService {
                     })
                   }
                 } catch (sendError: any) {
+                  // Si el error es de ventana de 24 horas, propagarlo inmediatamente
+                  if (sendError.message && (
+                    sendError.message.includes('24 horas') ||
+                    sendError.message.includes('ventana de 24') ||
+                    sendError.message.includes('template de WhatsApp')
+                  )) {
+                    throw sendError
+                  }
+                  
                   logger.error('Error enviando mensaje usando manychatId directamente después de error', {
                     error: sendError.message,
                     stack: sendError.stack,

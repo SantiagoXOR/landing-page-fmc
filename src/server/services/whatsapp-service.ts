@@ -432,6 +432,7 @@ export class WhatsAppService {
             throw new Error(errorMessage)
           }
         }
+      }
 
       // Si llegamos aquí, el subscriber tiene un ID válido
       // Asegurar que tenga teléfono configurado

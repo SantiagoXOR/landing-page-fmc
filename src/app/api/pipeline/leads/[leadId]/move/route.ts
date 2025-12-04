@@ -708,12 +708,14 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
           return
         }
         const manychatTags = subscriber.tags || []
+        // Extraer nombres de los tags (ManychatTag tiene estructura { id, name })
+        const manychatTagNames = manychatTags.map(tag => tag.name)
 
         // Obtener tags de negocio que deben mantenerse
         const businessTagNames = await getBusinessTags()
 
         // Filtrar tags a mantener (negocio + no pipeline)
-        const tagsToKeep = manychatTags.filter(tag => {
+        const tagsToKeep = manychatTagNames.filter(tag => {
           if (businessTagNames.includes(tag)) return true
           if (!pipelineTagNames.includes(tag)) return true
           if (tag === tagToAdd) return true
@@ -721,7 +723,7 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
         })
 
         // Determinar tags a remover (tags de pipeline que no son el nuevo)
-        const tagsToRemove = manychatTags.filter(tag => 
+        const tagsToRemove = manychatTagNames.filter(tag => 
           pipelineTagNames.includes(tag) && tag !== tagToAdd
         )
 

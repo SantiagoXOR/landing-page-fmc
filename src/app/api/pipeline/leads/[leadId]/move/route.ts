@@ -703,6 +703,10 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
       try {
         // Obtener tags actuales de ManyChat
         const subscriber = await ManychatService.getSubscriberById(lead.manychatId)
+        if (!subscriber) {
+          logger.warn('Subscriber not found in ManyChat', { leadId, manychatId: lead.manychatId })
+          return
+        }
         const manychatTags = subscriber.tags || []
 
         // Obtener tags de negocio que deben mantenerse

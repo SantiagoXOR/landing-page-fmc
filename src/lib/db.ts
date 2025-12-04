@@ -65,9 +65,22 @@ class SupabaseClient {
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        console.error(`❌ Supabase HTTP error: ${response.status} - ${error}`)
-        throw new Error(`Supabase error: ${response.status} - ${error}`)
+        const errorText = await response.text()
+        
+        // Si es un 404 de una función RPC que no existe, no registrar como error crítico
+        // El código que llama a esta función manejará el error apropiadamente
+        const isRPCNotFound = response.status === 404 && 
+                              endpoint.includes('/rpc/') && 
+                              (errorText.includes('PGRST202') || errorText.includes('Could not find the function'))
+        
+        if (isRPCNotFound) {
+          // No registrar como error, solo lanzar el error para que sea manejado por el código que llama
+          throw new Error(`Supabase error: ${response.status} - ${errorText}`)
+        }
+        
+        // Para otros errores, sí registrar como error crítico
+        console.error(`❌ Supabase HTTP error: ${response.status} - ${errorText}`)
+        throw new Error(`Supabase error: ${response.status} - ${errorText}`)
       }
 
       // Para DELETE con 204 No Content, no hay body
@@ -104,6 +117,12 @@ class SupabaseClient {
         console.error(`   Error type: ${error.constructor.name}`)
         console.error(`   Stack: ${error.stack}`)
         throw new Error(`Error de conexión a Supabase: ${error.message}. Verifique su conexión a internet y la configuración de red.`)
+      }
+      
+      // Si es un error de función RPC no encontrada, no registrar como error crítico
+      // El código que llama manejará este error apropiadamente
+      if (error.message?.includes('PGRST202') || error.message?.includes('Could not find the function')) {
+        throw error // Re-lanzar sin registrar como error
       }
       
       // Re-lanzar otros errores

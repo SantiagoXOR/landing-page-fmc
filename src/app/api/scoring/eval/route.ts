@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
     // Formatear respuesta para compatibilidad con el frontend
     const formattedResult = {
       score: result.total_score ?? 0,
-      decision: result.recommendation ?? result.decision ?? 'NUEVO',
-      motivos: motivos.length > 0 ? motivos : (result.reasons ?? result.motivos ?? [])
+      decision: result.recommendation ?? 'NUEVO',
+      motivos: motivos.length > 0 ? motivos : []
     }
 
     return NextResponse.json(formattedResult)

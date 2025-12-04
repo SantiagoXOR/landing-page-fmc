@@ -113,7 +113,8 @@ export async function POST(request: NextRequest) {
       to: validatedData.to,
       message: validatedData.message,
       mediaUrl: validatedData.mediaUrl || undefined,
-      messageType: validatedData.messageType
+      messageType: validatedData.messageType,
+      leadId: leadId // Pasar leadId para sincronización si es necesario
     })
 
     if (!result || !result.messageId) {

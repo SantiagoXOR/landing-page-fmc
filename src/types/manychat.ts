@@ -326,6 +326,7 @@ export interface ManychatLeadData {
   whatsapp_phone?: string
   custom_fields?: Record<string, any>
   tags?: string[]
+  consent_phrase?: string // Frase de consentimiento para WhatsApp (requerido por ManyChat API)
 }
 
 // ============================================================================

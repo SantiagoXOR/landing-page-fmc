@@ -136,6 +136,14 @@ export class SupabaseStorageService {
         status: 'PENDIENTE',
       }
 
+      console.log('[Storage] Inserting document metadata:', {
+        lead_id: params.leadId,
+        category: params.category,
+        filename: filename,
+        file_size: params.file.size,
+        mime_type: params.file.type
+      })
+
       const { data: docData, error: dbError } = await supabase.client
         .from('documents')
         .insert(metadata)
@@ -143,23 +151,63 @@ export class SupabaseStorageService {
         .single()
 
       if (dbError) {
+        console.error('[Storage] Database error inserting document:', {
+          error: dbError,
+          message: dbError.message,
+          code: dbError.code,
+          details: dbError.details,
+          hint: dbError.hint,
+          metadata
+        })
+        
         // Si falla guardar en DB, eliminar archivo de Storage
-        await this.deleteFile(filename)
-        throw dbError
+        try {
+          await this.deleteFile(filename)
+        } catch (deleteError) {
+          console.error('[Storage] Error deleting file after DB failure:', deleteError)
+        }
+        
+        // Crear un Error con el mensaje de Supabase para mejor manejo
+        const errorMessage = dbError.message || dbError.details || 'Error al guardar el documento en la base de datos'
+        const dbErrorObj = new Error(errorMessage)
+        ;(dbErrorObj as any).code = dbError.code
+        ;(dbErrorObj as any).details = dbError.details
+        ;(dbErrorObj as any).hint = dbError.hint
+        throw dbErrorObj
       }
 
+      console.log('[Storage] Document metadata saved successfully:', docData?.id)
       return docData
     } catch (error) {
-      console.error('[Storage] Error uploading file:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+      // Mejorar el logging de errores para capturar objetos de Supabase
+      const errorDetails: any = {
         leadId: params.leadId,
         category: params.category,
         fileName: params.file.name,
         fileSize: params.file.size,
         userId,
         timestamp: new Date().toISOString()
-      })
+      }
+
+      if (error instanceof Error) {
+        errorDetails.error = error.message
+        errorDetails.stack = error.stack
+        errorDetails.code = (error as any).code
+        errorDetails.details = (error as any).details
+        errorDetails.hint = (error as any).hint
+      } else if (error && typeof error === 'object') {
+        // Manejar errores de Supabase que son objetos
+        const supabaseError = error as any
+        errorDetails.error = supabaseError.message || JSON.stringify(error)
+        errorDetails.code = supabaseError.code
+        errorDetails.details = supabaseError.details
+        errorDetails.hint = supabaseError.hint
+        errorDetails.fullError = JSON.stringify(error, null, 2)
+      } else {
+        errorDetails.error = String(error)
+      }
+
+      console.error('[Storage] Error uploading file:', errorDetails)
       throw error
     }
   }

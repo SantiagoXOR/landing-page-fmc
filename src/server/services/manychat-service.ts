@@ -678,6 +678,13 @@ export class ManychatService {
         has_opt_in_sms: true,
       }
 
+      // Agregar consent_phrase si es para WhatsApp (requerido por ManyChat API)
+      // ManyChat requiere este campo cuando se crea un subscriber de WhatsApp
+      if (normalizedWhatsappPhone && normalizedWhatsappPhone === normalizedPhone) {
+        // Consent phrase por defecto para WhatsApp - puede ser personalizado según necesidades
+        body.consent_phrase = data.consent_phrase || 'He proporcionado mi número de teléfono y acepto recibir mensajes de WhatsApp'
+      }
+
       // Agregar custom fields si existen
       if (data.custom_fields) {
         body.custom_fields = data.custom_fields
@@ -705,6 +712,42 @@ export class ManychatService {
         })
 
         return response.data
+      }
+
+      // Si el error indica que falta consent_phrase, agregarlo y reintentar
+      if (response.error && (
+        response.error.toLowerCase().includes('consent_phrase') ||
+        (response.details && response.details.messages && 
+         Array.isArray(response.details.messages) &&
+         response.details.messages.some((msg: any) => 
+           msg.message && msg.message.toLowerCase().includes('consent_phrase')
+         ))
+      )) {
+        logger.info('Falta consent_phrase, reintentando con consent_phrase', {
+          phone: normalizedPhone
+        })
+
+        // Agregar consent_phrase si no está presente
+        if (!body.consent_phrase && normalizedWhatsappPhone && normalizedWhatsappPhone === normalizedPhone) {
+          body.consent_phrase = 'He proporcionado mi número de teléfono y acepto recibir mensajes de WhatsApp'
+          
+          // Reintentar la creación
+          const retryResponse = await this.executeWithRateLimit(() =>
+            this.makeRequest<ManychatSubscriber>({
+              method: 'POST',
+              endpoint: `/fb/subscriber/createSubscriber`,
+              body,
+            })
+          )
+
+          if (retryResponse.status === 'success' && retryResponse.data) {
+            logger.info('Subscriber creado exitosamente después de agregar consent_phrase', {
+              subscriberId: retryResponse.data.id,
+              phone: normalizedPhone
+            })
+            return retryResponse.data
+          }
+        }
       }
 
       // Si el error indica que el contacto ya existe, intentar obtenerlo

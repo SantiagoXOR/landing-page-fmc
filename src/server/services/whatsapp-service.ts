@@ -44,6 +44,7 @@ export interface SendMessageData {
   message: string
   mediaUrl?: string
   messageType?: 'text' | 'image' | 'video' | 'audio' | 'document'
+  leadId?: string // ID del lead para sincronización si es necesario
 }
 
 export class WhatsAppService {
@@ -220,6 +221,55 @@ export class WhatsAppService {
           phone: data.to.substring(0, 5) + '***'
         })
         throw new Error(errorMessage)
+      }
+
+      // Validar que el subscriber tenga un ID válido
+      if (!subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
+        logger.error('Subscriber encontrado pero sin ID válido', {
+          subscriber: {
+            hasId: !!subscriber.id,
+            hasPhone: !!subscriber.phone,
+            hasWhatsAppPhone: !!subscriber.whatsapp_phone,
+            hasEmail: !!subscriber.email
+          },
+          identifier: {
+            hasPhone: true,
+            hasEmail: false,
+            hasSubscriberId: false,
+            phonePreview: data.to.substring(0, 5) + '***'
+          }
+        })
+
+        // Intentar sincronizar el lead nuevamente si tenemos leadId
+        if (data.leadId) {
+          logger.info('Intentando sincronizar lead nuevamente para obtener subscriber válido', {
+            leadId: data.leadId,
+            phone: data.to.substring(0, 5) + '***'
+          })
+          
+          try {
+            await ManychatSyncService.syncLeadToManychat(data.leadId)
+            
+            // Intentar obtener subscriber nuevamente después de sincronizar
+            subscriber = await ManychatService.getSubscriberByPhone(data.to)
+            
+            if (subscriber && subscriber.id && subscriber.id > 0) {
+              logger.info('Subscriber válido obtenido después de sincronización', {
+                subscriberId: subscriber.id
+              })
+            } else {
+              throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente.')
+            }
+          } catch (syncError: any) {
+            logger.error('Error sincronizando lead para obtener subscriber válido', {
+              error: syncError.message,
+              leadId: data.leadId
+            })
+            throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente.')
+          }
+        } else {
+          throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente.')
+        }
       }
 
       // Si el subscriber no tiene teléfono configurado, intentar actualizarlo usando createOrUpdateSubscriber

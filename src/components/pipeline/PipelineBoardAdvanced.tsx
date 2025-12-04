@@ -832,7 +832,7 @@ function LeadCard({
         {...attributes}
         className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer relative ${
           isDragging ? 'opacity-50' : ''
-        } ${showDropdown ? 'ring-2 ring-blue-500' : ''}`}
+        } ${showDropdown ? 'ring-2 ring-blue-500' : ''} ${isMoving ? 'opacity-75' : ''}`}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         onMouseMove={handleMouseMove}
@@ -1018,9 +1018,9 @@ function LeadCard({
         )}
       </div>
 
-      {lead.tags && lead.tags.length > 0 && (
+      {parsedTags && parsedTags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {lead.tags.slice(0, 3).map((tag, index) => {
+          {parsedTags.slice(0, 3).map((tag, index) => {
             const tagColor = getTagColor(tag)
             return (
               <Badge 
@@ -1038,13 +1038,13 @@ function LeadCard({
               </Badge>
             )
           })}
-          {lead.tags.length > 3 && (
+          {parsedTags.length > 3 && (
             <Badge 
               variant="secondary" 
               className="text-xs"
-              title={`${lead.tags.slice(3).join(', ')}`}
+              title={`${parsedTags.slice(3).join(', ')}`}
             >
-              +{lead.tags.length - 3}
+              +{parsedTags.length - 3}
             </Badge>
           )}
         </div>
@@ -1055,6 +1055,18 @@ function LeadCard({
           <div className="absolute inset-0 bg-blue-50/50 border-2 border-blue-500 rounded-lg flex items-center justify-center z-10 pointer-events-none">
             <div className="text-xs text-blue-600 font-medium bg-white px-2 py-1 rounded shadow">
               Selecciona una etapa...
+            </div>
+          </div>
+        )}
+        
+        {/* Loading overlay durante el movimiento */}
+        {isMoving && (
+          <div className="absolute inset-0 bg-white/80 border-2 border-blue-500 rounded-lg flex items-center justify-center z-20 pointer-events-none">
+            <div className="flex flex-col items-center gap-2">
+              <LoadingSpinner size="sm" />
+              <div className="text-xs text-blue-600 font-medium">
+                Moviendo...
+              </div>
             </div>
           </div>
         )}

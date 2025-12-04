@@ -19,8 +19,9 @@ const VERCEL_BODY_LIMIT = 4.5 * 1024 * 1024 // 4.5MB
  * En ese caso, se recomienda usar upload directo a Supabase Storage.
  */
 export async function POST(request: NextRequest) {
+  let session = null
   try {
-    const session = await getServerSession(authOptions)
+    session = await getServerSession(authOptions)
     
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

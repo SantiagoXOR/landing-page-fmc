@@ -776,12 +776,8 @@ export class ManychatService {
         response.error.toLowerCase().includes('already exists') ||
         response.error.toLowerCase().includes('duplicate') ||
         response.error_code === 'subscriber_exists' ||
-        (response.details && response.details.messages && 
-         response.details.messages.wa_id &&
-         Array.isArray(response.details.messages.wa_id.message) &&
-         response.details.messages.wa_id.message.some((msg: string) => 
-           msg.toLowerCase().includes('already exists')
-         ))
+        (response.details && typeof response.details === 'string' && 
+         response.details.toLowerCase().includes('already exists'))
       )) {
         logger.info('Contacto ya existe en ManyChat, intentando obtenerlo', {
           phone: normalizedPhone,

@@ -800,12 +800,8 @@ export class ManychatService {
           })
           
           // Si hay un warning sobre permisos, informar al usuario
-          if (response.details && response.details.messages && 
-              response.details.messages.warning &&
-              Array.isArray(response.details.messages.warning.message) &&
-              response.details.messages.warning.message.some((msg: string) => 
-                msg.includes('Permission denied')
-              )) {
+          if (response.details && typeof response.details === 'string' && 
+              response.details.toLowerCase().includes('permission denied')) {
             logger.error('ManyChat requiere permisos adicionales para importar contactos', {
               phone: normalizedPhone
             })

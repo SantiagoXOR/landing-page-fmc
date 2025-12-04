@@ -12,16 +12,32 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { 
   MessageCircle, Send, AlertCircle, Image as ImageIcon,
-  Video, File, Loader2, Bot
+  Video, File, Loader2, Bot, FileText
 } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface ManychatMessageSenderProps {
   leadId: string
   telefono: string
   manychatId?: string
   onMessageSent?: (messageId: string) => void
+}
+
+interface Document {
+  id: string
+  original_filename: string
+  category: string
+  file_size: number
+  public_url?: string
+  storage_path: string
 }
 
 export default function ManychatMessageSender({ 
@@ -38,6 +54,11 @@ export default function ManychatMessageSender({
   const [error, setError] = useState<string | null>(null)
   const [isManychatConfigured, setIsManychatConfigured] = useState(false)
   const [isSynced, setIsSynced] = useState(false)
+  
+  // Estados para documentos
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [loadingDocuments, setLoadingDocuments] = useState(false)
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>('')
 
   useEffect(() => {
     checkConfiguration()
@@ -46,6 +67,13 @@ export default function ManychatMessageSender({
   useEffect(() => {
     setIsSynced(!!manychatId)
   }, [manychatId])
+
+  useEffect(() => {
+    // Cargar documentos cuando se selecciona el tipo "file"
+    if (messageType === 'file' && leadId) {
+      fetchLeadDocuments()
+    }
+  }, [messageType, leadId])
 
   const checkConfiguration = async () => {
     try {
@@ -59,6 +87,55 @@ export default function ManychatMessageSender({
     }
   }
 
+  const fetchLeadDocuments = async () => {
+    try {
+      setLoadingDocuments(true)
+      const response = await fetch(`/api/documents?leadId=${leadId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setDocuments(data.documents || [])
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error)
+    } finally {
+      setLoadingDocuments(false)
+    }
+  }
+
+  const handleDocumentSelect = async (documentId: string) => {
+    if (!documentId) {
+      setMediaUrl('')
+      setSelectedDocumentId('')
+      return
+    }
+
+    try {
+      // Obtener la URL firmada del documento
+      const response = await fetch(`/api/documents/${documentId}`)
+      if (response.ok) {
+        const doc = await response.json()
+        setMediaUrl(doc.public_url || '')
+        setSelectedDocumentId(documentId)
+      } else {
+        throw new Error('Error al obtener el documento')
+      }
+    } catch (error) {
+      addToast({
+        title: 'Error',
+        description: 'No se pudo cargar el documento seleccionado',
+        type: 'error',
+      })
+    }
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
   const handleSendMessage = async () => {
     if (!message.trim() && messageType === 'text') {
       setError('Escribe un mensaje antes de enviar')
@@ -66,7 +143,7 @@ export default function ManychatMessageSender({
     }
 
     if (messageType !== 'text' && !mediaUrl.trim()) {
-      setError('Ingresa la URL del archivo multimedia')
+      setError('Ingresa la URL del archivo multimedia o selecciona un documento')
       return
     }
 
@@ -132,6 +209,7 @@ export default function ManychatMessageSender({
       if (result.success !== false) {
         setMessage('')
         setMediaUrl('')
+        setSelectedDocumentId('')
         
         addToast({
           title: 'Mensaje enviado',
@@ -301,14 +379,73 @@ export default function ManychatMessageSender({
 
           <TabsContent value="file" className="space-y-3">
             <div>
-              <Label htmlFor="fileUrl">URL del archivo</Label>
+              <Label htmlFor="documentSelect">Seleccionar documento del lead</Label>
+              {loadingDocuments ? (
+                <div className="flex items-center justify-center py-4 border rounded-md">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  <span className="text-sm text-gray-500">Cargando documentos...</span>
+                </div>
+              ) : documents.length > 0 ? (
+                <Select value={selectedDocumentId} onValueChange={handleDocumentSelect}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona un documento para enviar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">
+                      <span className="text-gray-500">Ninguno (usar URL manual)</span>
+                    </SelectItem>
+                    {documents.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id}>
+                        <div className="flex items-center gap-2 py-1">
+                          <FileText className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-medium truncate">{doc.original_filename}</span>
+                            <span className="text-xs text-gray-500">
+                              {doc.category} • {formatFileSize(doc.file_size)}
+                            </span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-gray-500 py-2 px-3 border rounded-md bg-gray-50">
+                  No hay documentos disponibles para este lead
+                </div>
+              )}
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">O</span>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="fileUrl">URL del archivo (manual)</Label>
               <Input
                 id="fileUrl"
                 type="url"
                 value={mediaUrl}
-                onChange={(e) => setMediaUrl(e.target.value)}
+                onChange={(e) => {
+                  setMediaUrl(e.target.value)
+                  if (e.target.value) {
+                    setSelectedDocumentId('')
+                  }
+                }}
                 placeholder="https://ejemplo.com/documento.pdf"
+                disabled={!!selectedDocumentId}
+                className={selectedDocumentId ? 'bg-gray-100' : ''}
               />
+              {selectedDocumentId && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Un documento está seleccionado. Limpia la selección para usar URL manual.
+                </p>
+              )}
             </div>
             <p className="text-xs text-gray-500">
               Formatos soportados: PDF, DOC, DOCX, XLS, XLSX, etc.

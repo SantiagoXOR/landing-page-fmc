@@ -14,7 +14,7 @@ const eventRepo = new EventRepository()
 const SendMessageSchema = z.object({
   to: z.string().min(10, 'El número de teléfono es requerido'),
   message: z.string().min(1, 'El mensaje no puede estar vacío').max(4096, 'El mensaje es demasiado largo'),
-  messageType: z.enum(['text', 'image', 'video', 'file']).default('text'),
+  messageType: z.enum(['text', 'image', 'video', 'audio', 'document']).default('text'),
   mediaUrl: z.string().url().optional().or(z.literal('')),
   leadId: z.string().optional(), // Opcional para compatibilidad
 })

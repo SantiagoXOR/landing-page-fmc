@@ -1350,7 +1350,9 @@ export class ManychatService {
           subscriber_id: subscriberId,
           data: {
             version: 'v2',
-            messages,
+            content: {
+              messages,
+            },
             tag,
           },
         },
@@ -1437,7 +1439,9 @@ export class ManychatService {
           phone: normalizedPhone,
           data: {
             version: 'v2',
-            messages,
+            content: {
+              messages,
+            },
             tag,
           },
         },

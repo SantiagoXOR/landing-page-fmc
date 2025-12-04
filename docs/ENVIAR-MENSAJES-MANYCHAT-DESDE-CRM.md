@@ -23,12 +23,14 @@ Content-Type: application/json
   "subscriber_id": 123456789,
   "data": {
     "version": "v2",
-    "messages": [
-      {
-        "type": "text",
-        "text": "Hola, ¿cómo puedo ayudarte?"
-      }
-    ],
+    "content": {
+      "messages": [
+        {
+          "type": "text",
+          "text": "Hola, ¿cómo puedo ayudarte?"
+        }
+      ]
+    },
     "tag": "opcional_tag_name"
   }
 }
@@ -38,7 +40,8 @@ Content-Type: application/json
 
 - **`subscriber_id`** (requerido): ID único del subscriber en ManyChat
 - **`data.version`** (requerido): Versión de la API, usar `"v2"`
-- **`data.messages`** (requerido): Array de mensajes a enviar
+- **`data.content`** (requerido): Objeto que contiene los mensajes
+- **`data.content.messages`** (requerido): Array de mensajes a enviar
 - **`data.tag`** (opcional): Tag para etiquetar el mensaje en ManyChat
 
 ---

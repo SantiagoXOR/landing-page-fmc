@@ -366,17 +366,17 @@ export class WhatsAppService {
           subscriber.whatsapp_phone = data.to
           subscriber.phone = data.to
         }
-      } else if (!subscriber.whatsapp_phone && subscriber.phone) {
+      } else if (subscriber && !subscriber.whatsapp_phone && subscriber.phone) {
         // Si tiene phone pero no whatsapp_phone, asignar whatsapp_phone también
         subscriber.whatsapp_phone = subscriber.phone
-      } else if (subscriber.whatsapp_phone && !subscriber.phone) {
+      } else if (subscriber && subscriber.whatsapp_phone && !subscriber.phone) {
         // Si tiene whatsapp_phone pero no phone, asignar phone también
         subscriber.phone = subscriber.whatsapp_phone
       }
 
       // Si el subscriber no tiene ID válido pero ManyChat lo encontró (tiene key),
       // intentar enviar usando el teléfono directamente
-      if (!subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
+      if (subscriber && (!subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0))) {
         logger.warn('Subscriber sin ID válido, intentando enviar usando teléfono directamente', {
           phone: data.to.substring(0, 5) + '***',
           hasKey: !!subscriber.key

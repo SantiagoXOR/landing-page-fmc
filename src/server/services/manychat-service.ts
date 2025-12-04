@@ -1016,13 +1016,20 @@ export class ManychatService {
 
       return true
     } catch (error: any) {
+      // Convertir fullResponse a string si existe y no es string
+      const fullResponseStr = error.fullResponse 
+        ? (typeof error.fullResponse === 'string' 
+            ? error.fullResponse.substring(0, 500) 
+            : JSON.stringify(error.fullResponse).substring(0, 500))
+        : undefined
+      
       logger.error('Error obteniendo tags de Manychat para agregar tag', {
         subscriberId: subscriberIdStr,
         tagName: trimmedTagName,
         error: error.message,
         error_code: error.error_code,
         details: error.details,
-        fullResponse: error.fullResponse ? error.fullResponse.substring(0, 500) : undefined
+        fullResponse: fullResponseStr
       })
       
       // Si el error tiene fullResponse (HTML), propagarlo para diagnóstico detallado

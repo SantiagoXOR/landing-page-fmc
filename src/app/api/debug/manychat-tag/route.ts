@@ -125,21 +125,33 @@ export async function GET(request: NextRequest) {
           message: added ? 'Tag agregado exitosamente' : 'No se pudo agregar el tag (ver logs del servidor)'
         }
       } catch (addError: any) {
+        // Convertir fullResponse a string si existe y no es string
+        const fullResponseStr = addError.fullResponse 
+          ? (typeof addError.fullResponse === 'string' 
+              ? addError.fullResponse 
+              : JSON.stringify(addError.fullResponse))
+          : undefined
+        
+        const fullResponsePreview = fullResponseStr ? fullResponseStr.substring(0, 5000) : undefined
+        const htmlResponse = fullResponseStr && fullResponseStr.includes('<!DOCTYPE') 
+          ? fullResponseStr.substring(0, 10000) 
+          : undefined
+        
         logger.error('Error agregando tag en endpoint de diagnóstico', {
           subscriberId,
           tagName,
           error: addError.message,
           error_code: addError.error_code,
           details: addError.details,
-          fullResponse: addError.fullResponse
+          fullResponse: fullResponsePreview
         })
         diagnostics.addTagAttempt = {
           success: false,
           error: addError.message,
           error_code: addError.error_code,
           details: addError.details,
-          fullResponse: addError.fullResponse ? addError.fullResponse.substring(0, 5000) : undefined, // Limitar a 5000 caracteres
-          htmlResponse: addError.fullResponse && addError.fullResponse.includes('<!DOCTYPE') ? addError.fullResponse.substring(0, 10000) : undefined,
+          fullResponse: fullResponsePreview,
+          htmlResponse: htmlResponse,
           stack: addError.stack
         }
       }

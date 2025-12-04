@@ -752,12 +752,12 @@ function LeadCard({
         {...longPressHandlers}
         onMouseDown={(e) => {
           // Permitir drag solo si no hay dropdown abierto
-          if (!showDropdown) {
+          if (!showDropdown && listeners) {
             listeners.onMouseDown?.(e)
           }
         }}
         onTouchStart={(e) => {
-          if (!showDropdown) {
+          if (!showDropdown && listeners) {
             listeners.onTouchStart?.(e)
           }
         }}

@@ -55,6 +55,13 @@ export class ManychatService {
       'Content-Type': 'application/json',
     }
 
+    logger.info('Realizando petición a ManyChat API', {
+      method,
+      url: url.toString(),
+      endpoint,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+
     try {
       const response = await fetch(url.toString(), {
         method,
@@ -62,53 +69,52 @@ export class ManychatService {
         body: body ? JSON.stringify(body) : undefined,
       })
 
-      // Verificar Content-Type antes de parsear
+      // Siempre leer como texto primero para poder detectar HTML
+      const responseText = await response.text()
       const contentType = response.headers.get('content-type') || ''
-      const isJSON = contentType.includes('application/json')
+      const isJSONContentType = contentType.includes('application/json')
       
       let data: any
       
-      if (isJSON) {
-        try {
-          data = await response.json()
-        } catch (jsonError: any) {
-          // Si falla el parseo JSON, leer como texto para diagnóstico
-          const textResponse = await response.text()
-          logger.error('Error parseando JSON de ManyChat', {
-            endpoint,
-            status: response.status,
-            contentType,
-            responsePreview: textResponse.substring(0, 500),
-            error: jsonError.message
-          })
-          throw new Error(`ManyChat API devolvió JSON inválido: ${jsonError.message}`)
-        }
-      } else {
-        // Si no es JSON, leer como texto
-        const textResponse = await response.text()
+      // Intentar parsear como JSON
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError: any) {
+        // Si falla el parseo, probablemente es HTML o texto plano
         logger.error('ManyChat API devolvió respuesta no-JSON', {
           endpoint,
+          url: url.toString(),
           status: response.status,
+          statusText: response.statusText,
           contentType,
-          responsePreview: textResponse.substring(0, 500)
+          responseText: responseText.substring(0, 2000), // Log primeros 2000 caracteres
+          responseLength: responseText.length,
+          body: body ? JSON.stringify(body) : undefined,
         })
         
-        // Intentar parsear como JSON de todas formas (por si el header está mal)
-        try {
-          data = JSON.parse(textResponse)
-        } catch {
-          // Si no es JSON válido, crear un error descriptivo
-          throw new Error(`ManyChat API devolvió HTML/texto en lugar de JSON. Status: ${response.status}. Respuesta: ${textResponse.substring(0, 200)}`)
+        // Crear un error descriptivo con el HTML/texto completo
+        const htmlError: any = new Error(`ManyChat API devolvió HTML/texto en lugar de JSON. HTTP ${response.status} ${response.statusText}`)
+        htmlError.error_code = `HTTP_${response.status}_HTML_RESPONSE`
+        htmlError.details = {
+          contentType,
+          responseText: responseText.substring(0, 5000), // Incluir más texto en el error
+          url: url.toString(),
+          endpoint,
+          body: body ? JSON.stringify(body) : undefined,
         }
+        htmlError.fullResponse = responseText
+        throw htmlError
       }
 
       if (!response.ok) {
-        logger.error('Manychat API Error', {
+        logger.error('Manychat API Error (HTTP !ok)', {
           status: response.status,
           statusText: response.statusText,
           data,
           endpoint,
-          contentType
+          url: url.toString(),
+          contentType,
+          body: body ? JSON.stringify(body) : undefined,
         })
         
         return {
@@ -121,11 +127,26 @@ export class ManychatService {
 
       return data
     } catch (error: any) {
+      // Si el error ya tiene detalles de HTML, preservarlos
+      if (error.fullResponse || (error.error_code && error.error_code.includes('HTML_RESPONSE'))) {
+        logger.error('Error en petición a Manychat (HTML response)', {
+          error: error.message,
+          error_code: error.error_code,
+          details: error.details,
+          url: url.toString(),
+          endpoint,
+          body: body ? JSON.stringify(body) : undefined,
+        })
+        throw error
+      }
+      
       logger.error('Error en petición a Manychat', {
         error: error.message,
         stack: error.stack,
         endpoint,
-        method
+        url: url.toString(),
+        method,
+        body: body ? JSON.stringify(body) : undefined,
       })
       throw error
     }
@@ -997,8 +1018,17 @@ export class ManychatService {
       logger.error('Error obteniendo tags de Manychat para agregar tag', {
         subscriberId: subscriberIdStr,
         tagName: trimmedTagName,
-        error: error.message
+        error: error.message,
+        error_code: error.error_code,
+        details: error.details,
+        fullResponse: error.fullResponse ? error.fullResponse.substring(0, 500) : undefined
       })
+      
+      // Si el error tiene fullResponse (HTML), propagarlo para diagnóstico detallado
+      if (error.fullResponse || (error.error_code && error.error_code.includes('HTML_RESPONSE'))) {
+        throw error
+      }
+      
       return false
     }
   }

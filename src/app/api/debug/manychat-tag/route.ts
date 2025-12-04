@@ -116,8 +116,8 @@ export async function GET(request: NextRequest) {
       diagnostics.tagAlreadyAssigned = tagAlreadyAssigned || false
     }
 
-    // 4. Intentar agregar el tag si ambos existen
-    if (diagnostics.subscriber?.exists && diagnostics.tag?.exists) {
+    // 4. Intentar agregar el tag si ambos existen y no está asignado
+    if (diagnostics.subscriber?.exists && diagnostics.tag?.exists && !diagnostics.tagAlreadyAssigned) {
       try {
         const added = await ManychatService.addTagToSubscriber(subscriberId, tagName)
         diagnostics.addTagAttempt = {
@@ -125,14 +125,28 @@ export async function GET(request: NextRequest) {
           message: added ? 'Tag agregado exitosamente' : 'No se pudo agregar el tag (ver logs del servidor)'
         }
       } catch (addError: any) {
+        logger.error('Error agregando tag en endpoint de diagnóstico', {
+          subscriberId,
+          tagName,
+          error: addError.message,
+          error_code: addError.error_code,
+          details: addError.details,
+          fullResponse: addError.fullResponse
+        })
         diagnostics.addTagAttempt = {
           success: false,
           error: addError.message,
           error_code: addError.error_code,
           details: addError.details,
-          fullResponse: addError.fullResponse,
+          fullResponse: addError.fullResponse ? addError.fullResponse.substring(0, 5000) : undefined, // Limitar a 5000 caracteres
+          htmlResponse: addError.fullResponse && addError.fullResponse.includes('<!DOCTYPE') ? addError.fullResponse.substring(0, 10000) : undefined,
           stack: addError.stack
         }
+      }
+    } else if (diagnostics.tagAlreadyAssigned) {
+      diagnostics.addTagAttempt = {
+        success: true,
+        message: 'Tag ya estaba asignado'
       }
     } else {
       diagnostics.addTagAttempt = {

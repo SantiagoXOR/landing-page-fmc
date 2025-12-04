@@ -59,7 +59,15 @@ export async function GET(request: NextRequest) {
           lastName: subscriber.last_name,
           phone: subscriber.phone,
           whatsappPhone: subscriber.whatsapp_phone,
-          currentTags: subscriber.tags?.map(t => ({ id: t.id, name: t.name })) || []
+          status: subscriber.status,
+          subscribed: subscriber.subscribed,
+          lastInteraction: subscriber.last_interaction,
+          currentTags: subscriber.tags?.map(t => ({ id: t.id, name: t.name })) || [],
+          // Información adicional que podría afectar las automatizaciones
+          customFields: subscriber.custom_fields || {},
+          // Nota: ManyChat no expone directamente si las automatizaciones están pausadas vía API
+          // Esto se debe verificar manualmente en la interfaz de ManyChat
+          note: 'Para verificar si las automatizaciones están pausadas, revisa el perfil del contacto en ManyChat'
         }
       } else {
         diagnostics.subscriber = {
@@ -116,13 +124,52 @@ export async function GET(request: NextRequest) {
       diagnostics.tagAlreadyAssigned = tagAlreadyAssigned || false
     }
 
-    // 4. Intentar agregar el tag si ambos existen y no está asignado
+    // 4. Verificar si el tag credito-preaprobado ya está asignado antes de intentar agregarlo
+    if (diagnostics.subscriber?.exists && diagnostics.tag?.exists) {
+      const hasCreditoPreaprobado = diagnostics.subscriber.currentTags?.some(
+        (t: { id: number; name: string }) => 
+          t.name.toLowerCase() === 'credito-preaprobado' || 
+          t.name.toLowerCase() === 'credito-preaprobado'
+      )
+      diagnostics.hasCreditoPreaprobadoTag = hasCreditoPreaprobado || false
+    }
+
+    // 5. Intentar agregar el tag si ambos existen y no está asignado
     if (diagnostics.subscriber?.exists && diagnostics.tag?.exists && !diagnostics.tagAlreadyAssigned) {
       try {
+        logger.info('Intentando agregar tag desde endpoint de debug', {
+          subscriberId,
+          tagName,
+          subscriberExists: diagnostics.subscriber.exists,
+          tagExists: diagnostics.tag.exists
+        })
+        
         const added = await ManychatService.addTagToSubscriber(subscriberId, tagName)
-        diagnostics.addTagAttempt = {
-          success: added,
-          message: added ? 'Tag agregado exitosamente' : 'No se pudo agregar el tag (ver logs del servidor)'
+        
+        // Esperar un momento para ver si ManyChat dispara el flujo
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        
+        // Verificar si el tag se agregó correctamente
+        try {
+          const subscriberAfter = await ManychatService.getSubscriberById(subscriberId)
+          const tagAddedAfter = subscriberAfter?.tags?.some(
+            t => t.id === diagnostics.tag.id || t.name.toLowerCase() === tagName.toLowerCase()
+          )
+          
+          diagnostics.addTagAttempt = {
+            success: added,
+            tagAddedAfter: tagAddedAfter || false,
+            message: added 
+              ? 'Tag agregado exitosamente. ManyChat debería disparar el flujo automáticamente.' 
+              : 'No se pudo agregar el tag (ver logs del servidor)',
+            note: 'Si el flujo no se dispara automáticamente, verifica: 1) Si las automatizaciones están pausadas para este contacto, 2) Si el flujo está activo en ManyChat, 3) Si el trigger está configurado correctamente'
+          }
+        } catch (verifyError: any) {
+          diagnostics.addTagAttempt = {
+            success: added,
+            message: added ? 'Tag agregado pero no se pudo verificar después' : 'No se pudo agregar el tag',
+            verifyError: verifyError.message
+          }
         }
       } catch (addError: any) {
         // Convertir fullResponse a string si existe y no es string

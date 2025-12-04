@@ -744,9 +744,16 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
           }
 
           // Agregar nuevo tag si no está presente
-          if (!tagsToKeep.includes(tagToAdd)) {
+          const tagWasAlreadyAssigned = tagsToKeep.includes(tagToAdd)
+          
+          if (!tagWasAlreadyAssigned) {
             try {
               await ManychatService.addTagToSubscriber(lead.manychatId, tagToAdd)
+              logger.info('Tag agregado a ManyChat, ManyChat debería disparar el flujo automáticamente', {
+                leadId,
+                manychatId: lead.manychatId,
+                tag: tagToAdd
+              })
             } catch (err) {
               logger.warn('Failed to add tag to ManyChat', { 
                 leadId, 
@@ -754,6 +761,76 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
                 tag: tagToAdd,
                 error: err instanceof Error ? err.message : 'Unknown error'
               })
+            }
+          } else {
+            logger.info('Tag ya estaba asignado en ManyChat', {
+              leadId,
+              manychatId: lead.manychatId,
+              tag: tagToAdd,
+              note: 'ManyChat no dispara flujos cuando el tag ya existe. Enviando mensaje directamente.'
+            })
+          }
+
+          // Si el tag es "credito-preaprobado", enviar el mensaje automáticamente
+          // Esto es necesario porque:
+          // 1. Si el tag ya estaba asignado, ManyChat no dispara el flujo
+          // 2. ManyChat a veces no dispara flujos cuando se añade un tag desde la API externa
+          if (tagToAdd === 'credito-preaprobado' && lead.manychatId) {
+            try {
+              // Obtener información del lead para personalizar el mensaje
+              const leadInfo = await supabase.findLeadById(leadId)
+              const monto = leadInfo?.monto 
+                ? `$${typeof leadInfo.monto === 'number' ? leadInfo.monto.toLocaleString('es-AR') : leadInfo.monto}`
+                : '$240.000'
+              const agencia = leadInfo?.zona || 'La Cruz'
+              
+              const mensaje = `¡Felicitaciones! 🎉 Usted cuenta con un crédito preaprobado y una cuota disponible de ${monto}. Para continuar con el trámite, deberá acercarse a la agencia ${agencia}, ubicada en Formosa Capital. 🏛️📍`
+              
+              // Si el tag ya estaba asignado, enviar inmediatamente
+              // Si es nuevo, esperar 2 segundos para dar tiempo a ManyChat de disparar el flujo
+              if (tagWasAlreadyAssigned) {
+                // Enviar inmediatamente porque ManyChat no disparará el flujo
+                const sendResult = await ManychatService.sendTextMessage(
+                  parseInt(lead.manychatId),
+                  mensaje,
+                  'credito-preaprobado'
+                )
+                
+                if (sendResult.status === 'success') {
+                  logger.info('Mensaje de crédito preaprobado enviado directamente (tag ya existía)', {
+                    leadId,
+                    manychatId: lead.manychatId,
+                    messageId: sendResult.data?.data?.message_id,
+                    reason: 'Tag ya estaba asignado, ManyChat no dispara flujos en este caso'
+                  })
+                }
+              } else {
+                // Esperar 2 segundos para dar tiempo a ManyChat de disparar el flujo
+                await new Promise(resolve => setTimeout(resolve, 2000))
+                
+                const sendResult = await ManychatService.sendTextMessage(
+                  parseInt(lead.manychatId),
+                  mensaje,
+                  'credito-preaprobado'
+                )
+                
+                if (sendResult.status === 'success') {
+                  logger.info('Mensaje de crédito preaprobado enviado como respaldo', {
+                    leadId,
+                    manychatId: lead.manychatId,
+                    messageId: sendResult.data?.data?.message_id,
+                    note: 'ManyChat debería haber disparado el flujo automáticamente, pero se envió el mensaje directamente como respaldo'
+                  })
+                }
+              }
+            } catch (messageError: any) {
+              logger.warn('No se pudo enviar mensaje automático de crédito preaprobado', {
+                leadId,
+                manychatId: lead.manychatId,
+                error: messageError.message,
+                tagWasAlreadyAssigned
+              })
+              // No fallar si el mensaje no se puede enviar, el tag ya se agregó
             }
           }
 

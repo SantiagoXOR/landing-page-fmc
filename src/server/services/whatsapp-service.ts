@@ -345,93 +345,93 @@ export class WhatsAppService {
             subscriberKey: subscriber?.key
           })
 
-        // Preparar mensaje según el tipo
-        const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
-        const messages: any[] = []
+          // Preparar mensaje según el tipo
+          const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
+          const messages: any[] = []
 
-        if (messageType === 'text') {
-          messages.push({
-            type: 'text',
-            text: data.message
-          })
-        } else if (data.mediaUrl) {
-          if (messageType === 'image') {
+          if (messageType === 'text') {
             messages.push({
-              type: 'image',
-              url: data.mediaUrl,
-              caption: data.message || undefined
+              type: 'text',
+              text: data.message
             })
-          } else if (messageType === 'video') {
-            messages.push({
-              type: 'video',
-              url: data.mediaUrl,
-              caption: data.message || undefined
+          } else if (data.mediaUrl) {
+            if (messageType === 'image') {
+              messages.push({
+                type: 'image',
+                url: data.mediaUrl,
+                caption: data.message || undefined
+              })
+            } else if (messageType === 'video') {
+              messages.push({
+                type: 'video',
+                url: data.mediaUrl,
+                caption: data.message || undefined
+              })
+            } else if (messageType === 'file') {
+              messages.push({
+                type: 'file',
+                url: data.mediaUrl,
+                filename: data.message || 'document'
+              })
+            } else if (messageType === 'audio') {
+              messages.push({
+                type: 'audio',
+                url: data.mediaUrl
+              })
+            }
+          }
+
+          // Intentar enviar usando teléfono directamente
+          try {
+            const phoneResponse = await ManychatService.sendMessageByPhone(data.to, messages)
+            
+            if (phoneResponse.status === 'success') {
+              logger.info('Mensaje enviado exitosamente usando teléfono directamente', {
+                phone: data.to.substring(0, 5) + '***',
+                messageId: phoneResponse.data?.message_id
+              })
+
+              return {
+                success: true,
+                messageId: phoneResponse.data?.message_id || 'sent_by_phone',
+                provider: 'manychat',
+                channel: 'whatsapp',
+              }
+            } else {
+              logger.error('Error enviando mensaje usando teléfono directamente', {
+                phone: data.to.substring(0, 5) + '***',
+                error: phoneResponse.error,
+                errorCode: phoneResponse.error_code
+              })
+              
+              // Si el error es sobre permisos, proporcionar mensaje más específico
+              if (phoneResponse.error_code?.includes('PERMISSION') || 
+                  phoneResponse.error?.toLowerCase().includes('permission denied')) {
+                throw new Error('ManyChat requiere permisos adicionales para enviar mensajes. Por favor, contacta al soporte de ManyChat para habilitar esta funcionalidad.')
+              }
+              
+              // Si falla, continuar con el error original
+              throw new Error(phoneResponse.error || 'Error enviando mensaje por ManyChat usando teléfono')
+            }
+          } catch (phoneError: any) {
+            // Si el error de teléfono es diferente, lanzarlo
+            if (phoneError.message && !phoneError.message.includes('Error enviando mensaje por ManyChat')) {
+              throw phoneError
+            }
+            
+            // Si falla el envío por teléfono, lanzar error descriptivo
+            // ManyChat requiere subscriber_id y no acepta solo phone
+            const errorMessage = `No se puede enviar el mensaje porque ManyChat requiere un subscriber_id válido y el contacto no está completamente sincronizado. Por favor, sincroniza el contacto primero desde la página del lead usando el botón "Actualizar sincronización".`
+            logger.error('No se puede enviar mensaje: subscriber no encontrado y falló envío por teléfono', {
+              phone: data.to.substring(0, 5) + '***',
+              phoneError: phoneError.message,
+              hasSubscriber: !!subscriber,
+              subscriberKey: subscriber?.key,
+              leadId: data.leadId
             })
-          } else if (messageType === 'file') {
-            messages.push({
-              type: 'file',
-              url: data.mediaUrl,
-              filename: data.message || 'document'
-            })
-          } else if (messageType === 'audio') {
-            messages.push({
-              type: 'audio',
-              url: data.mediaUrl
-            })
+            throw new Error(errorMessage)
           }
         }
-
-        // Intentar enviar usando teléfono directamente
-        try {
-          const phoneResponse = await ManychatService.sendMessageByPhone(data.to, messages)
-          
-          if (phoneResponse.status === 'success') {
-            logger.info('Mensaje enviado exitosamente usando teléfono directamente', {
-              phone: data.to.substring(0, 5) + '***',
-              messageId: phoneResponse.data?.message_id
-            })
-
-            return {
-              success: true,
-              messageId: phoneResponse.data?.message_id || 'sent_by_phone',
-              provider: 'manychat',
-              channel: 'whatsapp',
-            }
-          } else {
-            logger.error('Error enviando mensaje usando teléfono directamente', {
-              phone: data.to.substring(0, 5) + '***',
-              error: phoneResponse.error,
-              errorCode: phoneResponse.error_code
-            })
-            
-            // Si el error es sobre permisos, proporcionar mensaje más específico
-            if (phoneResponse.error_code?.includes('PERMISSION') || 
-                phoneResponse.error?.toLowerCase().includes('permission denied')) {
-              throw new Error('ManyChat requiere permisos adicionales para enviar mensajes. Por favor, contacta al soporte de ManyChat para habilitar esta funcionalidad.')
-            }
-            
-            // Si falla, continuar con el error original
-            throw new Error(phoneResponse.error || 'Error enviando mensaje por ManyChat usando teléfono')
-          }
-        } catch (phoneError: any) {
-          // Si el error de teléfono es diferente, lanzarlo
-          if (phoneError.message && !phoneError.message.includes('Error enviando mensaje por ManyChat')) {
-            throw phoneError
-          }
-          
-          // Si falla el envío por teléfono, lanzar error descriptivo
-          // ManyChat requiere subscriber_id y no acepta solo phone
-          const errorMessage = `No se puede enviar el mensaje porque ManyChat requiere un subscriber_id válido y el contacto no está completamente sincronizado. Por favor, sincroniza el contacto primero desde la página del lead usando el botón "Actualizar sincronización".`
-          logger.error('No se puede enviar mensaje: subscriber no encontrado y falló envío por teléfono', {
-            phone: data.to.substring(0, 5) + '***',
-            phoneError: phoneError.message,
-            hasSubscriber: !!subscriber,
-            subscriberKey: subscriber?.key,
-            leadId: data.leadId
-          })
-          throw new Error(errorMessage)
-        }
-      }
 
       // Si llegamos aquí, el subscriber tiene un ID válido
       // Asegurar que tenga teléfono configurado

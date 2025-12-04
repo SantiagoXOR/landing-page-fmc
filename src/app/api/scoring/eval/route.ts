@@ -41,11 +41,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar campos requeridos en el resultado
-    if (typeof result.score === 'undefined' && typeof result.total_score === 'undefined') {
-      logger.error('Scoring result missing score', { leadId, result })
+    if (typeof result.total_score === 'undefined') {
+      logger.error('Scoring result missing total_score', { leadId, result })
       return NextResponse.json({
         error: 'Scoring result is incomplete',
-        details: process.env.NODE_ENV === 'development' ? 'Missing score field' : undefined
+        details: process.env.NODE_ENV === 'development' ? 'Missing total_score field' : undefined
       }, { status: 500 })
     }
 
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     // Si aún no hay motivos, agregar uno genérico basado en el score
     if (motivos.length === 0) {
-      const score = result.total_score ?? result.score ?? 0
+      const score = result.total_score ?? 0
       if (score > 0) {
         motivos.push(`Puntuación obtenida: ${score} puntos`)
       } else {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // Formatear respuesta para compatibilidad con el frontend
     const formattedResult = {
-      score: result.total_score ?? result.score ?? 0,
+      score: result.total_score ?? 0,
       decision: result.recommendation ?? result.decision ?? 'NUEVO',
       motivos: motivos.length > 0 ? motivos : (result.reasons ?? result.motivos ?? [])
     }

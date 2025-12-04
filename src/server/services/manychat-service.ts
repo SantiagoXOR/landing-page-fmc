@@ -1067,7 +1067,6 @@ export class ManychatService {
         logger.error('Error removiendo tag de subscriber', {
           subscriberId: subscriberIdStr,
           tagName: trimmedTagName,
-          tagId: tag.id,
           error: response.error,
           details: response.details
         })

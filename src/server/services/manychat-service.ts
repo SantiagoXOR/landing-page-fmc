@@ -950,10 +950,10 @@ export class ManychatService {
         })
       }
 
-      // Usar el endpoint addTag con tag_name (endpoint correcto según ManyChat API)
+      // Usar el endpoint addTag con tag_id (ManyChat requiere tag_id, no tag_name)
       const requestBody = {
         subscriber_id: subscriberIdStr,
-        tag_name: tag.name, // Usar el nombre exacto del tag encontrado
+        tag_id: tag.id, // ManyChat requiere tag_id según el error de validación
       }
       
       logger.info('Intentando agregar tag a subscriber en ManyChat', {
@@ -1058,14 +1058,29 @@ export class ManychatService {
     const trimmedTagName = tagName.trim()
 
     try {
-      // Usar el endpoint removeTag con tag_name (endpoint correcto según ManyChat API)
+      // Obtener el tag para obtener su ID (ManyChat requiere tag_id)
+      const allTags = await this.getTags()
+      const normalizedTagName = trimmedTagName.toLowerCase().trim()
+      const tag = allTags.find(t => 
+        t.name.toLowerCase().trim() === normalizedTagName ||
+        t.name.trim() === trimmedTagName
+      )
+
+      if (!tag) {
+        logger.warn(`Tag "${trimmedTagName}" no encontrado en Manychat para remover`, {
+          subscriberId: subscriberIdStr
+        })
+        return false
+      }
+
+      // Usar el endpoint removeTag con tag_id (ManyChat requiere tag_id)
       const response = await this.executeWithRateLimit(() =>
         this.makeRequest({
           method: 'POST',
           endpoint: `/fb/subscriber/removeTag`,
           body: {
             subscriber_id: subscriberIdStr,
-            tag_name: trimmedTagName,
+            tag_id: tag.id,
           },
         })
       )

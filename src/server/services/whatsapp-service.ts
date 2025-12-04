@@ -280,13 +280,18 @@ export class WhatsAppService {
             // Intentar obtener subscriber nuevamente después de sincronizar
             subscriber = await ManychatService.getSubscriberByPhone(data.to)
             
-            if (subscriber && subscriber.id && subscriber.id > 0) {
+            if (subscriber && subscriber.id && typeof subscriber.id === 'number' && subscriber.id > 0) {
               logger.info('Subscriber válido obtenido después de sincronización', {
                 subscriberId: subscriber.id
               })
             } else {
-              // Si aún no tiene ID válido después de sincronizar, puede ser problema de permisos
-              throw new Error('El contacto existe en ManyChat pero no se puede acceder debido a restricciones de permisos. Por favor, contacta al soporte de ManyChat para habilitar la importación de contactos, o sincroniza el contacto manualmente desde ManyChat.')
+              // Si aún no tiene ID válido después de sincronizar, intentar usar teléfono directamente
+              logger.warn('Subscriber aún sin ID válido después de sincronización, intentando usar teléfono directamente', {
+                phone: data.to.substring(0, 5) + '***',
+                hasSubscriber: !!subscriber,
+                subscriberKey: subscriber?.key
+              })
+              // Continuar con el flujo para intentar enviar usando teléfono directamente
             }
           } catch (syncError: any) {
             logger.error('Error sincronizando lead para obtener subscriber válido', {
@@ -294,15 +299,28 @@ export class WhatsAppService {
               leadId: data.leadId
             })
             
-            // Si el error menciona permisos, proporcionar mensaje más específico
-            if (syncError.message && syncError.message.includes('Permission denied')) {
-              throw new Error('ManyChat requiere permisos adicionales para importar contactos. Por favor, contacta al soporte de ManyChat para habilitar esta funcionalidad.')
-            }
+            // Intentar obtener subscriber nuevamente después del error
+            subscriber = await ManychatService.getSubscriberByPhone(data.to)
             
-            throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto nuevamente o contacta al soporte de ManyChat si el problema persiste.')
+            // Si aún no tiene ID válido, continuar con el flujo para intentar usar teléfono directamente
+            if (!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
+              logger.warn('Subscriber aún sin ID válido después de error de sincronización, continuando para intentar usar teléfono directamente', {
+                phone: data.to.substring(0, 5) + '***'
+              })
+              // Continuar con el flujo para intentar enviar usando teléfono directamente
+            }
           }
         } else {
-          throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto primero desde la página del lead.')
+          // Si no hay leadId, intentar usar teléfono directamente si ManyChat encontró el subscriber
+          if (subscriber && subscriber.key) {
+            logger.warn('No hay leadId pero ManyChat encontró subscriber con key, intentando usar teléfono directamente', {
+              phone: data.to.substring(0, 5) + '***',
+              subscriberKey: subscriber.key
+            })
+            // Continuar con el flujo para intentar enviar usando teléfono directamente
+          } else {
+            throw new Error('El contacto encontrado en ManyChat no tiene un ID válido. Por favor, sincroniza el contacto primero desde la página del lead.')
+          }
         }
       }
 
@@ -354,6 +372,75 @@ export class WhatsAppService {
       } else if (subscriber.whatsapp_phone && !subscriber.phone) {
         // Si tiene whatsapp_phone pero no phone, asignar phone también
         subscriber.phone = subscriber.whatsapp_phone
+      }
+
+      // Si el subscriber no tiene ID válido pero ManyChat lo encontró (tiene key),
+      // intentar enviar usando el teléfono directamente
+      if (!subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
+        logger.warn('Subscriber sin ID válido, intentando enviar usando teléfono directamente', {
+          phone: data.to.substring(0, 5) + '***',
+          hasKey: !!subscriber.key
+        })
+
+        // Preparar mensaje según el tipo
+        const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
+        const messages: any[] = []
+
+        if (messageType === 'text') {
+          messages.push({
+            type: 'text',
+            text: data.message
+          })
+        } else if (data.mediaUrl) {
+          if (messageType === 'image') {
+            messages.push({
+              type: 'image',
+              url: data.mediaUrl,
+              caption: data.message || undefined
+            })
+          } else if (messageType === 'video') {
+            messages.push({
+              type: 'video',
+              url: data.mediaUrl,
+              caption: data.message || undefined
+            })
+          } else if (messageType === 'file' || messageType === 'document') {
+            messages.push({
+              type: 'file',
+              url: data.mediaUrl,
+              filename: data.message || 'document'
+            })
+          } else if (messageType === 'audio') {
+            messages.push({
+              type: 'audio',
+              url: data.mediaUrl
+            })
+          }
+        }
+
+        // Intentar enviar usando teléfono directamente
+        const phoneResponse = await ManychatService.sendMessageByPhone(data.to, messages)
+        
+        if (phoneResponse.status === 'success') {
+          logger.info('Mensaje enviado exitosamente usando teléfono directamente', {
+            phone: data.to.substring(0, 5) + '***',
+            messageId: phoneResponse.data?.message_id
+          })
+
+          return {
+            success: true,
+            messageId: phoneResponse.data?.message_id || 'sent_by_phone',
+            provider: 'manychat',
+            channel: 'whatsapp',
+          }
+        } else {
+          logger.error('Error enviando mensaje usando teléfono directamente', {
+            phone: data.to.substring(0, 5) + '***',
+            error: phoneResponse.error,
+            errorCode: phoneResponse.error_code
+          })
+          throw new Error(phoneResponse.error || 'Error enviando mensaje por ManyChat usando teléfono')
+        }
       }
 
       // Usar el nuevo MessagingService para mejor manejo multi-canal

@@ -1292,7 +1292,7 @@ export class ManychatService {
   // ============================================================================
 
   /**
-   * Enviar mensaje a un subscriber
+   * Enviar mensaje a un subscriber por ID
    */
   static async sendMessage(
     subscriberId: number,
@@ -1355,6 +1355,98 @@ export class ManychatService {
         errorCode: response.error_code,
         details: response.details,
         messagesSent: messages.length
+      })
+    }
+
+    return response as ManychatSendMessageResponse
+  }
+
+  /**
+   * Enviar mensaje usando teléfono directamente (cuando el subscriber no tiene ID válido)
+   * ManyChat API permite enviar mensajes usando el teléfono en lugar del subscriber_id
+   */
+  static async sendMessageByPhone(
+    phone: string,
+    messages: ManychatMessage[],
+    tag?: string
+  ): Promise<ManychatSendMessageResponse> {
+    // Validar teléfono
+    if (!phone || typeof phone !== 'string') {
+      logger.error('Teléfono inválido para enviar mensaje', {
+        phone,
+        messagesCount: messages.length
+      })
+      return {
+        status: 'error',
+        error: 'Teléfono inválido',
+        error_code: 'INVALID_PHONE'
+      }
+    }
+
+    // Validar que haya mensajes
+    if (!messages || messages.length === 0) {
+      logger.error('No hay mensajes para enviar', {
+        phone: phone.substring(0, 5) + '***'
+      })
+      return {
+        status: 'error',
+        error: 'No hay mensajes para enviar',
+        error_code: 'NO_MESSAGES'
+      }
+    }
+
+    // Normalizar teléfono
+    let normalizedPhone: string
+    try {
+      normalizedPhone = this.validateAndNormalizePhone(phone)
+    } catch (error: any) {
+      logger.error('Error normalizando teléfono para enviar mensaje', {
+        phone: phone.substring(0, 5) + '***',
+        error: error.message
+      })
+      return {
+        status: 'error',
+        error: 'Teléfono inválido',
+        error_code: 'INVALID_PHONE'
+      }
+    }
+
+    // Log del request que se enviará a ManyChat
+    logger.info('Enviando mensaje a ManyChat API usando teléfono directamente', {
+      phone: normalizedPhone.substring(0, 5) + '***',
+      messagesCount: messages.length,
+      messageTypes: messages.map(m => m.type),
+      hasTag: !!tag
+    })
+
+    const response = await this.executeWithRateLimit(() =>
+      this.makeRequest<ManychatSendMessageResponse>({
+        method: 'POST',
+        endpoint: `/fb/sending/sendContent`,
+        body: {
+          phone: normalizedPhone,
+          data: {
+            version: 'v2',
+            messages,
+            tag,
+          },
+        },
+      })
+    )
+
+    // Log detallado de la respuesta
+    if (response.status === 'error') {
+      logger.error('Error en respuesta de ManyChat sendContent (por teléfono)', {
+        phone: normalizedPhone.substring(0, 5) + '***',
+        error: response.error,
+        errorCode: response.error_code,
+        details: response.details,
+        messagesSent: messages.length
+      })
+    } else {
+      logger.info('Mensaje enviado exitosamente usando teléfono', {
+        phone: normalizedPhone.substring(0, 5) + '***',
+        messageId: response.data?.message_id
       })
     }
 

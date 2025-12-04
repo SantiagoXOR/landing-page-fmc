@@ -7,7 +7,8 @@ import { z } from 'zod'
 import { automationService } from '@/services/automation-service'
 import { pipelineService } from '@/server/services/pipeline-service'
 import { supabase } from '@/lib/db'
-import { syncPipelineToManychat } from '@/lib/manychat-sync'
+import { syncPipelineToManychat, getTagForStage, getPipelineTags, getBusinessTags } from '@/lib/manychat-sync'
+import { ManychatService } from '@/server/services/manychat-service'
 
 // Schema de validación para mover lead
 const MoveLeadSchema = z.object({
@@ -613,20 +614,6 @@ async function validateStageTransition(
 // Función para asignar tags según la etapa
 async function assignStageTag(leadId: string, stageId: string): Promise<void> {
   try {
-    // Mapeo de etapas a tags
-    const stageTags: Record<string, string> = {
-      'nuevo': 'nuevo-lead',
-      'contactado': 'contactado',
-      'calificado': 'calificado',
-      'propuesta': 'propuesta-enviada',
-      'negociacion': 'negociacion',
-      'cerrado-ganado': 'cerrado-ganado',
-      'cerrado-perdido': 'cerrado-perdido'
-    }
-
-    const tagToAdd = stageTags[stageId]
-    if (!tagToAdd) return
-
     // Obtener lead actual
     const lead = await supabase.findLeadById(leadId)
     if (!lead) {
@@ -634,7 +621,50 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
       return
     }
 
-    // Obtener tags actuales
+    // Mapear stageId a enum de etapa para consultar la tabla
+    const stageMapping: Record<string, string> = {
+      'cliente-nuevo': 'CLIENTE_NUEVO',
+      'consultando-credito': 'CONSULTANDO_CREDITO',
+      'solicitando-docs': 'SOLICITANDO_DOCS',
+      'solicitando-documentacion': 'SOLICITANDO_DOCS',
+      'listo-analisis': 'LISTO_ANALISIS',
+      'preaprobado': 'PREAPROBADO',
+      'aprobado': 'APROBADO',
+      'en-seguimiento': 'EN_SEGUIMIENTO',
+      'cerrado-ganado': 'CERRADO_GANADO',
+      'cerrado_ganado': 'CERRADO_GANADO',
+      'venta-cerrada': 'CERRADO_GANADO',
+      'rechazado': 'RECHAZADO',
+      'cerrado-perdido': 'RECHAZADO',
+      'cerrado_perdido': 'RECHAZADO',
+      'encuesta': 'ENCUESTA',
+      'encuesta-pendiente': 'ENCUESTA',
+      'solicitar-referido': 'SOLICITAR_REFERIDO',
+      // Legacy
+      'nuevo': 'CLIENTE_NUEVO',
+      'contactado': 'CONSULTANDO_CREDITO',
+      'calificado': 'LISTO_ANALISIS',
+      'propuesta': 'PREAPROBADO',
+      'negociacion': 'APROBADO'
+    }
+
+    const stageEnum = stageMapping[stageId] || stageId
+
+    // Obtener el tag de ManyChat para esta etapa desde la base de datos
+    const tagToAdd = await getTagForStage(stageEnum)
+    if (!tagToAdd) {
+      logger.warn('No tag mapping found for stage', { 
+        leadId, 
+        stageId, 
+        stageEnum
+      })
+      return
+    }
+
+    // Obtener todos los tags de pipeline para filtrar
+    const pipelineTagNames = await getPipelineTags()
+
+    // Obtener tags actuales del lead
     let currentTags: string[] = []
     if (lead.tags) {
       try {
@@ -646,9 +676,8 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
       }
     }
 
-    // Remover tags de otras etapas
-    const stageTagValues = Object.values(stageTags)
-    const filteredTags = currentTags.filter(tag => !stageTagValues.includes(tag))
+    // Remover todos los tags de pipeline (excepto el nuevo que vamos a agregar)
+    const filteredTags = currentTags.filter(tag => !pipelineTagNames.includes(tag))
 
     // Agregar el nuevo tag si no existe
     if (!filteredTags.includes(tagToAdd)) {
@@ -663,8 +692,81 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
     logger.info('Stage tag assigned', {
       leadId,
       stageId,
-      tag: tagToAdd
+      stageEnum,
+      tag: tagToAdd,
+      previousTags: currentTags,
+      newTags: filteredTags
     })
+
+    // Si el lead tiene manychatId, también sincronizar con ManyChat
+    if (lead.manychatId) {
+      try {
+        // Obtener tags actuales de ManyChat
+        const subscriber = await ManychatService.getSubscriberById(lead.manychatId)
+        const manychatTags = subscriber.tags || []
+
+        // Obtener tags de negocio que deben mantenerse
+        const businessTagNames = await getBusinessTags()
+
+        // Filtrar tags a mantener (negocio + no pipeline)
+        const tagsToKeep = manychatTags.filter(tag => {
+          if (businessTagNames.includes(tag)) return true
+          if (!pipelineTagNames.includes(tag)) return true
+          if (tag === tagToAdd) return true
+          return false
+        })
+
+        // Determinar tags a remover (tags de pipeline que no son el nuevo)
+        const tagsToRemove = manychatTags.filter(tag => 
+          pipelineTagNames.includes(tag) && tag !== tagToAdd
+        )
+
+        // Actualizar tags en ManyChat
+        if (tagsToRemove.length > 0 || !tagsToKeep.includes(tagToAdd)) {
+          // Remover tags antiguos
+          for (const tagToRemove of tagsToRemove) {
+            try {
+              await ManychatService.removeTagFromSubscriber(lead.manychatId, tagToRemove)
+            } catch (err) {
+              logger.warn('Failed to remove tag from ManyChat', { 
+                leadId, 
+                manychatId: lead.manychatId, 
+                tag: tagToRemove,
+                error: err instanceof Error ? err.message : 'Unknown error'
+              })
+            }
+          }
+
+          // Agregar nuevo tag si no está presente
+          if (!tagsToKeep.includes(tagToAdd)) {
+            try {
+              await ManychatService.addTagToSubscriber(lead.manychatId, tagToAdd)
+            } catch (err) {
+              logger.warn('Failed to add tag to ManyChat', { 
+                leadId, 
+                manychatId: lead.manychatId, 
+                tag: tagToAdd,
+                error: err instanceof Error ? err.message : 'Unknown error'
+              })
+            }
+          }
+
+          logger.info('ManyChat tags synchronized', {
+            leadId,
+            manychatId: lead.manychatId,
+            added: tagToAdd,
+            removed: tagsToRemove
+          })
+        }
+      } catch (manychatError: any) {
+        logger.warn('Failed to sync tags to ManyChat', {
+          leadId,
+          manychatId: lead.manychatId,
+          error: manychatError.message
+        })
+        // No fallar si ManyChat falla, ya que la actualización local ya se hizo
+      }
+    }
   } catch (error) {
     logger.error('Error assigning stage tag', {
       leadId,

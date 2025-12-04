@@ -717,11 +717,8 @@ export class ManychatService {
       // Si el error indica que falta consent_phrase, agregarlo y reintentar
       if (response.error && (
         response.error.toLowerCase().includes('consent_phrase') ||
-        (response.details && response.details.messages && 
-         Array.isArray(response.details.messages) &&
-         response.details.messages.some((msg: any) => 
-           msg.message && msg.message.toLowerCase().includes('consent_phrase')
-         ))
+        (response.details && typeof response.details === 'string' && 
+         response.details.toLowerCase().includes('consent_phrase'))
       )) {
         logger.info('Falta consent_phrase, reintentando con consent_phrase', {
           phone: normalizedPhone

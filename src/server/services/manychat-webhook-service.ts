@@ -617,8 +617,14 @@ export class ManychatWebhookService {
       })
 
       // Determinar plataforma y platformId
-      const platform = subscriber.instagram_id ? 'instagram' : 'whatsapp'
-      const platformId = subscriber.instagram_id || subscriber.whatsapp_phone || subscriber.phone || String(subscriber.id)
+      const platform = subscriber.instagram_id || subscriber.ig_id ? 'instagram' : 'whatsapp'
+      const platformId = String(
+        subscriber.instagram_id || 
+        subscriber.ig_id || 
+        subscriber.whatsapp_phone || 
+        subscriber.phone || 
+        subscriber.id
+      )
 
       logger.debug('Plataforma determinada para mensaje', {
         platform,
@@ -1054,8 +1060,14 @@ export class ManychatWebhookService {
       const messageText = `${fieldLabel}: ${formattedValue}`
 
       // Determinar plataforma y platformId
-      const platform = subscriber.instagram_id ? 'instagram' : 'whatsapp'
-      const platformId = subscriber.instagram_id || subscriber.whatsapp_phone || subscriber.phone || String(subscriber.id)
+      const platform = subscriber.instagram_id || subscriber.ig_id ? 'instagram' : 'whatsapp'
+      const platformId = String(
+        subscriber.instagram_id || 
+        subscriber.ig_id || 
+        subscriber.whatsapp_phone || 
+        subscriber.phone || 
+        subscriber.id
+      )
 
       // Buscar o crear conversación
       const conversationId = await this.findOrCreateConversation(leadId, platform, platformId)

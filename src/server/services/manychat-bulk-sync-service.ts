@@ -301,8 +301,14 @@ export class ManychatBulkSyncService {
       }
 
       // Determinar plataforma
-      const platform = subscriber.instagram_id ? 'instagram' : 'whatsapp'
-      const platformId = subscriber.instagram_id || subscriber.whatsapp_phone || subscriber.phone || String(subscriber.id)
+      const platform = subscriber.instagram_id || subscriber.ig_id ? 'instagram' : 'whatsapp'
+      const platformId = String(
+        subscriber.instagram_id || 
+        subscriber.ig_id || 
+        subscriber.whatsapp_phone || 
+        subscriber.phone || 
+        subscriber.id
+      )
 
       // Buscar o crear conversación
       let conversation = await ConversationService.findConversationByPlatform(platform, platformId)

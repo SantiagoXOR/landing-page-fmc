@@ -570,19 +570,17 @@ export async function POST(request: NextRequest) {
       customFieldValue: event.custom_field?.value
     })
 
-    // Procesar el evento
-    const result = await ManychatWebhookService.processWebhookEvent(event)
-
-    // Establecer custom field "origen" en ManyChat si el subscriber tiene datos
-    // Esto permite que las automatizaciones filtren por origen cuando se agregue el tag
-    if (result.success && event.subscriber && event.subscriber.id) {
+    // Establecer custom field "origen" en ManyChat ANTES de procesar el evento
+    // Esto asegura que el lead se cree con el origen correcto
+    let detectedChannel: string | null = null
+    if (event.subscriber && event.subscriber.id) {
       try {
         const subscriber = event.subscriber
         
         // Detectar canal real desde los datos del subscriber
-        const detectedChannel = ManychatService.detectChannel(subscriber)
+        detectedChannel = ManychatService.detectChannel(subscriber)
         
-        logger.info('Canal detectado desde webhook, estableciendo en ManyChat', {
+        logger.info('Canal detectado desde webhook, estableciendo en ManyChat ANTES de procesar', {
           subscriberId: subscriber.id,
           detectedChannel,
           hasWhatsAppPhone: !!subscriber.whatsapp_phone,
@@ -593,18 +591,24 @@ export async function POST(request: NextRequest) {
         })
         
         // Establecer el canal detectado en el custom field "origen" de ManyChat
-        // Esto permite que las automatizaciones filtren por origen cuando se agregue el tag
+        // Esto permite que el lead se cree con el origen correcto
         if (detectedChannel && detectedChannel !== 'unknown') {
           await ManychatService.setCustomField(
             String(subscriber.id), 
             'origen', 
             detectedChannel
           )
-          logger.info('Custom field "origen" establecido en ManyChat', {
+          logger.info('Custom field "origen" establecido en ManyChat ANTES de procesar webhook', {
             subscriberId: subscriber.id,
             origen: detectedChannel,
             eventType: event.event_type
           })
+          
+          // Actualizar el custom field en el objeto subscriber para que se use al crear el lead
+          if (!subscriber.custom_fields) {
+            subscriber.custom_fields = {}
+          }
+          subscriber.custom_fields.origen = detectedChannel
         } else {
           logger.warn('No se pudo detectar canal para establecer origen', {
             subscriberId: subscriber.id,
@@ -624,6 +628,50 @@ export async function POST(request: NextRequest) {
           error: origenError.message,
           subscriberId: event.subscriber?.id,
           eventType: event.event_type
+        })
+      }
+    }
+
+    // Procesar el evento (ahora el subscriber ya tiene el campo origen actualizado)
+    const result = await ManychatWebhookService.processWebhookEvent(event)
+
+    // Actualizar el lead si ya existe y el origen cambió
+    if (result.success && result.leadId && detectedChannel && detectedChannel !== 'unknown') {
+      try {
+        const { createClient } = await import('@supabase/supabase-js')
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+        
+        // Verificar el origen actual del lead
+        const { data: lead } = await supabase
+          .from('Lead')
+          .select('origen')
+          .eq('id', result.leadId)
+          .single()
+        
+        // Actualizar solo si el origen es diferente
+        if (lead && lead.origen !== detectedChannel) {
+          await supabase
+            .from('Lead')
+            .update({ 
+              origen: detectedChannel,
+              updatedAt: new Date().toISOString()
+            })
+            .eq('id', result.leadId)
+          
+          logger.info('Lead actualizado con origen correcto', {
+            leadId: result.leadId,
+            origenAnterior: lead.origen,
+            origenNuevo: detectedChannel
+          })
+        }
+      } catch (updateError: any) {
+        // No fallar el webhook si no se puede actualizar el lead
+        logger.warn('Error actualizando origen del lead', {
+          error: updateError.message,
+          leadId: result.leadId
         })
       }
     }

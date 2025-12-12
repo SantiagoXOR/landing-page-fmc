@@ -443,16 +443,7 @@ export class ManychatService {
    * Basado en la información disponible del subscriber
    */
   static detectChannel(subscriber: ManychatSubscriber): ManychatChannel {
-    // Prioridad 1: WhatsApp (si tiene whatsapp_phone o phone con formato E.164)
-    if (subscriber.whatsapp_phone || (subscriber.phone && this.isWhatsAppPhone(subscriber.phone))) {
-      logger.debug('Canal detectado: WhatsApp', {
-        subscriberId: subscriber.id,
-        phone: subscriber.whatsapp_phone || subscriber.phone
-      })
-      return 'whatsapp'
-    }
-
-    // Prioridad 2: Instagram (si tiene instagram_id)
+    // Prioridad 1: Instagram (si tiene instagram_id) - verificar primero porque puede tener phone también
     if (subscriber.instagram_id) {
       logger.debug('Canal detectado: Instagram', {
         subscriberId: subscriber.id,
@@ -461,20 +452,31 @@ export class ManychatService {
       return 'instagram'
     }
 
-    // Prioridad 3: Facebook Messenger (si tiene email o está asociado a página de Facebook)
-    // Por defecto, si tiene page_id, probablemente es Facebook Messenger
-    if (subscriber.page_id && subscriber.email) {
+    // Prioridad 2: WhatsApp (si tiene whatsapp_phone o phone con formato E.164)
+    // Pero solo si NO tiene page_id (que indicaría Facebook Messenger)
+    if (!subscriber.page_id && (subscriber.whatsapp_phone || (subscriber.phone && this.isWhatsAppPhone(subscriber.phone)))) {
+      logger.debug('Canal detectado: WhatsApp', {
+        subscriberId: subscriber.id,
+        phone: subscriber.whatsapp_phone || subscriber.phone
+      })
+      return 'whatsapp'
+    }
+
+    // Prioridad 3: Facebook Messenger (si tiene page_id)
+    // Si tiene page_id, es Facebook Messenger, incluso si tiene teléfono
+    if (subscriber.page_id) {
       logger.debug('Canal detectado: Facebook Messenger', {
         subscriberId: subscriber.id,
         pageId: subscriber.page_id,
-        email: subscriber.email.substring(0, 3) + '***'
+        hasEmail: !!subscriber.email,
+        hasPhone: !!subscriber.phone
       })
       return 'facebook'
     }
 
-    // Si solo tiene teléfono pero no está en formato WhatsApp, asumir WhatsApp
-    if (subscriber.phone) {
-      logger.debug('Canal asumido: WhatsApp (por teléfono)', {
+    // Si solo tiene teléfono pero no está en formato WhatsApp y no tiene page_id, asumir WhatsApp
+    if (subscriber.phone && !subscriber.page_id) {
+      logger.debug('Canal asumido: WhatsApp (por teléfono, sin page_id)', {
         subscriberId: subscriber.id
       })
       return 'whatsapp'
@@ -493,7 +495,8 @@ export class ManychatService {
       hasPhone: !!subscriber.phone,
       hasEmail: !!subscriber.email,
       hasWhatsAppPhone: !!subscriber.whatsapp_phone,
-      hasInstagramId: !!subscriber.instagram_id
+      hasInstagramId: !!subscriber.instagram_id,
+      hasPageId: !!subscriber.page_id
     })
 
     return 'unknown'

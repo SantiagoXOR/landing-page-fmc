@@ -107,7 +107,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Buscar o crear conversación
-        const platformId = subscriber.whatsapp_phone || subscriber.phone || subscriber.instagram_id || String(subscriber.id)
+        const platformId = String(
+          subscriber.whatsapp_phone || 
+          subscriber.phone || 
+          subscriber.instagram_id || 
+          subscriber.ig_id || 
+          subscriber.id
+        )
         let conversation = await ConversationService.findConversationByPlatform(platform, platformId)
 
         if (!conversation) {

@@ -33,8 +33,11 @@ export class ManychatHistorySyncService {
         return { success: true }
       }
 
-      // Determinar plataforma y platformId
-      const platform = subscriber.instagram_id || subscriber.ig_id ? 'instagram' : 'whatsapp'
+      // Determinar plataforma usando detectChannel
+      const detectedChannel = ManychatService.detectChannel(subscriber)
+      const platform = detectedChannel === 'instagram' ? 'instagram' :
+                       detectedChannel === 'facebook' ? 'facebook' :
+                       'whatsapp'
       const platformId = String(
         subscriber.instagram_id || 
         subscriber.ig_id || 

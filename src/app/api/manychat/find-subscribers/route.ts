@@ -98,13 +98,11 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Determinar plataforma
-        let platform = 'whatsapp'
-        if (subscriber.instagram_id) {
-          platform = 'instagram'
-        } else if (subscriber.whatsapp_phone || subscriber.phone) {
-          platform = 'whatsapp'
-        }
+        // Determinar plataforma usando detectChannel
+        const detectedChannel = ManychatService.detectChannel(subscriber)
+        const platform = detectedChannel === 'instagram' ? 'instagram' :
+                         detectedChannel === 'facebook' ? 'facebook' :
+                         'whatsapp'
 
         // Buscar o crear conversación
         const platformId = String(

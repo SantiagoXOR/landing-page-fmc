@@ -331,7 +331,15 @@ export default function LeadDetailPage() {
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex items-center gap-1 text-sm text-gray-600">
                   <Phone className="w-4 h-4" />
-                  <span>{lead.telefono}</span>
+                  {lead.telefono?.startsWith('manychat_') ? (
+                    <span className="text-gray-500 italic">
+                      Sin teléfono (ID: {lead.manychatId || lead.telefono.replace('manychat_', '')})
+                    </span>
+                  ) : (
+                    <a href={`tel:${lead.telefono}`} className="hover:text-blue-600">
+                      {lead.telefono}
+                    </a>
+                  )}
                 </div>
                 {lead.manychatId && (
                   <ManychatBadge variant="success" size="sm">

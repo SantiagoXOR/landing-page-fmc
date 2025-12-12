@@ -213,12 +213,16 @@ export class ManychatWebhookService {
       const customFields = subscriber.custom_fields || {}
       const tags = subscriber.tags || []
 
+      // Detectar origen automáticamente usando detectChannel
+      const detectedChannel = ManychatService.detectChannel(subscriber)
+      const origen = customFields.origen || detectedChannel || 'unknown'
+
       const leadData = {
         nombre,
         telefono: phone || `manychat_${subscriber.id}`,
         email: subscriber.email || null,
         manychatId: subscriberId,
-        origen: subscriber.instagram_id ? 'instagram' : 'whatsapp',
+        origen: origen, // Usar origen detectado automáticamente
         estado: customFields.estado || 'NUEVO',
         dni: customFields.dni || null,
         cuil: customFields.cuit || customFields.cuil || null,

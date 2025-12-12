@@ -121,3 +121,8 @@ info('npm run manychat:sync-by-ids scripts/subscriber-ids-extracted.csv')
 
 
 
+
+
+
+
+

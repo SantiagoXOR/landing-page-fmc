@@ -443,11 +443,14 @@ export class ManychatService {
    * Basado en la información disponible del subscriber
    */
   static detectChannel(subscriber: ManychatSubscriber): ManychatChannel {
-    // Prioridad 1: Instagram (si tiene instagram_id) - verificar primero porque puede tener phone también
-    if (subscriber.instagram_id) {
+    // Prioridad 1: Instagram (campos específicos de Instagram)
+    // Verificar primero porque puede tener phone también
+    // ManyChat puede devolver instagram_id, ig_id o ig_username
+    if (subscriber.instagram_id || subscriber.ig_id || subscriber.ig_username) {
       logger.debug('Canal detectado: Instagram', {
         subscriberId: subscriber.id,
-        instagramId: subscriber.instagram_id
+        instagramId: subscriber.instagram_id || subscriber.ig_id,
+        igUsername: subscriber.ig_username
       })
       return 'instagram'
     }

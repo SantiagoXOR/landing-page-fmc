@@ -129,23 +129,40 @@ export class ManychatSyncService {
 
       const phone = subscriber.whatsapp_phone || subscriber.phone || ''
       
-      if (!phone) {
-        throw new Error('Subscriber no tiene teléfono')
+      // Permitir contactos sin teléfono (Facebook/Instagram)
+      // Si no hay teléfono, usar manychatId como identificador
+      if (!phone && !subscriber.id) {
+        throw new Error('Subscriber no tiene teléfono ni ID')
       }
 
       const nombre = [subscriber.first_name, subscriber.last_name]
         .filter(Boolean)
         .join(' ') || subscriber.name || 'Contacto Manychat'
 
-      // Buscar lead existente por manychatId o teléfono
-      const { data: existingLeads } = await supabase.client
+      // Buscar lead existente por manychatId o teléfono (si existe)
+      let query = supabase.client
         .from('Lead')
         .select('*')
-        .or(`manychatId.eq.${subscriber.id},telefono.eq.${phone}`)
-        .limit(1)
+      
+      if (subscriber.id && phone) {
+        // Si tenemos ambos, buscar por cualquiera de los dos
+        query = query.or(`manychatId.eq.${subscriber.id},telefono.eq.${phone}`)
+      } else if (subscriber.id) {
+        // Solo manychatId
+        query = query.eq('manychatId', String(subscriber.id))
+      } else if (phone) {
+        // Solo teléfono
+        query = query.eq('telefono', phone)
+      }
+      
+      const { data: existingLeads } = await query.limit(1)
 
       const customFields = subscriber.custom_fields || {}
       const tags = subscriber.tags?.map(t => t.name) || []
+
+      // Detectar origen automáticamente usando detectChannel
+      const detectedChannel = ManychatService.detectChannel(subscriber)
+      const origen = customFields.origen || detectedChannel || 'unknown'
 
       // Función helper para extraer CUIL/CUIT/DNI de un valor (puede estar dentro de texto)
       const extractCUILOrDNI = (value: any): string | null => {
@@ -212,7 +229,7 @@ export class ManychatSyncService {
 
       const leadData: any = {
         nombre,
-        telefono: phone,
+        telefono: phone || `manychat_${subscriber.id}`, // Usar manychatId como fallback si no hay teléfono
         email: subscriber.email || null,
         manychatId: String(subscriber.id),
         dni: customFields.dni || null,
@@ -221,7 +238,7 @@ export class ManychatSyncService {
         zona: customFields.zona || null,
         producto: customFields.producto || null,
         monto: customFields.monto ?? null,
-        origen: customFields.origen || 'whatsapp',
+        origen: origen, // Usar origen detectado automáticamente
         estado: customFields.estado || 'NUEVO',
         agencia: customFields.agencia || null,
         banco: customFields.banco || null,  // Guardar banco en campo separado

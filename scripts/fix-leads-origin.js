@@ -23,24 +23,29 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 // Importar ManychatService (necesitamos la función detectChannel)
 // Como estamos en Node.js, necesitamos usar una versión simplificada
+// IMPORTANTE: Esta función debe coincidir con la lógica en manychat-service.ts
 function detectChannel(subscriber) {
-  // Prioridad 1: WhatsApp (si tiene whatsapp_phone o phone con formato E.164)
-  if (subscriber.whatsapp_phone || (subscriber.phone && isWhatsAppPhone(subscriber.phone))) {
-    return 'whatsapp'
-  }
-
-  // Prioridad 2: Instagram (si tiene instagram_id)
-  if (subscriber.instagram_id) {
+  // Prioridad 1: Instagram (campos específicos de Instagram)
+  // Verificar primero porque puede tener phone también
+  if (subscriber.instagram_id || subscriber.ig_id || subscriber.ig_username) {
     return 'instagram'
   }
 
-  // Prioridad 3: Facebook Messenger (si tiene email o está asociado a página de Facebook)
-  if (subscriber.page_id && subscriber.email) {
+  // Prioridad 2: WhatsApp (si tiene whatsapp_phone o phone con formato E.164)
+  // Pero solo si NO tiene page_id (que indicaría Facebook Messenger)
+  if (!subscriber.page_id && (subscriber.whatsapp_phone || (subscriber.phone && isWhatsAppPhone(subscriber.phone)))) {
+    return 'whatsapp'
+  }
+
+  // Prioridad 3: Facebook Messenger (si tiene page_id)
+  // Si tiene page_id, es Facebook Messenger, incluso si tiene teléfono
+  // page_id siempre indica que es de Facebook/Instagram, no WhatsApp
+  if (subscriber.page_id) {
     return 'facebook'
   }
 
-  // Si solo tiene teléfono pero no está en formato WhatsApp, asumir WhatsApp
-  if (subscriber.phone) {
+  // Si solo tiene teléfono pero no está en formato WhatsApp y no tiene page_id, asumir WhatsApp
+  if (subscriber.phone && !subscriber.page_id) {
     return 'whatsapp'
   }
 

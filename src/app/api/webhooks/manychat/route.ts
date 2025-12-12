@@ -282,7 +282,12 @@ export async function POST(request: NextRequest) {
           opted_in_phone: body.optin_phone || false,
           opted_in_email: body.optin_email || false,
           has_opt_in_sms: body.optin_phone || false,
-          has_opt_in_email: body.optin_email || false
+          has_opt_in_email: body.optin_email || false,
+          instagram_id: body.instagram_id || body.ig_id || null,
+          ig_id: body.ig_id || body.instagram_id || null,
+          ig_username: body.ig_username || null,
+          ig_last_interaction: body.ig_last_interaction || null,
+          ig_last_seen: body.ig_last_seen || null
         },
         message: body.last_input_text ? {
           id: `msg_${body.id}_${Date.now()}`,

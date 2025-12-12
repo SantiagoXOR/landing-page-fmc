@@ -33,7 +33,11 @@ export interface ManychatSubscriber {
   has_opt_in_sms?: boolean
   has_opt_in_email?: boolean
   whatsapp_phone?: string
-  instagram_id?: string
+  instagram_id?: string | number
+  ig_id?: string | number // ID de Instagram (puede venir como ig_id o instagram_id)
+  ig_username?: string // Username de Instagram
+  ig_last_interaction?: string // ISO date
+  ig_last_seen?: string // ISO date
 }
 
 // ============================================================================

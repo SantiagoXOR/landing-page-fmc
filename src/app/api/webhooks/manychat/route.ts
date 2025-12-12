@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ManychatWebhookService } from '@/server/services/manychat-webhook-service'
 import { ManychatWebhookEvent, ManychatWebhookMessage } from '@/types/manychat'
 import { logger } from '@/lib/logger'
+import { ManychatService } from '@/server/services/manychat-service'
 
 // Forzar renderizado dinámico (webhooks son siempre dinámicos)
 export const dynamic = 'force-dynamic'
@@ -571,6 +572,61 @@ export async function POST(request: NextRequest) {
 
     // Procesar el evento
     const result = await ManychatWebhookService.processWebhookEvent(event)
+
+    // Establecer custom field "origen" en ManyChat si el subscriber tiene datos
+    // Esto permite que las automatizaciones filtren por origen cuando se agregue el tag
+    if (result.success && event.subscriber && event.subscriber.id) {
+      try {
+        const subscriber = event.subscriber
+        
+        // Detectar canal real desde los datos del subscriber
+        const detectedChannel = ManychatService.detectChannel(subscriber)
+        
+        logger.info('Canal detectado desde webhook, estableciendo en ManyChat', {
+          subscriberId: subscriber.id,
+          detectedChannel,
+          hasWhatsAppPhone: !!subscriber.whatsapp_phone,
+          hasInstagramId: !!subscriber.instagram_id,
+          hasPageId: !!subscriber.page_id,
+          hasEmail: !!subscriber.email,
+          eventType: event.event_type
+        })
+        
+        // Establecer el canal detectado en el custom field "origen" de ManyChat
+        // Esto permite que las automatizaciones filtren por origen cuando se agregue el tag
+        if (detectedChannel && detectedChannel !== 'unknown') {
+          await ManychatService.setCustomField(
+            String(subscriber.id), 
+            'origen', 
+            detectedChannel
+          )
+          logger.info('Custom field "origen" establecido en ManyChat', {
+            subscriberId: subscriber.id,
+            origen: detectedChannel,
+            eventType: event.event_type
+          })
+        } else {
+          logger.warn('No se pudo detectar canal para establecer origen', {
+            subscriberId: subscriber.id,
+            subscriberData: {
+              whatsapp_phone: subscriber.whatsapp_phone,
+              phone: subscriber.phone,
+              instagram_id: subscriber.instagram_id,
+              page_id: subscriber.page_id,
+              email: subscriber.email
+            },
+            eventType: event.event_type
+          })
+        }
+      } catch (origenError: any) {
+        // No fallar el webhook si no se puede establecer el origen
+        logger.warn('Error estableciendo custom field origen en ManyChat', {
+          error: origenError.message,
+          subscriberId: event.subscriber?.id,
+          eventType: event.event_type
+        })
+      }
+    }
 
     // Siempre responder 200 OK para evitar reintentos de Manychat
     // (a menos que sea un error de formato, en cuyo caso ya respondimos 400)

@@ -188,15 +188,27 @@ export async function syncPipelineToManychat(
     let currentTags: string[] = []
     try {
       const subscriber = await getManychatSubscriber(manychatId)
-      // Normalizar tags: asegurar que sean strings y limpiar espacios
-      currentTags = (subscriber.tags || []).map(tag => 
-        typeof tag === 'string' ? tag.trim() : String(tag).trim()
-      ).filter(tag => tag.length > 0)
+      // Normalizar tags: ManyChat puede devolver tags como strings o como objetos {id, name}
+      // Extraer el nombre del tag en ambos casos
+      currentTags = (subscriber.tags || []).map(tag => {
+        if (typeof tag === 'string') {
+          return tag.trim()
+        } else if (tag && typeof tag === 'object' && 'name' in tag) {
+          // Si es un objeto con propiedad 'name', extraer el nombre
+          return String((tag as any).name || tag).trim()
+        } else {
+          // Fallback: convertir a string (aunque esto debería ser raro)
+          return String(tag).trim()
+        }
+      }).filter(tag => tag.length > 0)
+      
       logger.info('Current ManyChat tags', { 
         leadId, 
         tags: currentTags,
         rawTags: subscriber.tags,
-        tagCount: currentTags.length
+        tagCount: currentTags.length,
+        rawTagTypes: subscriber.tags?.map(t => typeof t),
+        rawTagStructure: subscriber.tags?.map(t => typeof t === 'object' ? Object.keys(t) : 'primitive')
       })
     } catch (error: any) {
       if (error.message.includes('not found')) {

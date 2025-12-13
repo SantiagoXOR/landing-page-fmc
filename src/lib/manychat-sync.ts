@@ -260,7 +260,7 @@ export async function syncPipelineToManychat(
     // Remover TODOS los tags de pipeline excepto el nuevo tag
     // Esto asegura que no queden tags antiguos que puedan causar conflictos
     // Usar comparación case-insensitive para mayor robustez
-    const normalizedNewTag = newTag.trim().toLowerCase()
+    // normalizedNewTag ya está definido arriba, reutilizarlo
     for (const tag of currentTags) {
       const normalizedTag = tag.trim().toLowerCase()
       // Si es un tag de pipeline y no es el nuevo tag, agregarlo a la lista de eliminación

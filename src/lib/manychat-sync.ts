@@ -188,8 +188,16 @@ export async function syncPipelineToManychat(
     let currentTags: string[] = []
     try {
       const subscriber = await getManychatSubscriber(manychatId)
-      currentTags = subscriber.tags || []
-      logger.info('Current ManyChat tags', { leadId, tags: currentTags })
+      // Normalizar tags: asegurar que sean strings y limpiar espacios
+      currentTags = (subscriber.tags || []).map(tag => 
+        typeof tag === 'string' ? tag.trim() : String(tag).trim()
+      ).filter(tag => tag.length > 0)
+      logger.info('Current ManyChat tags', { 
+        leadId, 
+        tags: currentTags,
+        rawTags: subscriber.tags,
+        tagCount: currentTags.length
+      })
     } catch (error: any) {
       if (error.message.includes('not found')) {
         logger.warn('Subscriber not found in ManyChat', { leadId, manychatId })
@@ -210,23 +218,36 @@ export async function syncPipelineToManychat(
     const pipelineTags = await getPipelineTags()
     const businessTags = await getBusinessTags()
 
+    // Normalizar tags de pipeline y negocio para comparación
+    const normalizedPipelineTags = pipelineTags.map(tag => tag.trim().toLowerCase())
+    const normalizedBusinessTags = businessTags.map(tag => tag.trim().toLowerCase())
+
     logger.info('Tag lists', {
+      leadId,
       pipelineTags,
-      businessTags
+      businessTags,
+      normalizedPipelineTags,
+      normalizedBusinessTags,
+      currentTagsCount: currentTags.length,
+      newTag
     })
 
     // 6. Filtrar tags a mantener (tags de negocio + tags no relacionados con pipeline)
+    // Usar comparación case-insensitive para mayor robustez
+    const normalizedNewTag = newTag.trim().toLowerCase()
     const tagsToKeep = currentTags.filter(tag => {
+      const normalizedTag = tag.trim().toLowerCase()
+      
       // Mantener tags de negocio
-      if (businessTags.includes(tag)) {
+      if (normalizedBusinessTags.includes(normalizedTag)) {
         return true
       }
       // Mantener tags que no son de pipeline
-      if (!pipelineTags.includes(tag)) {
+      if (!normalizedPipelineTags.includes(normalizedTag)) {
         return true
       }
       // Si es el nuevo tag, mantenerlo
-      if (tag === newTag) {
+      if (normalizedTag === normalizedNewTag) {
         return true
       }
       // Remover cualquier otro tag de pipeline
@@ -238,18 +259,48 @@ export async function syncPipelineToManychat(
     
     // Remover TODOS los tags de pipeline excepto el nuevo tag
     // Esto asegura que no queden tags antiguos que puedan causar conflictos
+    // Usar comparación case-insensitive para mayor robustez
+    const normalizedNewTag = newTag.trim().toLowerCase()
     for (const tag of currentTags) {
+      const normalizedTag = tag.trim().toLowerCase()
       // Si es un tag de pipeline y no es el nuevo tag, agregarlo a la lista de eliminación
-      if (pipelineTags.includes(tag) && tag !== newTag) {
-        tagsToRemove.push(tag)
+      const isPipelineTag = normalizedPipelineTags.includes(normalizedTag)
+      const isNewTag = normalizedTag === normalizedNewTag
+      
+      if (isPipelineTag && !isNewTag) {
+        tagsToRemove.push(tag) // Usar el tag original (no normalizado) para la eliminación
+        logger.debug('Tag marcado para eliminación', {
+          leadId,
+          tag,
+          normalizedTag,
+          isPipelineTag,
+          isNewTag
+        })
       }
     }
 
     const tagsToAdd: string[] = []
     
-    // Agregar el nuevo tag si no está presente
-    if (!tagsToKeep.includes(newTag)) {
+    // Agregar el nuevo tag si no está presente (comparación case-insensitive)
+    const normalizedNewTagForAdd = newTag.trim().toLowerCase()
+    const newTagExists = currentTags.some(tag => 
+      tag.trim().toLowerCase() === normalizedNewTagForAdd
+    )
+    
+    if (!newTagExists) {
       tagsToAdd.push(newTag)
+      logger.debug('Tag marcado para agregar', {
+        leadId,
+        newTag,
+        normalizedNewTag: normalizedNewTagForAdd,
+        currentTags
+      })
+    } else {
+      logger.debug('Tag ya existe, no se agregará', {
+        leadId,
+        newTag,
+        normalizedNewTag: normalizedNewTagForAdd
+      })
     }
 
     logger.info('Tags to update', {
@@ -331,16 +382,51 @@ export async function syncPipelineToManychat(
 
     // 9. Actualizar tags en ManyChat usando ManychatService que busca tags por ID
     // Remover tags primero
+    logger.info('Iniciando eliminación de tags', {
+      leadId,
+      manychatId,
+      tagsToRemove,
+      count: tagsToRemove.length
+    })
+    
     for (const tag of tagsToRemove) {
       try {
+        logger.info(`Intentando eliminar tag '${tag}' del subscriber ${manychatId}`, {
+          leadId,
+          manychatId,
+          tag
+        })
         const removed = await ManychatService.removeTagFromSubscriber(manychatId, tag)
-        if (!removed) {
-          logger.warn(`Failed to remove tag '${tag}' from subscriber ${manychatId}`)
+        if (removed) {
+          logger.info(`Tag '${tag}' eliminado exitosamente del subscriber ${manychatId}`, {
+            leadId,
+            manychatId,
+            tag
+          })
+        } else {
+          logger.warn(`Failed to remove tag '${tag}' from subscriber ${manychatId}`, {
+            leadId,
+            manychatId,
+            tag
+          })
         }
       } catch (error: any) {
-        // Si el tag no existe, ignorar el error
-        if (!error.message.includes('not found') && !error.message.includes('does not exist')) {
-          logger.warn(`Error removing tag '${tag}':`, error.message)
+        // Si el tag no existe, ignorar el error pero loguearlo
+        if (error.message.includes('not found') || error.message.includes('does not exist')) {
+          logger.info(`Tag '${tag}' no existe en ManyChat, ignorando`, {
+            leadId,
+            manychatId,
+            tag,
+            error: error.message
+          })
+        } else {
+          logger.error(`Error removing tag '${tag}' from subscriber ${manychatId}`, {
+            leadId,
+            manychatId,
+            tag,
+            error: error.message,
+            stack: error.stack
+          })
         }
       }
     }

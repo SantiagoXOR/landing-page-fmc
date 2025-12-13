@@ -290,6 +290,11 @@ export async function syncPipelineToManychat(
         page_id: typeof subscriberRaw.page_id === 'string' ? parseInt(subscriberRaw.page_id, 10) || 0 : subscriberRaw.page_id,
         status: subscriberRaw.status as 'active' | 'inactive',
         gender: subscriberRaw.gender === 'male' || subscriberRaw.gender === 'female' ? subscriberRaw.gender : undefined,
+        subscribed: subscriberRaw.subscribed !== undefined 
+          ? (typeof subscriberRaw.subscribed === 'boolean' 
+              ? (subscriberRaw.subscribed ? new Date().toISOString() : undefined)
+              : subscriberRaw.subscribed)
+          : undefined,
         tags: subscriberRaw.tags?.map(tag => typeof tag === 'string' ? { id: 0, name: tag } : tag) || []
       }
       detectedChannel = ManychatService.detectChannel(subscriber)

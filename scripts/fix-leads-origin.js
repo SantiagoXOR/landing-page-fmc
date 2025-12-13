@@ -31,15 +31,20 @@ function detectChannel(subscriber) {
     return 'instagram'
   }
 
-  // Prioridad 2: WhatsApp (si tiene whatsapp_phone o phone con formato E.164)
-  // Pero solo si NO tiene page_id (que indicaría Facebook Messenger)
-  if (!subscriber.page_id && (subscriber.whatsapp_phone || (subscriber.phone && isWhatsAppPhone(subscriber.phone)))) {
+  // Prioridad 2: WhatsApp
+  // Si tiene whatsapp_phone explícito, es definitivamente WhatsApp (incluso si tiene page_id)
+  // Esto corrige el problema donde contactos de WhatsApp con page_id se detectaban como Facebook
+  if (subscriber.whatsapp_phone) {
+    return 'whatsapp'
+  }
+  
+  // Si tiene phone en formato E.164 y NO tiene page_id, también es WhatsApp
+  if (subscriber.phone && isWhatsAppPhone(subscriber.phone) && !subscriber.page_id) {
     return 'whatsapp'
   }
 
-  // Prioridad 3: Facebook Messenger (si tiene page_id)
-  // Si tiene page_id, es Facebook Messenger, incluso si tiene teléfono
-  // page_id siempre indica que es de Facebook/Instagram, no WhatsApp
+  // Prioridad 3: Facebook Messenger (si tiene page_id y no es WhatsApp)
+  // Si tiene page_id pero no tiene whatsapp_phone, es Facebook Messenger
   if (subscriber.page_id) {
     return 'facebook'
   }

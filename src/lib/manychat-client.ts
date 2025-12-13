@@ -250,6 +250,17 @@ export async function updateManychatTags(
       }
     }
 
+    // Esperar 1 segundo para que ManyChat procese la eliminación antes de agregar nuevos tags
+    // Esto es necesario para que las automatizaciones se disparen correctamente
+    if (tagsToRemove.length > 0 && tagsToAdd.length > 0) {
+      logger.info('Esperando 1 segundo después de remover tags para que ManyChat procese la eliminación', {
+        subscriberId,
+        removed: tagsToRemove.length,
+        toAdd: tagsToAdd.length
+      })
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+
     // Agregar nuevos tags
     for (const tag of tagsToAdd) {
       await addManychatTag(subscriberId, tag)

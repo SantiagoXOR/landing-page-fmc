@@ -235,9 +235,13 @@ export async function syncPipelineToManychat(
     // 7. Determinar tags a agregar y remover
     const tagsToRemove: string[] = []
     
-    // Remover el tag anterior de pipeline si existe y está presente
-    if (previousTag && currentTags.includes(previousTag) && previousTag !== newTag) {
-      tagsToRemove.push(previousTag)
+    // Remover TODOS los tags de pipeline excepto el nuevo tag
+    // Esto asegura que no queden tags antiguos que puedan causar conflictos
+    for (const tag of currentTags) {
+      // Si es un tag de pipeline y no es el nuevo tag, agregarlo a la lista de eliminación
+      if (pipelineTags.includes(tag) && tag !== newTag) {
+        tagsToRemove.push(tag)
+      }
     }
 
     const tagsToAdd: string[] = []
@@ -273,6 +277,43 @@ export async function syncPipelineToManychat(
       return true
     }
 
+    // 8.5. Obtener subscriber para detectar canal y establecer custom field "origen"
+    // Esto es necesario para que las reglas de ManyChat puedan filtrar por plataforma
+    let detectedChannel: string | null = null
+    try {
+      const subscriber = await getManychatSubscriber(manychatId)
+      detectedChannel = ManychatService.detectChannel(subscriber)
+      
+      // Establecer el custom field "origen" en ManyChat para que las reglas puedan filtrar
+      if (detectedChannel && detectedChannel !== 'unknown') {
+        try {
+          await ManychatService.setCustomField(
+            String(manychatId),
+            'origen',
+            detectedChannel
+          )
+          logger.info('Custom field "origen" establecido en ManyChat para filtrar automatizaciones por plataforma', {
+            leadId,
+            manychatId,
+            origen: detectedChannel
+          })
+        } catch (origenError: any) {
+          // No fallar si no se puede establecer el origen, solo loguear
+          logger.warn('No se pudo establecer custom field "origen" en ManyChat', {
+            leadId,
+            manychatId,
+            error: origenError.message
+          })
+        }
+      }
+    } catch (subscriberError: any) {
+      logger.warn('No se pudo obtener subscriber para establecer origen', {
+        leadId,
+        manychatId,
+        error: subscriberError.message
+      })
+    }
+
     // 9. Actualizar tags en ManyChat usando ManychatService que busca tags por ID
     // Remover tags primero
     for (const tag of tagsToRemove) {
@@ -287,6 +328,18 @@ export async function syncPipelineToManychat(
           logger.warn(`Error removing tag '${tag}':`, error.message)
         }
       }
+    }
+    
+    // Esperar 1 segundo para que ManyChat procese la eliminación antes de agregar nuevos tags
+    // Esto es necesario para que las automatizaciones se disparen correctamente
+    if (tagsToRemove.length > 0 && tagsToAdd.length > 0) {
+      logger.info('Esperando 1 segundo después de remover tags para que ManyChat procese la eliminación', {
+        leadId,
+        manychatId,
+        removed: tagsToRemove.length,
+        toAdd: tagsToAdd.length
+      })
+      await new Promise(resolve => setTimeout(resolve, 1000))
     }
     
     // Agregar nuevos tags

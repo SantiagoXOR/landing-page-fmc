@@ -244,8 +244,9 @@ export async function syncPipelineToManychat(
       newTag
     })
 
-    // 6. Filtrar tags a mantener (tags de negocio + tags no relacionados con pipeline)
-    // Usar comparación case-insensitive para mayor robustez
+    // 6. Determinar tags a mantener (solo tags de negocio y tags no relacionados con pipeline)
+    // IMPORTANTE: NO mantener el nuevo tag de pipeline si ya existe, lo eliminaremos y re-agregaremos
+    // para asegurar que ManyChat dispare las automatizaciones correctamente
     const normalizedNewTag = newTag.trim().toLowerCase()
     const tagsToKeep = currentTags.filter(tag => {
       const normalizedTag = tag.trim().toLowerCase()
@@ -258,62 +259,45 @@ export async function syncPipelineToManychat(
       if (!normalizedPipelineTags.includes(normalizedTag)) {
         return true
       }
-      // Si es el nuevo tag, mantenerlo
-      if (normalizedTag === normalizedNewTag) {
-        return true
-      }
-      // Remover cualquier otro tag de pipeline
+      // NO mantener tags de pipeline (incluyendo el nuevo si ya existe)
+      // Los eliminaremos todos y luego agregaremos el nuevo para disparar automatizaciones
       return false
     })
 
     // 7. Determinar tags a agregar y remover
     const tagsToRemove: string[] = []
     
-    // Remover TODOS los tags de pipeline excepto el nuevo tag
-    // Esto asegura que no queden tags antiguos que puedan causar conflictos
-    // Usar comparación case-insensitive para mayor robustez
-    // normalizedNewTag ya está definido arriba, reutilizarlo
+    // Remover TODOS los tags de pipeline (incluyendo el nuevo si ya existe)
+    // Esto asegura un estado limpio antes de agregar el nuevo tag
+    // El orden correcto es: eliminar todos → esperar → agregar nuevo → ManyChat dispara automatización
     for (const tag of currentTags) {
       const normalizedTag = tag.trim().toLowerCase()
-      // Si es un tag de pipeline y no es el nuevo tag, agregarlo a la lista de eliminación
+      // Si es un tag de pipeline, agregarlo a la lista de eliminación
       const isPipelineTag = normalizedPipelineTags.includes(normalizedTag)
-      const isNewTag = normalizedTag === normalizedNewTag
       
-      if (isPipelineTag && !isNewTag) {
+      if (isPipelineTag) {
         tagsToRemove.push(tag) // Usar el tag original (no normalizado) para la eliminación
-        logger.debug('Tag marcado para eliminación', {
+        logger.debug('Tag de pipeline marcado para eliminación', {
           leadId,
           tag,
           normalizedTag,
           isPipelineTag,
-          isNewTag
+          isNewTag: normalizedTag === normalizedNewTag
         })
       }
     }
 
     const tagsToAdd: string[] = []
     
-    // Agregar el nuevo tag si no está presente (comparación case-insensitive)
-    const normalizedNewTagForAdd = newTag.trim().toLowerCase()
-    const newTagExists = currentTags.some(tag => 
-      tag.trim().toLowerCase() === normalizedNewTagForAdd
-    )
-    
-    if (!newTagExists) {
-      tagsToAdd.push(newTag)
-      logger.debug('Tag marcado para agregar', {
-        leadId,
-        newTag,
-        normalizedNewTag: normalizedNewTagForAdd,
-        currentTags
-      })
-    } else {
-      logger.debug('Tag ya existe, no se agregará', {
-        leadId,
-        newTag,
-        normalizedNewTag: normalizedNewTagForAdd
-      })
-    }
+    // Siempre agregar el nuevo tag (incluso si ya existía)
+    // Esto asegura que ManyChat dispare el evento "tag_added" y active las automatizaciones
+    tagsToAdd.push(newTag)
+    logger.debug('Tag marcado para agregar', {
+      leadId,
+      newTag,
+      normalizedNewTag,
+      wasAlreadyPresent: currentTags.some(tag => tag.trim().toLowerCase() === normalizedNewTag)
+    })
 
     logger.info('Tags to update', {
       leadId,
@@ -322,9 +306,20 @@ export async function syncPipelineToManychat(
       remove: tagsToRemove
     })
 
-    // 8. Si no hay cambios, salir
-    if (tagsToAdd.length === 0 && tagsToRemove.length === 0) {
-      logger.info('No tag changes needed', { leadId, manychatId })
+    // 8. Si no hay cambios (no hay tags para eliminar y el nuevo tag ya existe y no es credito-preaprobado), salir
+    // Nota: Para credito-preaprobado siempre hacemos el proceso completo para asegurar que se dispare el flujo
+    const newTagWasAlreadyPresent = currentTags.some(tag => 
+      tag.trim().toLowerCase() === normalizedNewTag
+    )
+    const needsSpecialHandling = newTag === 'credito-preaprobado' && newTagWasAlreadyPresent
+    
+    if (tagsToRemove.length === 0 && newTagWasAlreadyPresent && !needsSpecialHandling) {
+      logger.info('No tag changes needed (tag ya existe y no requiere manejo especial)', { 
+        leadId, 
+        manychatId,
+        newTag,
+        wasAlreadyPresent: true
+      })
       await logManychatSync({
         leadId,
         syncType: 'pipeline_stage_change',
@@ -335,7 +330,7 @@ export async function syncPipelineToManychat(
           newStage,
           previousTag,
           newTag,
-          message: 'No changes needed'
+          message: 'No changes needed - tag already exists'
         }
       })
       return true
@@ -561,13 +556,53 @@ export async function syncPipelineToManychat(
       }
     }
 
+    // 9.5. Caso especial: Si el tag es credito-preaprobado y ya existía antes,
+    // hacer un remove/re-add adicional para asegurar que ManyChat dispare el flujo
+    // Esto es necesario porque ManyChat solo dispara automatizaciones en eventos "tag_added"
+    // Nota: newTagWasAlreadyPresent ya fue definido arriba en la sección 8
+    const needsSpecialHandlingForPreaprobado = newTag === 'credito-preaprobado' && newTagWasAlreadyPresent
+    
+    if (needsSpecialHandlingForPreaprobado) {
+      try {
+        logger.info('Tag credito-preaprobado ya existía antes, haciendo remove/re-add adicional para disparar flujo', {
+          leadId,
+          manychatId,
+          tag: newTag
+        })
+        
+        // Remover el tag que acabamos de agregar
+        await ManychatService.removeTagFromSubscriber(manychatId, newTag)
+        
+        // Esperar un momento para que ManyChat procese la eliminación
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // Volver a agregar el tag para generar el evento "tag_added" y disparar el flujo
+        await ManychatService.addTagToSubscriber(manychatId, newTag)
+        
+        logger.info('Tag credito-preaprobado removido y reañadido exitosamente, ManyChat debería disparar el flujo automáticamente', {
+          leadId,
+          manychatId,
+          tag: newTag
+        })
+      } catch (err: any) {
+        logger.warn('Error en remove/re-add adicional para credito-preaprobado (no crítico)', {
+          leadId,
+          manychatId,
+          tag: newTag,
+          error: err.message
+        })
+        // No fallar si esto falla, el tag ya fue agregado correctamente
+      }
+    }
+
     logger.info('Successfully synced pipeline to ManyChat', {
       leadId,
       manychatId,
       newStage,
       newTag,
       added: tagsToAdd,
-      removed: tagsToRemove
+      removed: tagsToRemove,
+      specialHandling: newTag === 'credito-preaprobado' && newTagWasAlreadyPresent ? 'remove-re-add' : 'none'
     })
 
     // 10. Registrar sincronización exitosa

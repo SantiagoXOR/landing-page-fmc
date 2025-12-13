@@ -699,173 +699,28 @@ async function assignStageTag(leadId: string, stageId: string, alreadySyncedToMa
       newTags: filteredTags
     })
 
-    // Si el lead tiene manychatId, sincronizar con ManyChat según corresponda
-    if (lead.manychatId) {
-      if (!alreadySyncedToManyChat) {
-        // Sincronización completa (código existente)
-        try {
-          // Obtener tags actuales de ManyChat
-          const subscriber = await ManychatService.getSubscriberById(lead.manychatId)
-          if (!subscriber) {
-            logger.warn('Subscriber not found in ManyChat', { leadId, manychatId: lead.manychatId })
-            return
-          }
-          const manychatTags = subscriber.tags || []
-          // Extraer nombres de los tags (ManychatTag tiene estructura { id, name })
-          const manychatTagNames = manychatTags.map(tag => tag.name)
-
-          // Obtener tags de negocio que deben mantenerse
-          const businessTagNames = await getBusinessTags()
-
-          // Filtrar tags a mantener (negocio + no pipeline)
-          const tagsToKeep = manychatTagNames.filter(tag => {
-            if (businessTagNames.includes(tag)) return true
-            if (!pipelineTagNames.includes(tag)) return true
-            if (tag === tagToAdd) return true
-            return false
-          })
-
-          // Determinar tags a remover (tags de pipeline que no son el nuevo)
-          const tagsToRemove = manychatTagNames.filter(tag => 
-            pipelineTagNames.includes(tag) && tag !== tagToAdd
-          )
-
-          // Actualizar tags en ManyChat
-          if (tagsToRemove.length > 0 || !tagsToKeep.includes(tagToAdd)) {
-            // Remover tags antiguos
-            for (const tagToRemove of tagsToRemove) {
-              try {
-                await ManychatService.removeTagFromSubscriber(lead.manychatId, tagToRemove)
-              } catch (err) {
-                logger.warn('Failed to remove tag from ManyChat', { 
-                  leadId, 
-                  manychatId: lead.manychatId, 
-                  tag: tagToRemove,
-                  error: err instanceof Error ? err.message : 'Unknown error'
-                })
-              }
-            }
-
-            // Agregar nuevo tag si no está presente
-            const tagWasAlreadyAssigned = tagsToKeep.includes(tagToAdd)
-            
-            if (!tagWasAlreadyAssigned) {
-              try {
-                await ManychatService.addTagToSubscriber(lead.manychatId, tagToAdd)
-                logger.info('Tag agregado a ManyChat, ManyChat debería disparar el flujo automáticamente', {
-                  leadId,
-                  manychatId: lead.manychatId,
-                  tag: tagToAdd
-                })
-              } catch (err) {
-                logger.warn('Failed to add tag to ManyChat', { 
-                  leadId, 
-                  manychatId: lead.manychatId, 
-                  tag: tagToAdd,
-                  error: err instanceof Error ? err.message : 'Unknown error'
-                })
-              }
-            } else {
-              // Si el tag ya estaba asignado, ManyChat no dispara el flujo automáticamente
-              // Para generar el evento "tag_added" y disparar el flujo, primero removemos el tag
-              // y luego lo volvemos a añadir (solo para credito-preaprobado)
-              if (tagToAdd === 'credito-preaprobado') {
-                try {
-                  logger.info('Tag credito-preaprobado ya estaba asignado, removiendo y reañadiendo para disparar flujo', {
-                    leadId,
-                    manychatId: lead.manychatId,
-                    tag: tagToAdd
-                  })
-                  
-                  // Remover el tag primero
-                  await ManychatService.removeTagFromSubscriber(lead.manychatId, tagToAdd)
-                  
-                  // Esperar un momento para que ManyChat procese la eliminación
-                  await new Promise(resolve => setTimeout(resolve, 1000))
-                  
-                  // Volver a añadir el tag para generar el evento "tag_added"
-                  await ManychatService.addTagToSubscriber(lead.manychatId, tagToAdd)
-                  
-                  logger.info('Tag credito-preaprobado removido y reañadido exitosamente, ManyChat debería disparar el flujo automáticamente', {
-                    leadId,
-                    manychatId: lead.manychatId,
-                    tag: tagToAdd
-                  })
-                } catch (err) {
-                  logger.warn('Failed to remove and re-add tag to trigger ManyChat flow', { 
-                    leadId, 
-                    manychatId: lead.manychatId, 
-                    tag: tagToAdd,
-                    error: err instanceof Error ? err.message : 'Unknown error'
-                  })
-                }
-              } else {
-                logger.info('Tag ya estaba asignado en ManyChat (no es credito-preaprobado)', {
-                  leadId,
-                  manychatId: lead.manychatId,
-                  tag: tagToAdd,
-                  note: 'ManyChat no dispara flujos cuando el tag ya existe'
-                })
-              }
-            }
-
-            logger.info('ManyChat tags synchronized', {
-              leadId,
-              manychatId: lead.manychatId,
-              added: tagToAdd,
-              removed: tagsToRemove
-            })
-          }
-        } catch (manychatError: any) {
-          logger.warn('Failed to sync tags to ManyChat', {
-            leadId,
-            manychatId: lead.manychatId,
-            error: manychatError.message
-          })
-          // No fallar si ManyChat falla, ya que la actualización local ya se hizo
-        }
-      } else {
-        // Ya se sincronizó, solo manejar caso especial de credito-preaprobado
-        if (tagToAdd === 'credito-preaprobado') {
-          try {
-            // Verificar si el tag ya está asignado en ManyChat
-            const subscriber = await ManychatService.getSubscriberById(lead.manychatId)
-            const manychatTagNames = subscriber?.tags?.map(tag => tag.name) || []
-            const tagExists = manychatTagNames.includes('credito-preaprobado')
-            
-            if (tagExists) {
-              // Remover y reañadir para disparar el flujo
-              logger.info('Tag credito-preaprobado ya existe en ManyChat, removiendo y reañadiendo para disparar flujo', {
-                leadId,
-                manychatId: lead.manychatId
-              })
-              
-              await ManychatService.removeTagFromSubscriber(lead.manychatId, 'credito-preaprobado')
-              await new Promise(resolve => setTimeout(resolve, 1000))
-              await ManychatService.addTagToSubscriber(lead.manychatId, 'credito-preaprobado')
-              
-              logger.info('Tag credito-preaprobado removido y reañadido para disparar flujo', {
-                leadId,
-                manychatId: lead.manychatId
-              })
-            } else {
-              // El tag no existe, syncPipelineToManychat debería haberlo añadido
-              // Pero por si acaso, verificamos y lo añadimos
-              logger.info('Tag credito-preaprobado no existe en ManyChat después de sync, añadiéndolo', {
-                leadId,
-                manychatId: lead.manychatId
-              })
-              await ManychatService.addTagToSubscriber(lead.manychatId, 'credito-preaprobado')
-            }
-          } catch (err) {
-            logger.warn('Error handling credito-preaprobado tag after sync', {
-              leadId,
-              manychatId: lead.manychatId,
-              error: err instanceof Error ? err.message : 'Unknown error'
-            })
-          }
-        }
-      }
+    // Si el lead tiene manychatId y ya se sincronizó con ManyChat,
+    // NO hacer operaciones adicionales en ManyChat aquí.
+    // syncPipelineToManychat ya se encargó de:
+    // 1. Eliminar todos los tags de pipeline antiguos
+    // 2. Agregar el nuevo tag
+    // 3. Manejar el caso especial de credito-preaprobado si es necesario
+    // 
+    // Esta función solo actualiza los tags locales en la base de datos.
+    if (lead.manychatId && alreadySyncedToManyChat) {
+      logger.info('ManyChat ya fue sincronizado por syncPipelineToManychat, solo actualizando tags locales', {
+        leadId,
+        manychatId: lead.manychatId,
+        tag: tagToAdd
+      })
+    } else if (lead.manychatId && !alreadySyncedToManyChat) {
+      // Si no se sincronizó, syncPipelineToManychat debería haber sido llamado antes
+      // pero por si acaso, loguear un warning
+      logger.warn('Lead tiene manychatId pero no se sincronizó con ManyChat antes de assignStageTag', {
+        leadId,
+        manychatId: lead.manychatId,
+        tag: tagToAdd
+      })
     }
   } catch (error) {
     logger.error('Error assigning stage tag', {

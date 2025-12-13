@@ -11,6 +11,7 @@ import {
   getSubscriberTags
 } from './manychat-client'
 import { ManychatService } from '@/server/services/manychat-service'
+import { ManychatSubscriber as ManychatSubscriberType } from '@/types/manychat'
 import { logger } from './logger'
 
 // Cliente Supabase
@@ -281,7 +282,15 @@ export async function syncPipelineToManychat(
     // Esto es necesario para que las reglas de ManyChat puedan filtrar por plataforma
     let detectedChannel: string | null = null
     try {
-      const subscriber = await getManychatSubscriber(manychatId)
+      const subscriberRaw = await getManychatSubscriber(manychatId)
+      // Convertir el subscriber al tipo esperado por detectChannel
+      const subscriber: ManychatSubscriberType = {
+        ...subscriberRaw,
+        id: typeof subscriberRaw.id === 'string' ? parseInt(subscriberRaw.id, 10) || 0 : subscriberRaw.id,
+        page_id: typeof subscriberRaw.page_id === 'string' ? parseInt(subscriberRaw.page_id, 10) || 0 : subscriberRaw.page_id,
+        status: subscriberRaw.status as 'active' | 'inactive',
+        tags: subscriberRaw.tags?.map(tag => typeof tag === 'string' ? { id: 0, name: tag } : tag) || []
+      }
       detectedChannel = ManychatService.detectChannel(subscriber)
       
       // Establecer el custom field "origen" en ManyChat para que las reglas puedan filtrar

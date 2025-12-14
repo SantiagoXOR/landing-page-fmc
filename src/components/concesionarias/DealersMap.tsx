@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 declare global {
   interface Window {
     google: any
-    initMap: () => void
+    initMap?: () => void
   }
 }
 

@@ -34,6 +34,9 @@ export const DEALERS: Dealer[] = [
   latitude: -26.1857768,
   longitude: -58.1755669,
   placeId: 'ChIJBU_PiOSlXJQRcq4bWubrygs'
+
+  photoUrl: 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=AZLasHq2pMBdOdDwJdQQEJ_nzNFj-5VdI5UkZ1NEuIZs5086fW20N0MnerFVvuS3sEWdN6qZgcV0TO20sNZ1txVgvouKJCOxIQWf3euOkLXg_EogfPAYspLXCBxglh0b4v1lrMV8yTx0RmJP2AuXmal4KYXoQ4JtRyDHMgwpo8kBrdERFK6XJ5DOXoIWGeO5n8QUrNcqUV-Frz7eEECTxfVuGmsJlIEk3QB6UiIFbENhBsWikK2zP7XLlmYDXf8N2uoPgDysAQPQpLzjGRY9DzBJ9p-9TtuBR5-MeYbmwAf_CUiAzCt6nZdyn7qWh78Ee04MYI7DjRW4Kh6EuWjBC0GezY01-GCxYNY9qzWkP9cqnXA7cUTz0h_ECCVUNkhZnrY6IDGWeJeyJEMBCX7FQRT0wKSFObDJjkXj3nrGOKm3aa7g_A&key=AIzaSyBXMS9TANDsT6q60igtiBZOyIso-ugNo8k',
+  website: 'http://www.formosa.gov.ar/',
 },
   { name: 'MAQUIMOT', address: 'Julio A. Roca 610', phone: '0370-485-8840', brands: ['KELLER', 'CORVEN', 'ZANELLA', 'BAJAJ', 'MOTOMEL'], zone: 'Capital',
   latitude: -26.1838973,
@@ -84,6 +87,9 @@ export const DEALERS: Dealer[] = [
   latitude: -26.1857768,
   longitude: -58.1755669,
   placeId: 'ChIJBU_PiOSlXJQRcq4bWubrygs'
+
+  photoUrl: 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=AZLasHpWa1Jp2Pqg8H1qySBewNSRgL_rBNvqShpRtEmLLXhmATJzpDdXvYVWYZj3_-MrWhiRRc35RLLFCL4d1pS9S9AJLQjMi3pcfG4bcCccBFaLWl1M7FF6q5pR0PobrX7jgJVemHuNyvnJ4C36cy8w_7PJb88v6i4Er2thECBO_lOhQ9XsUhRv5bTFaO7OzlSYtAHgj-4-wZoEdfy0qpDQ2YEE2P1JxoajawoRisyDHkMz6osQI8pyJPhJAzo-gs4IkQM9QCL-bXzXObPT8M572muTRd8z7XER36rlIyqPAflRgecb1O7vbShmrmRrSLkGspAKBYQrlxf5t1wALTTdGbMcn95NFyrdmaBlS_izUKnxUhWopxTRh_g9sWubvXxU7ksYfUH4-TzzI5vd31RPnCRAHa_nz3OhdSZ-bhmjsqH6NQ&key=AIzaSyBXMS9TANDsT6q60igtiBZOyIso-ugNo8k',
+  website: 'http://www.formosa.gov.ar/',
 },
   { name: 'MAYANS SRL', address: 'Av. 12 de Octubre 1145', phone: '0371-844-4917', brands: ['HONDA'], zone: 'Interior',
   latitude: -25.2873409,

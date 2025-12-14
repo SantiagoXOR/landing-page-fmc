@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
+import { rateLimit, GoogleMapsRateLimits } from '@/lib/rate-limit-api'
 
 export const dynamic = 'force-dynamic'
 
@@ -114,6 +115,28 @@ async function geocodeAddress(address: string): Promise<GeocodeResult> {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const rateLimitResult = await rateLimit(request, GoogleMapsRateLimits.geocode)
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: `Demasiadas solicitudes. Intenta nuevamente en ${rateLimitResult.retryAfter} segundos.`,
+          retryAfter: rateLimitResult.retryAfter
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': rateLimitResult.reset.toString(),
+            'Retry-After': rateLimitResult.retryAfter?.toString() || '60'
+          }
+        }
+      )
+    }
+
     const body: GeocodeRequest = await request.json()
 
     if (!body.addresses || !Array.isArray(body.addresses) || body.addresses.length === 0) {
@@ -164,6 +187,12 @@ export async function POST(request: NextRequest) {
         total: results.length,
         successful,
         failed
+      }
+    }, {
+      headers: {
+        'X-RateLimit-Limit': '10',
+        'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+        'X-RateLimit-Reset': rateLimitResult.reset.toString()
       }
     })
   } catch (error: any) {

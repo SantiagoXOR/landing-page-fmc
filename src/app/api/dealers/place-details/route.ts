@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
+import { rateLimit, GoogleMapsRateLimits } from '@/lib/rate-limit-api'
 
 export const dynamic = 'force-dynamic'
 
@@ -114,6 +115,28 @@ async function getPlaceDetails(placeId: string): Promise<PlaceDetailsResult> {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Rate limiting (más restrictivo porque Place Details es costoso)
+    const rateLimitResult = await rateLimit(request, GoogleMapsRateLimits.placeDetails)
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: `Demasiadas solicitudes. Intenta nuevamente en ${rateLimitResult.retryAfter} segundos.`,
+          retryAfter: rateLimitResult.retryAfter
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': rateLimitResult.reset.toString(),
+            'Retry-After': rateLimitResult.retryAfter?.toString() || '60'
+          }
+        }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const placeId = searchParams.get('placeId')
 
@@ -141,7 +164,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(result)
+    return NextResponse.json(result, {
+      headers: {
+        'X-RateLimit-Limit': '5',
+        'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+        'X-RateLimit-Reset': rateLimitResult.reset.toString()
+      }
+    })
   } catch (error: any) {
     logger.error('Error en GET /api/dealers/place-details', {
       error: error.message,

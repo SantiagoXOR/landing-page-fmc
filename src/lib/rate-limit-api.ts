@@ -110,8 +110,9 @@ export async function rateLimit(
     // Limpiar entradas expiradas periódicamente
     if (memoryCache.size > 1000) {
       const now = Date.now()
-      for (const [key, value] of memoryCache.entries()) {
-        if (value.reset <= now) {
+      for (const key of Array.from(memoryCache.keys())) {
+        const value = memoryCache.get(key)
+        if (value && value.reset <= now) {
           memoryCache.delete(key)
         }
       }

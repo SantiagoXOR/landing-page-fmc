@@ -20,6 +20,7 @@ interface DealersMapProps {
   center?: { lat: number; lng: number }
   zoom?: number
   onMarkerClick?: (dealer: Dealer) => void
+  selectedDealer?: Dealer | null
   className?: string
 }
 
@@ -28,6 +29,7 @@ export function DealersMap({
   center = DEFAULT_MAP_CONFIG.center,
   zoom = DEFAULT_MAP_CONFIG.zoom,
   onMarkerClick,
+  selectedDealer,
   className
 }: DealersMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -89,6 +91,33 @@ export function DealersMap({
       updateMarkers()
     }
   }, [dealersWithCoords, isLoaded])
+
+  // Efecto para hacer zoom cuando se selecciona un dealer
+  useEffect(() => {
+    if (selectedDealer && mapInstanceRef.current && window.google && isLoaded &&
+        selectedDealer.latitude !== undefined && selectedDealer.longitude !== undefined) {
+      const position = {
+        lat: selectedDealer.latitude,
+        lng: selectedDealer.longitude
+      }
+      
+      mapInstanceRef.current.setCenter(position)
+      mapInstanceRef.current.setZoom(16)
+      
+      // Abrir info window del marcador seleccionado
+      const markerIndex = markersRef.current.findIndex((marker, index) => {
+        return dealersWithCoords[index]?.name === selectedDealer.name
+      })
+      
+      if (markerIndex !== -1 && infoWindowsRef.current[markerIndex]) {
+        infoWindowsRef.current.forEach(iw => iw.close())
+        infoWindowsRef.current[markerIndex].open(
+          mapInstanceRef.current,
+          markersRef.current[markerIndex]
+        )
+      }
+    }
+  }, [selectedDealer, isLoaded, dealersWithCoords])
 
   const initializeMap = () => {
     if (!mapRef.current || !window.google) return

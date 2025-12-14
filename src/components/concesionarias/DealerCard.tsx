@@ -9,13 +9,21 @@ import { cn } from '@/lib/utils'
 
 interface DealerCardProps {
   dealer: Dealer
+  isSelected?: boolean
+  onClick?: () => void
 }
 
-export function DealerCard({ dealer }: DealerCardProps) {
+export function DealerCard({ dealer, isSelected = false, onClick }: DealerCardProps) {
   const waUrl = getWhatsAppUrl(dealer)
 
   return (
-    <Card className="group relative h-full flex flex-col bg-white border-fmc-purple/20 hover:border-fmc-purple/40 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <Card 
+      className={cn(
+        "group relative h-full flex flex-col bg-white border-fmc-purple/20 hover:border-fmc-purple/40 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer",
+        isSelected && "border-fmc-purple ring-2 ring-fmc-purple/50"
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-6 flex flex-col flex-1">
         {/* Header con nombre y badge de zona */}
         <div className="mb-4">

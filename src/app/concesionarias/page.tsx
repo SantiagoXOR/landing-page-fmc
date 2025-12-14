@@ -5,17 +5,13 @@ import { DEALERS, type Dealer } from '@/lib/dealers-data'
 import { DealerCard } from '@/components/concesionarias/DealerCard'
 import { DealerFilters } from '@/components/concesionarias/DealerFilters'
 import { DealersMap } from '@/components/concesionarias/DealersMap'
-import { MapPin, Map, Grid } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-
-type ViewMode = 'grid' | 'map'
+import { MapPin } from 'lucide-react'
 
 export default function ConcesionariasPage() {
   const [zoneFilter, setZoneFilter] = useState<string>('all')
   const [brandFilter, setBrandFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null)
 
   // Filtrar concesionarias según los filtros activos
   const filteredDealers = useMemo(() => {
@@ -80,8 +76,8 @@ export default function ConcesionariasPage() {
           />
         </div>
 
-        {/* Contador de resultados y toggle de vista */}
-        <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+        {/* Contador de resultados */}
+        <div className="mb-6">
           <p className="text-sm md:text-base text-gray-600 font-acto-regular">
             {filteredDealers.length === 0 ? (
               <span>No se encontraron concesionarias</span>
@@ -91,64 +87,28 @@ export default function ConcesionariasPage() {
               </span>
             )}
           </p>
-          
-          {/* Toggle de vista */}
-          <div className="flex items-center gap-2 bg-white rounded-lg border border-fmc-purple/20 p-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className={cn(
-                "font-acto-medium",
-                viewMode === 'grid'
-                  ? "bg-fmc-purple text-white hover:bg-fmc-purple/90"
-                  : "text-gray-600 hover:text-fmc-purple"
-              )}
-            >
-              <Grid className="w-4 h-4 mr-2" />
-              Lista
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode('map')}
-              className={cn(
-                "font-acto-medium",
-                viewMode === 'map'
-                  ? "bg-fmc-purple text-white hover:bg-fmc-purple/90"
-                  : "text-gray-600 hover:text-fmc-purple"
-              )}
-            >
-              <Map className="w-4 h-4 mr-2" />
-              Mapa
-            </Button>
-          </div>
         </div>
 
-        {/* Vista de Grid o Mapa */}
+        {/* Mapa y lista de concesionarias */}
         {filteredDealers.length > 0 ? (
-          <>
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredDealers.map((dealer) => (
-                  <DealerCard key={`${dealer.name}-${dealer.phone}`} dealer={dealer} />
-                ))}
-              </div>
-            ) : (
-              <div className="mb-8">
-                <DealersMap 
-                  dealers={filteredDealers}
-                  className="mb-6"
+          <div className="mb-8">
+            <DealersMap 
+              dealers={filteredDealers}
+              selectedDealer={selectedDealer}
+              className="mb-6"
+            />
+            {/* Grid de cards debajo del mapa */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredDealers.map((dealer) => (
+                <DealerCard 
+                  key={`${dealer.name}-${dealer.phone}`} 
+                  dealer={dealer}
+                  isSelected={selectedDealer?.name === dealer.name}
+                  onClick={() => setSelectedDealer(dealer)}
                 />
-                {/* Grid compacto debajo del mapa */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredDealers.map((dealer) => (
-                    <DealerCard key={`${dealer.name}-${dealer.phone}`} dealer={dealer} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+              ))}
+            </div>
+          </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-fmc-purple/10 p-12 text-center">
             <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />

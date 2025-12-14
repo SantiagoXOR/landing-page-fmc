@@ -38,6 +38,17 @@ export function ChatList({
 
     return matchesSearch && matchesFilter
   })
+  
+  // #region agent log
+  if (filteredConversations.length > 0) {
+    const sample = filteredConversations.slice(0, 5).map(c => ({
+      id: c.id,
+      lastMessageAt: c.lastMessageAt,
+      createdAt: c.createdAt
+    }))
+    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatList.tsx:filtered',message:'Filtered conversations before render',data:{total:filteredConversations.length,firstFive:sample},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+  }
+  // #endregion
 
   const formatTime = (dateString: string) => {
     if (!dateString) return 'Fecha inválida'

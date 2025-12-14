@@ -321,10 +321,37 @@ export async function POST() {
           tag.toLowerCase().includes('urgente')
         ) || (unreadCount > 0 && messages[0]?.isFromBot)
 
-        // Actualizar última actividad basada en last_interaction de Manychat
-        if (subscriber.last_interaction) {
-          // Actualizar last_message_at con la fecha de last_interaction de Manychat
+        // Actualizar última actividad basada en el último mensaje real de la conversación
+        // No usar last_interaction de ManyChat porque puede no ser el último mensaje real
+        // En su lugar, obtener el último mensaje de la base de datos
+        const { data: lastMessages } = await supabase.client
+          .from('messages')
+          .select('sent_at')
+          .eq('conversation_id', conversation.id)
+          .order('sent_at', { ascending: false })
+          .limit(1)
+        
+        const lastMessage = lastMessages && lastMessages.length > 0 ? lastMessages[0] : null
+
+        if (lastMessage?.sent_at) {
+          // Usar el timestamp del último mensaje real
+          const lastMessageAt = new Date(lastMessage.sent_at).toISOString()
+          // #region agent log
+          fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sync-manychat/route.ts:updateLastMessageAt',message:'Updating last_message_at from real message',data:{conversationId:conversation.id,lastMessageSentAt:lastMessage.sent_at,lastMessageAt,subscriberLastInteraction:subscriber.last_interaction},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+          // #endregion
+          await supabase.client
+            .from('conversations')
+            .update({ 
+              last_message_at: lastMessageAt,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', conversation.id)
+        } else if (subscriber.last_interaction) {
+          // Fallback: si no hay mensajes, usar last_interaction
           const lastInteractionDate = new Date(subscriber.last_interaction)
+          // #region agent log
+          fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sync-manychat/route.ts:updateLastMessageAt:fallback',message:'Updating last_message_at from last_interaction (fallback)',data:{conversationId:conversation.id,lastInteraction:subscriber.last_interaction,hasLastMessage:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+          // #endregion
           await supabase.client
             .from('conversations')
             .update({ 

@@ -39,8 +39,77 @@ export default function ChatsPage() {
         const data = await response.json()
         const apiConversations = data.conversations || []
         
-        // Siempre usar las conversaciones del API, incluso si están vacías
-        setConversations(apiConversations)
+        // #region agent log
+        const sample = apiConversations.slice(0, 5).map((c: Conversation) => ({
+          id: c.id,
+          lastMessageAt: c.lastMessageAt,
+          createdAt: c.createdAt,
+          hasLastMessageAt: !!c.lastMessageAt
+        }))
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chats/page.tsx:fetchConversations:received',message:'Conversations received from API',data:{total:apiConversations.length,firstFive:sample},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
+        
+        // Ordenar conversaciones por lastMessageAt descendente (más recientes primero)
+        // Si lastMessageAt es idéntico (misma fecha exacta), usar createdAt como desempate
+        // Conversaciones sin lastMessageAt van al final
+        const sortedConversations = [...apiConversations].sort((a, b) => {
+          const aLastMsgTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0
+          const bLastMsgTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0
+          
+          // Si ambas tienen lastMessageAt
+          if (aLastMsgTime > 0 && bLastMsgTime > 0) {
+            // Primero ordenar por lastMessageAt descendente
+            const lastMsgDiff = bLastMsgTime - aLastMsgTime
+            if (lastMsgDiff !== 0) {
+              return lastMsgDiff
+            }
+            // Si lastMessageAt es idéntico, usar createdAt como desempate
+            const aCreatedTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const bCreatedTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return bCreatedTime - aCreatedTime // Descendente por createdAt
+          }
+          
+          // Si solo una tiene lastMessageAt, esa va primero
+          if (aLastMsgTime > 0 && bLastMsgTime === 0) return -1
+          if (aLastMsgTime === 0 && bLastMsgTime > 0) return 1
+          
+          // Si ninguna tiene lastMessageAt, ordenar por createdAt
+          const aCreatedTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const bCreatedTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          return bCreatedTime - aCreatedTime // Descendente por createdAt
+        })
+        
+        // #region agent log
+        const sortedSample = sortedConversations.slice(0, 10).map((c: Conversation) => ({
+          id: c.id,
+          lastMessageAt: c.lastMessageAt,
+          createdAt: c.createdAt,
+          lastMessageAtTime: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0,
+          createdAtTime: c.createdAt ? new Date(c.createdAt).getTime() : 0
+        }))
+        // Verificar si hay problemas de ordenamiento
+        let orderingIssues = 0
+        const issueDetails: Array<{current: string, next: string, currentTime: number, nextTime: number}> = []
+        for (let i = 0; i < sortedConversations.length - 1; i++) {
+          const current = sortedConversations[i]
+          const next = sortedConversations[i + 1]
+          const currentTime = current.lastMessageAt ? new Date(current.lastMessageAt).getTime() : 0
+          const nextTime = next.lastMessageAt ? new Date(next.lastMessageAt).getTime() : 0
+          if (currentTime > 0 && nextTime > 0 && currentTime < nextTime) {
+            orderingIssues++
+            issueDetails.push({
+              current: current.id,
+              next: next.id,
+              currentTime,
+              nextTime
+            })
+          }
+        }
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chats/page.tsx:fetchConversations:sorted',message:'Conversations after sorting',data:{total:sortedConversations.length,firstTen:sortedSample,orderingIssues,issueDetails},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
+        
+        // Siempre usar las conversaciones ordenadas del API
+        setConversations(sortedConversations)
         
         if (sync) {
           if (apiConversations.length > 0) {
@@ -239,7 +308,16 @@ export default function ChatsPage() {
         throw new Error('Failed to fetch conversation')
       })
       .then(data => {
-        setSelectedConversation(data.conversation)
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'chats/page.tsx:handleSelectConversation:apiResponse',message:'Conversation fetched from API',data:{conversationId:data.conversation?.id,lastMessageAt:data.conversation?.lastMessageAt,createdAt:data.conversation?.createdAt,hasLastMessageAt:!!data.conversation?.lastMessageAt,hasCreatedAt:!!data.conversation?.createdAt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+        // #endregion
+        // Preservar createdAt y lastMessageAt del objeto de la lista si la API no los retorna
+        const updatedConversation = {
+          ...data.conversation,
+          createdAt: data.conversation?.createdAt || conversation.createdAt,
+          lastMessageAt: data.conversation?.lastMessageAt || conversation.lastMessageAt
+        }
+        setSelectedConversation(updatedConversation)
       })
       .catch(() => {
         // Error silencioso, la conversación ya está seleccionada

@@ -5,6 +5,18 @@ export type Dealer = {
   phone: string
   brands: string[]
   zone: 'Capital' | 'Interior'
+  // Coordenadas geográficas (opcionales)
+  latitude?: number
+  longitude?: number
+  // Información de Places API (opcionales)
+  placeId?: string
+  rating?: number
+  photoUrl?: string
+  openingHours?: {
+    openNow?: boolean
+    weekdayText?: string[]
+  }
+  website?: string
 }
 
 export const DEALERS: Dealer[] = [

@@ -118,7 +118,10 @@ export async function GET(request: NextRequest) {
         // Por ahora, si hay mensajes sin leer y el último mensaje es del bot, podría necesitar atención
         const botAlert = unreadCount > 0 && messages[0]?.isFromBot
 
-        return {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversations/route.ts:transform:before',message:'Before transforming conversation',data:{convId:conv.id,last_message_at:conv.last_message_at,created_at:conv.created_at,hasLastMessageAt:!!conv.last_message_at,hasCreatedAt:!!conv.created_at},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
+        const transformed = {
           id: conv.id,
           platform: conv.platform || 'whatsapp',
           status: conv.status || 'open',
@@ -154,6 +157,10 @@ export async function GET(request: NextRequest) {
             botActive: conv.manychat_bot_active || false
           } : undefined
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversations/route.ts:transform:after',message:'After transforming conversation',data:{conversationId:transformed.id,lastMessageAt:transformed.lastMessageAt,createdAt:transformed.createdAt,lastMessageAtType:typeof transformed.lastMessageAt,createdAtType:typeof transformed.createdAt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
+        return transformed
       })
     )
 

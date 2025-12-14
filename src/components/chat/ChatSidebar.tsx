@@ -50,6 +50,11 @@ export function ChatSidebar({
   onAddNote,
   className 
 }: ChatSidebarProps) {
+  // #region agent log
+  if (conversation) {
+    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:render:conversation',message:'ChatSidebar received conversation',data:{conversationId:conversation.id,lastMessageAt:conversation.lastMessageAt,createdAt:conversation.createdAt,hasLastMessageAt:!!conversation.lastMessageAt,hasCreatedAt:!!conversation.createdAt,lastMessageAtType:typeof conversation.lastMessageAt,createdAtType:typeof conversation.createdAt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+  }
+  // #endregion
   const [note, setNote] = useState('')
   const [selectedUser, setSelectedUser] = useState('')
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; nombre: string; email: string }>>([])
@@ -109,22 +114,40 @@ export function ChatSidebar({
     }
   }
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'Fecha no disponible'
+  const formatDate = (dateString: string | undefined | null) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:formatDate:entry',message:'formatDate called',data:{dateString,type:typeof dateString,isNull:dateString===null,isUndefined:dateString===undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
+    if (!dateString) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:formatDate:noDate',message:'dateString is falsy',data:{dateString},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      return 'Fecha no disponible'
+    }
     
     try {
       const date = new Date(dateString)
       if (isNaN(date.getTime())) {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:formatDate:invalid',message:'Invalid date',data:{dateString,parsedDate:date.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
         return 'Fecha inválida'
       }
-      return date.toLocaleDateString('es-ES', {
+      const formatted = date.toLocaleDateString('es-ES', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       })
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:formatDate:success',message:'Date formatted successfully',data:{dateString,formatted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
+      return formatted
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:formatDate:error',message:'Error formatting date',data:{dateString,error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       return 'Fecha inválida'
     }
   }
@@ -483,6 +506,9 @@ export function ChatSidebar({
             <Clock className="h-4 w-4 text-gray-400" />
             <div className="flex-1">
               <p className="text-gray-900">Conversación iniciada</p>
+              {/* #region agent log */}
+              {(()=>{fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:render:createdAt',message:'Rendering createdAt',data:{createdAt:conversation.createdAt,type:typeof conversation.createdAt,conversationId:conversation.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});return null;})()}
+              {/* #endregion */}
               <p className="text-gray-500 text-xs">{formatDate(conversation.createdAt)}</p>
             </div>
           </div>
@@ -491,6 +517,9 @@ export function ChatSidebar({
             <MessageSquare className="h-4 w-4 text-gray-400" />
             <div className="flex-1">
               <p className="text-gray-900">Último mensaje</p>
+              {/* #region agent log */}
+              {(()=>{fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatSidebar.tsx:render:lastMessageAt',message:'Rendering lastMessageAt',data:{lastMessageAt:conversation.lastMessageAt,type:typeof conversation.lastMessageAt,conversationId:conversation.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});return null;})()}
+              {/* #endregion */}
               <p className="text-gray-500 text-xs">{formatDate(conversation.lastMessageAt)}</p>
             </div>
           </div>

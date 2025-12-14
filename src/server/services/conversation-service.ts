@@ -9,12 +9,12 @@ export interface CreateConversationData {
 export interface ConversationWithDetails {
   id: string
   platform: string
-  platformId: string
+  platformId?: string
   status: string
   assignedTo?: string
-  lastMessageAt: Date
-  createdAt: Date
-  updatedAt: Date
+  lastMessageAt: string | Date // ISO string o Date
+  createdAt: string | Date // ISO string o Date
+  updatedAt?: string | Date
   lead?: {
     id: string
     nombre: string
@@ -31,8 +31,8 @@ export interface ConversationWithDetails {
     direction: string
     content: string
     messageType: string
-    sentAt: Date
-    readAt?: Date
+    sentAt: string | Date // ISO string o Date
+    readAt?: string | Date
   }>
 }
 
@@ -94,6 +94,12 @@ export class ConversationService {
         throw error
       }
 
+      // #region agent log
+      if (conversation) {
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversation-service.ts:getConversationById:afterQuery',message:'Conversation fetched from DB',data:{conversationId:conversation.id,last_message_at:conversation.last_message_at,created_at:conversation.created_at,hasLastMessageAt:!!conversation.last_message_at,hasCreatedAt:!!conversation.created_at,lastMessageAtType:typeof conversation.last_message_at,createdAtType:typeof conversation.created_at},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+      }
+      // #endregion
+
       // Obtener mensajes de la conversación
       const { data: messages, error: messagesError } = await supabase.client
         .from('messages')
@@ -148,10 +154,38 @@ export class ConversationService {
         }
       })
 
-      return {
-        ...(conversation as any),
+      // Transformar campos de snake_case a camelCase y asegurar formato ISO
+      const toISOString = (dateValue: any): string => {
+        if (!dateValue) return new Date().toISOString()
+        if (typeof dateValue === 'string') {
+          const parsed = new Date(dateValue)
+          if (!isNaN(parsed.getTime())) return parsed.toISOString()
+        }
+        if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+          return dateValue.toISOString()
+        }
+        return new Date().toISOString()
+      }
+
+      const transformed = {
+        id: conversation.id,
+        platform: conversation.platform || 'whatsapp',
+        status: conversation.status || 'open',
+        assignedTo: conversation.assigned_to,
+        lastMessageAt: toISOString(conversation.last_message_at || conversation.created_at),
+        createdAt: toISOString(conversation.created_at),
+        lead: conversation.lead ? {
+          id: conversation.lead.id,
+          nombre: conversation.lead.nombre || 'Sin nombre',
+          telefono: conversation.lead.telefono || '',
+          email: conversation.lead.email
+        } : undefined,
         messages: formattedMessages
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversation-service.ts:getConversationById:return',message:'Returning transformed conversation',data:{conversationId:transformed.id,lastMessageAt:transformed.lastMessageAt,createdAt:transformed.createdAt,hasLastMessageAt:!!transformed.lastMessageAt,hasCreatedAt:!!transformed.createdAt},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      return transformed
     } catch (error) {
       console.error('Error fetching conversation:', error)
       throw new Error('Failed to fetch conversation')
@@ -204,13 +238,33 @@ export class ConversationService {
       }
 
       // Orden y paginación
+      // Ordenar por last_message_at descendente, pero manejar NULLs al final
       query = query
-        .order('last_message_at', { ascending: false })
+        .order('last_message_at', { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1)
 
       const { data: conversations, error, count } = await query
+      
+      // #region agent log
+      if (conversations && conversations.length > 0) {
+        const sample = conversations.slice(0, 5).map(c => ({
+          id: c.id,
+          last_message_at: c.last_message_at,
+          created_at: c.created_at,
+          hasLastMessageAt: !!c.last_message_at
+        }))
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversation-service.ts:getConversations:afterOrder',message:'Conversations after ordering',data:{total:conversations.length,firstFive:sample},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      }
+      // #endregion
 
       if (error) throw error
+      
+      // #region agent log
+      if (conversations && conversations.length > 0) {
+        const sample = conversations[0]
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversation-service.ts:getConversations:afterQuery',message:'Conversations fetched from DB',data:{count:conversations.length,sampleId:sample.id,sampleCreatedAt:sample.created_at,sampleLastMessageAt:sample.last_message_at,hasCreatedAt:!!sample.created_at,hasLastMessageAt:!!sample.last_message_at,createdAtType:typeof sample.created_at,lastMessageAtType:typeof sample.last_message_at},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      }
+      // #endregion
 
       // Si hay búsqueda, filtrar por contenido de mensajes
       let filteredConversations = conversations || []
@@ -351,10 +405,41 @@ export class ConversationService {
         throw new Error('Database connection error')
       }
 
+      // Obtener el último mensaje de la conversación para usar su timestamp real
+      const { data: messages, error: messageError } = await supabase.client
+        .from('messages')
+        .select('sent_at')
+        .eq('conversation_id', conversationId)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+
+      // Si hay un mensaje, usar su timestamp; si no, mantener el last_message_at actual o usar created_at
+      let lastMessageAt: string | null = null
+      if (messages && messages.length > 0 && messages[0]?.sent_at) {
+        lastMessageAt = new Date(messages[0].sent_at).toISOString()
+      } else {
+        // Si no hay mensajes, obtener el last_message_at actual o created_at de la conversación
+        const { data: currentConv } = await supabase.client
+          .from('conversations')
+          .select('last_message_at, created_at')
+          .eq('id', conversationId)
+          .single()
+        
+        lastMessageAt = currentConv?.last_message_at 
+          ? new Date(currentConv.last_message_at).toISOString()
+          : currentConv?.created_at
+          ? new Date(currentConv.created_at).toISOString()
+          : new Date().toISOString()
+      }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversation-service.ts:updateLastActivity',message:'Updating last_message_at',data:{conversationId,lastMessageSentAt:messages?.[0]?.sent_at,lastMessageAt,hasLastMessage:!!(messages && messages.length > 0)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+
       const { error } = await supabase.client
         .from('conversations')
         .update({
-          last_message_at: new Date().toISOString(),
+          last_message_at: lastMessageAt,
           updated_at: new Date().toISOString()
         })
         .eq('id', conversationId)

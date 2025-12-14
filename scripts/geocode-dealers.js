@@ -18,29 +18,35 @@ if (!GOOGLE_MAPS_API_KEY) {
 const dealersDataPath = path.join(__dirname, '../src/lib/dealers-data.ts')
 const dealersDataContent = fs.readFileSync(dealersDataPath, 'utf-8')
 
-// Extraer el array DEALERS usando regex
-const dealersMatch = dealersDataContent.match(/export const DEALERS: Dealer\[\] = \[([\s\S]*?)\]/)
+// Extraer el array DEALERS usando regex (greedy para capturar todo)
+const dealersMatch = dealersDataContent.match(/export const DEALERS: Dealer\[\] = \[([\s\S]+)\]/)
 if (!dealersMatch) {
   console.error('❌ No se pudo encontrar el array DEALERS en dealers-data.ts')
   process.exit(1)
 }
 
-// Parsear los dealers manualmente (simplificado)
+// Parsear los dealers - cada dealer está en una línea
 const dealersText = dealersMatch[1]
 const dealers = []
 
-// Extraer cada dealer del array
-const dealerRegex = /\{\s*name:\s*'([^']+)',\s*address:\s*'([^']+)',\s*phone:\s*'([^']+)',\s*brands:\s*\[([^\]]+)\],\s*zone:\s*'([^']+)'/g
+// Buscar cada objeto dealer en líneas separadas
+// Patrón: { name: '...', address: '...', phone: '...', brands: [...], zone: '...' }
+const dealerRegex = /\{\s*name:\s*'([^']+)',\s*address:\s*'([^']+)',\s*phone:\s*'([^']+)',\s*brands:\s*\[([^\]]+)\],\s*zone:\s*'([^']+)'([^}]*)\}/g
+
 let match
 while ((match = dealerRegex.exec(dealersText)) !== null) {
   const brands = match[4].split(',').map(b => b.trim().replace(/['"]/g, ''))
+  const hasCoords = match[0].includes('latitude:') && match[0].includes('longitude:')
+  
   dealers.push({
     name: match[1],
     address: match[2],
     phone: match[3],
     brands,
     zone: match[5],
-    originalIndex: dealers.length
+    originalIndex: dealers.length,
+    hasCoords,
+    fullMatch: match[0]
   })
 }
 
@@ -80,23 +86,31 @@ async function geocodeAddress(address) {
  */
 function updateDealersData(dealersWithCoords) {
   let updatedContent = dealersDataContent
-  let offset = 0
 
   dealersWithCoords.forEach(({ dealer, coords }) => {
-    const dealerIndex = dealers.findIndex(d => d.name === dealer.name)
-    if (dealerIndex === -1) return
+    if (!coords) return // No actualizar si no hay coordenadas
 
-    // Buscar la línea del dealer en el contenido original
+    // Escapar caracteres especiales para el regex
+    const escapedName = dealer.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const escapedAddress = dealer.address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const escapedPhone = dealer.phone.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    
+    // Buscar el dealer completo en el contenido (formato de una línea)
+    // Patrón que busca desde name hasta zone, permitiendo campos opcionales en el medio
     const dealerPattern = new RegExp(
-      `(\\{\\s*name:\\s*'${dealer.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}',[^}]+)(zone:\\s*'${dealer.zone}')\\s*\\}`,
+      `(\\{\\s*name:\\s*'${escapedName}',\\s*address:\\s*'${escapedAddress}',\\s*phone:\\s*'${escapedPhone}',\\s*brands:\\s*\\[[^\\]]+\\],\\s*zone:\\s*'${dealer.zone}')([^}]*)\\}`,
       'g'
     )
 
-    updatedContent = updatedContent.replace(dealerPattern, (match, before, zonePart) => {
-      const coordsStr = coords
-        ? `\n  latitude: ${coords.latitude},\n  longitude: ${coords.longitude},${coords.placeId ? `\n  placeId: '${coords.placeId}',` : ''}`
-        : ''
-      return `${before}${coordsStr}\n  ${zonePart}\n}`
+    updatedContent = updatedContent.replace(dealerPattern, (match, before, existingFields) => {
+      // Verificar si ya tiene coordenadas para no duplicar
+      if (existingFields.includes('latitude:') || existingFields.includes('longitude:')) {
+        return match // Ya tiene coordenadas, no modificar
+      }
+      
+      // Agregar coordenadas antes del cierre del objeto
+      const coordsStr = `,\n  latitude: ${coords.latitude},\n  longitude: ${coords.longitude}${coords.placeId ? `,\n  placeId: '${coords.placeId}'` : ''}`
+      return `${before}${coordsStr}\n}`
     })
   })
 
@@ -112,10 +126,13 @@ async function main() {
   let successCount = 0
   let failCount = 0
 
-  // Geocodificar cada dealer
-  for (let i = 0; i < dealers.length; i++) {
-    const dealer = dealers[i]
-    console.log(`[${i + 1}/${dealers.length}] Geocodificando: ${dealer.name}`)
+  // Geocodificar cada dealer (solo los que no tienen coordenadas)
+  const dealersToGeocode = dealers.filter(d => !d.hasCoords)
+  console.log(`📍 ${dealersToGeocode.length} concesionarias necesitan geocodificación (${dealers.length - dealersToGeocode.length} ya tienen coordenadas)\n`)
+
+  for (let i = 0; i < dealersToGeocode.length; i++) {
+    const dealer = dealersToGeocode[i]
+    console.log(`[${i + 1}/${dealersToGeocode.length}] Geocodificando: ${dealer.name}`)
     console.log(`   Dirección: ${dealer.address}`)
 
     const coords = await geocodeAddress(dealer.address)
@@ -136,7 +153,7 @@ async function main() {
     console.log('')
 
     // Pausa entre requests para evitar rate limiting
-    if (i < dealers.length - 1) {
+    if (i < dealersToGeocode.length - 1) {
       await new Promise(resolve => setTimeout(resolve, 200))
     }
   }
@@ -144,7 +161,8 @@ async function main() {
   console.log('\n📊 Resumen:')
   console.log(`   ✅ Exitosas: ${successCount}`)
   console.log(`   ❌ Fallidas: ${failCount}`)
-  console.log(`   📍 Total: ${dealers.length}\n`)
+  console.log(`   📍 Total procesadas: ${dealersToGeocode.length}`)
+  console.log(`   ⏭️  Omitidas (ya tienen coordenadas): ${dealers.length - dealersToGeocode.length}\n`)
 
   if (successCount > 0) {
     // Actualizar el archivo

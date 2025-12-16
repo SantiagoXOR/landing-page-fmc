@@ -66,6 +66,7 @@ export function PipelineBoardAdvanced({
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [filters, setFilters] = useState<PipelineFilters>({})
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -473,7 +474,7 @@ export function PipelineBoardAdvanced({
       >
         <div className="relative pipeline-scroll-top">
           {/* Contenedor con scrollbar arriba */}
-          <div className="overflow-x-auto pb-4">
+          <div ref={scrollContainerRef} className="overflow-x-auto pb-4">
             <div className="flex gap-6">
               {stages
                 .sort((a, b) => a.order - b.order)
@@ -500,6 +501,7 @@ export function PipelineBoardAdvanced({
                         stages={stages}
                         onLeadMove={handleLeadMoveToStage}
                         onLeadMoved={onLeadMoved}
+                        scrollContainerRef={scrollContainerRef}
                       />
                     </div>
                   )
@@ -553,6 +555,7 @@ interface PipelineStageColumnProps {
   stages: PipelineStage[]
   onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
   onLeadMoved?: (leadId: string, newStageId: string) => void
+  scrollContainerRef: React.RefObject<HTMLDivElement>
 }
 
 function PipelineStageColumn({
@@ -570,14 +573,65 @@ function PipelineStageColumn({
   getTagColor,
   stages,
   onLeadMove,
-  onLeadMoved
+  onLeadMoved,
+  scrollContainerRef
 }: PipelineStageColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
   })
+  const columnRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+
+  // Función para hacer scroll a esta columna
+  const scrollToColumn = useCallback(() => {
+    if (!scrollContainerRef.current || !columnRef.current) return
+    
+    const container = scrollContainerRef.current
+    const column = columnRef.current
+    
+    // Obtener posición de la columna relativa al contenedor
+    const containerRect = container.getBoundingClientRect()
+    const columnRect = column.getBoundingClientRect()
+    
+    // Calcular la posición de scroll necesaria para centrar la columna
+    const scrollLeft = container.scrollLeft
+    const columnLeft = columnRect.left - containerRect.left + scrollLeft
+    const columnWidth = columnRect.width
+    const containerWidth = containerRect.width
+    
+    // Calcular posición para centrar la columna en el viewport
+    const targetScroll = columnLeft - (containerWidth / 2) + (columnWidth / 2)
+    
+    // Hacer scroll suave
+    container.scrollTo({
+      left: targetScroll,
+      behavior: 'smooth'
+    })
+  }, [])
+
+  // Handler para detectar clicks en espacios en blanco
+  const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Si el click fue directamente en el CardContent (no en una tarjeta), hacer scroll
+    if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.text-center')) {
+      scrollToColumn()
+      return
+    }
+    
+    // Verificar si el click fue en un espacio en blanco (no en una tarjeta)
+    const target = e.target as HTMLElement
+    const clickedCard = target.closest('[data-lead-card]')
+    
+    // Si no se hizo click en una tarjeta, hacer scroll
+    if (!clickedCard) {
+      scrollToColumn()
+    }
+  }, [scrollToColumn])
 
   return (
-    <div className="flex-shrink-0 w-80" ref={setNodeRef}>
+    <div className="flex-shrink-0 w-80" ref={(node) => {
+      setNodeRef(node)
+      columnRef.current = node
+    }}>
       <Card className={`h-full ${!canDrop && isDragOver ? 'opacity-50' : ''} ${isOver ? 'ring-2 ring-blue-500' : ''}`}>
         <CardHeader 
           className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -625,7 +679,11 @@ function PipelineStageColumn({
           )}
         </CardHeader>
         
-        <CardContent className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+        <CardContent 
+          ref={contentRef}
+          className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto cursor-pointer"
+          onClick={handleContentClick}
+        >
           {leads.map((lead) => (
             <LeadCard
               key={lead.id}
@@ -1111,6 +1169,7 @@ const LeadCard = memo(function LeadCard({
           setNodeRef(node)
           cardRef.current = node
         }}
+        data-lead-card
         style={style}
         {...attributes}
         {...listeners}
@@ -1124,6 +1183,11 @@ const LeadCard = memo(function LeadCard({
         onMouseUp={handleMouseUp}
         onMouseLeave={longPressHandlers.onMouseLeave}
         onTouchEnd={handleTouchEnd}
+        onClick={(e) => {
+          // Prevenir que el click en la tarjeta active el scroll del contenedor
+          e.stopPropagation()
+          onClick?.()
+        }}
       >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">

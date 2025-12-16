@@ -612,7 +612,7 @@ function PipelineStageColumn({
           )}
         </CardHeader>
         
-        <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+        <CardContent className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
           {leads.map((lead) => (
             <LeadCard
               key={lead.id}

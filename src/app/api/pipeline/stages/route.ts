@@ -119,11 +119,37 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
+    id: 'rechazado',
+    name: 'Rechazado',
+    description: 'Crédito rechazado o cliente desistió',
+    color: '#DC2626',
+    order: 6,
+    isActive: true,
+    rules: [
+      {
+        id: 'rule-6',
+        type: 'required_field',
+        field: 'razon_perdida',
+        message: 'La razón de rechazo es requerida',
+        isActive: true
+      }
+    ],
+    automation: [],
+    metrics: {
+      totalLeads: 0,
+      averageTimeInStage: 0,
+      conversionRate: 0,
+      leadsThisWeek: 0,
+      leadsThisMonth: 0,
+      trend: 'stable'
+    }
+  },
+  {
     id: 'aprobado',
     name: 'Aprobado',
     description: 'Crédito aprobado, proceso de desembolso',
     color: '#06B6D4',
-    order: 6,
+    order: 7,
     isActive: true,
     rules: [],
     automation: [],
@@ -141,24 +167,6 @@ const defaultStages: PipelineStage[] = [
     name: 'En Seguimiento',
     description: 'Crédito activo, en seguimiento post-desembolso',
     color: '#84CC16',
-    order: 7,
-    isActive: true,
-    rules: [],
-    automation: [],
-    metrics: {
-      totalLeads: 0,
-      averageTimeInStage: 0,
-      conversionRate: 0,
-      leadsThisWeek: 0,
-      leadsThisMonth: 0,
-      trend: 'stable'
-    }
-  },
-  {
-    id: 'cerrado-ganado',
-    name: 'Cerrado Ganado',
-    description: 'Venta exitosa completada',
-    color: '#059669',
     order: 8,
     isActive: true,
     rules: [
@@ -193,10 +201,10 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
-    id: 'encuesta',
-    name: 'Encuesta Satisfacción',
-    description: 'Encuesta de satisfacción post-venta',
-    color: '#A855F7',
+    id: 'cerrado-ganado',
+    name: 'Cerrado Ganado',
+    description: 'Venta exitosa completada',
+    color: '#059669',
     order: 9,
     isActive: true,
     rules: [],
@@ -211,21 +219,13 @@ const defaultStages: PipelineStage[] = [
     }
   },
   {
-    id: 'rechazado',
-    name: 'Rechazado',
-    description: 'Crédito rechazado o cliente desistió',
-    color: '#DC2626',
+    id: 'encuesta',
+    name: 'Encuesta Satisfacción',
+    description: 'Encuesta de satisfacción post-venta',
+    color: '#A855F7',
     order: 10,
     isActive: true,
-    rules: [
-      {
-        id: 'rule-6',
-        type: 'required_field',
-        field: 'razon_perdida',
-        message: 'La razón de rechazo es requerida',
-        isActive: true
-      }
-    ],
+    rules: [],
     automation: [],
     metrics: {
       totalLeads: 0,

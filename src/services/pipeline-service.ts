@@ -65,11 +65,11 @@ export class PipelineService {
       { name: 'Solicitando Documentación', order: 3, color: '#F59E0B' },
       { name: 'Listo para Análisis', order: 4, color: '#8B5CF6' },
       { name: 'Preaprobado', order: 5, color: '#6366F1' },
-      { name: 'Aprobado', order: 6, color: '#06B6D4' },
-      { name: 'En Seguimiento', order: 7, color: '#84CC16' },
-      { name: 'Cerrado Ganado', order: 8, color: '#059669' },
-      { name: 'Encuesta Satisfacción', order: 9, color: '#A855F7' },
-      { name: 'Rechazado', order: 10, color: '#DC2626' },
+      { name: 'Rechazado', order: 6, color: '#DC2626' },
+      { name: 'Aprobado', order: 7, color: '#06B6D4' },
+      { name: 'En Seguimiento', order: 8, color: '#84CC16' },
+      { name: 'Cerrado Ganado', order: 9, color: '#059669' },
+      { name: 'Encuesta Satisfacción', order: 10, color: '#A855F7' },
       { name: 'Solicitar Referido', order: 11, color: '#EC4899' }
     ]
 

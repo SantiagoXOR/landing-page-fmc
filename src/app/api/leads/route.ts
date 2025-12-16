@@ -494,6 +494,7 @@ async function getHandler(
       ingresoMax: validatedQuery.ingresoMax,
       fechaDesde: validatedQuery.fechaDesde,
       fechaHasta: validatedQuery.fechaHasta,
+      tag: validatedQuery.tag,
       sortBy: validatedQuery.sortBy,
       sortOrder: validatedQuery.sortOrder,
       limit: limit,
@@ -507,6 +508,10 @@ async function getHandler(
         delete filters[key]
       }
     })
+
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:510',message:'Filtros después de limpieza',data:{filters:Object.keys(filters),tag:filters.tag,ingresoMin:filters.ingresoMin,ingresoMax:filters.ingresoMax,fechaDesde:filters.fechaDesde,fechaHasta:filters.fechaHasta},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+    // #endregion
 
     logger.info('GET /api/leads - Using Supabase client directly', {
       filters: { ...filters, search: filters.search ? '***' : undefined } // Ocultar búsqueda en logs
@@ -544,6 +549,9 @@ async function getHandler(
         query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1)
       }
       
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:547',message:'GET /api/leads - Filtros recibidos',data:{filters},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,C'})}).catch(()=>{});
+      // #endregion
       // Aplicar filtros
       if (filters.estado) {
         query = query.eq('estado', filters.estado)
@@ -554,11 +562,52 @@ async function getHandler(
       if (filters.zona) {
         query = query.eq('zona', filters.zona)
       }
+      if (filters.ingresoMin !== undefined && filters.ingresoMin !== null && filters.ingresoMin !== '') {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:556',message:'Aplicando filtro ingresoMin',data:{ingresoMin:filters.ingresoMin},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        query = query.gte('ingresos', Number(filters.ingresoMin))
+      }
+      if (filters.ingresoMax !== undefined && filters.ingresoMax !== null && filters.ingresoMax !== '') {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:561',message:'Aplicando filtro ingresoMax',data:{ingresoMax:filters.ingresoMax},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        query = query.lte('ingresos', Number(filters.ingresoMax))
+      }
+      if (filters.fechaDesde) {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:566',message:'Aplicando filtro fechaDesde',data:{fechaDesde:filters.fechaDesde},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        query = query.gte('createdAt', `${filters.fechaDesde}T00:00:00`)
+      }
+      if (filters.fechaHasta) {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:571',message:'Aplicando filtro fechaHasta',data:{fechaHasta:filters.fechaHasta},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        query = query.lte('createdAt', `${filters.fechaHasta}T23:59:59`)
+      }
       if (filters.search) {
-        query = query.or(`nombre.ilike.%${filters.search}%,telefono.ilike.%${filters.search}%,email.ilike.%${filters.search}%`)
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:576',message:'Aplicando búsqueda',data:{search:filters.search},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        query = query.or(`nombre.ilike.%${filters.search}%,telefono.ilike.%${filters.search}%,email.ilike.%${filters.search}%,dni.ilike.%${filters.search}%`)
+      }
+      
+      // Filtro por tag
+      if (filters.tag) {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:585',message:'Aplicando filtro tag',data:{tag:filters.tag},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        // Los tags se almacenan como JSON string, necesitamos buscar leads que contengan el tag
+        // Usamos ilike para buscar el tag dentro del string JSON
+        query = query.ilike('tags', `%${filters.tag}%`)
       }
       
       const { data, error, count } = await query
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:583',message:'Query ejecutada - Resultado',data:{leadsCount:data?.length,total:count,hasError:!!error,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,C'})}).catch(()=>{});
+      // #endregion
       
       if (error) {
         throw error

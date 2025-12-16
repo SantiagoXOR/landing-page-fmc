@@ -78,7 +78,13 @@ export default function AdvancedSearch({
   }
 
   const handleSearch = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdvancedSearch.tsx:80',message:'handleSearch - Botón buscar clickeado',data:{filters},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     await debouncedExecute(async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdvancedSearch.tsx:82',message:'handleSearch - Llamando onSearch',data:{filters},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       onSearch(filters)
     })
   }

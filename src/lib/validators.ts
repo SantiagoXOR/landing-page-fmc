@@ -329,6 +329,9 @@ export const LeadQuerySchema = z.object({
   q: z.string()
     .max(100, 'Búsqueda no puede exceder 100 caracteres')
     .optional(),
+  tag: z.string()
+    .max(100, 'Tag no puede exceder 100 caracteres')
+    .optional(),
   from: z.string()
     .datetime('Fecha desde debe ser válida')
     .optional(),

@@ -54,6 +54,7 @@ function LeadsPage() {
   const [allLeads, setAllLeads] = useState<Lead[]>([]) // Para contadores dinámicos exactos
   const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string }>>([])
   const [selectedTag, setSelectedTag] = useState<string>('')
+  const [tagCounts, setTagCounts] = useState<Map<string, number>>(new Map())
 
   // Estados de carga usando el hook personalizado
   const {
@@ -92,9 +93,15 @@ function LeadsPage() {
   // Función para obtener todos los leads para contadores dinámicos
   const fetchAllLeads = async () => {
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:93',message:'fetchAllLeads - Iniciando',timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'tag-count'})}).catch(()=>{});
+      // #endregion
       const response = await fetch('/api/leads?limit=1000') // Obtener todos para contadores
       if (response.ok) {
         const data: LeadsResponse = await response.json()
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:98',message:'fetchAllLeads - Leads obtenidos',data:{leadsCount:data.leads.length,total:data.total,sampleTags:data.leads.slice(0,5).map(l=>({id:l.id,tags:l.tags}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'tag-count'})}).catch(()=>{});
+        // #endregion
         setAllLeads(data.leads)
       }
     } catch (error) {
@@ -115,9 +122,37 @@ function LeadsPage() {
     }
   }
 
+  // Función para obtener conteos de tags desde el backend
+  const fetchTagCounts = async () => {
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:117',message:'fetchTagCounts - Iniciando',timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'tag-count'})}).catch(()=>{});
+      // #endregion
+      const response = await fetch('/api/tags/stats')
+      if (response.ok) {
+        const data = await response.json()
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:122',message:'fetchTagCounts - Stats obtenidas',data:{statsCount:data.stats?.length,sampleStats:data.stats?.slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'tag-count'})}).catch(()=>{});
+        // #endregion
+        const countsMap = new Map<string, number>()
+        if (data.stats && Array.isArray(data.stats)) {
+          data.stats.forEach((stat: { name: string; count: number }) => {
+            countsMap.set(stat.name, stat.count)
+          })
+        }
+        setTagCounts(countsMap)
+      }
+    } catch (error) {
+      console.error('Error fetching tag counts:', error)
+    }
+  }
+
   const fetchLeads = async () => {
     await apiCall(
       async () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:121',message:'fetchLeads - Parámetros antes de construir URL',data:{page,search,estado,origen,zona,ingresoMin,ingresoMax,fechaDesde,fechaHasta,selectedTag},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const params = new URLSearchParams({
           page: page.toString(),
           limit: '10',
@@ -129,7 +164,12 @@ function LeadsPage() {
           ...(ingresoMax && { ingresoMax }),
           ...(fechaDesde && { fechaDesde }),
           ...(fechaHasta && { fechaHasta }),
+          ...(selectedTag && { tag: selectedTag }),
         })
+
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:133',message:'fetchLeads - URL construida',data:{url:`/api/leads?${params}`,paramsString:params.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
 
         const response = await fetch(`/api/leads?${params}`)
         if (!response.ok) {
@@ -137,6 +177,9 @@ function LeadsPage() {
         }
 
         const data: LeadsResponse = await response.json()
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:140',message:'fetchLeads - Respuesta recibida',data:{leadsCount:data.leads?.length,total:data.total,totalPages:data.totalPages},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         setLeads(data.leads)
         setTotalPages(data.totalPages)
         setTotalLeads(data.total) // Usar el total real de la API
@@ -153,6 +196,9 @@ function LeadsPage() {
 
   // Función para manejar búsqueda avanzada
   const handleAdvancedSearch = (filters: any) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'page.tsx:155',message:'handleAdvancedSearch - Filtros recibidos',data:{filters},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     setSearch(filters.search)
     setEstado(filters.estado)
     setZona(filters.zona)
@@ -179,17 +225,9 @@ function LeadsPage() {
     setPage(1)
   }
 
-  // Función para obtener conteo de leads por tag
+  // Función para obtener conteo de leads por tag (usa los conteos del backend)
   const getTagCount = (tagName: string) => {
-    return allLeads.filter(lead => {
-      if (!lead.tags) return false
-      try {
-        const leadTags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
-        return Array.isArray(leadTags) && leadTags.includes(tagName)
-      } catch {
-        return false
-      }
-    }).length
+    return tagCounts.get(tagName) || 0
   }
 
   // Función para abrir modal de eliminación
@@ -311,6 +349,7 @@ function LeadsPage() {
   useEffect(() => {
     fetchAllLeads() // Cargar todos los leads para contadores dinámicos
     fetchAvailableTags() // Cargar tags disponibles
+    fetchTagCounts() // Cargar conteos de tags desde el backend
   }, [])
 
   // Funciones para contadores dinámicos exactos
@@ -341,16 +380,9 @@ function LeadsPage() {
     }).length
   }
 
-  // Filtrar leads por tag seleccionado (se aplica después de obtener los leads de la página actual)
-  const filteredLeadsByTag = selectedTag ? leads.filter(lead => {
-    if (!lead.tags) return false
-    try {
-      const leadTags = typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags
-      return Array.isArray(leadTags) && leadTags.includes(selectedTag)
-    } catch {
-      return false
-    }
-  }) : leads
+  // Los tags ahora se filtran en el servidor, no necesitamos filtrar en el cliente
+  // Mantenemos esta variable para compatibilidad pero siempre usamos leads directamente
+  const filteredLeadsByTag = leads
 
   // Función para generar título con contadores dinámicos exactos
   const getPageTitle = () => {
@@ -543,32 +575,48 @@ function LeadsPage() {
                     setSelectedTag('')
                     setEstado('')
                   }}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
                     !selectedTag && !estado
                       ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  Todos ({totalLeads || allLeads.length})
+                  <span>Todos</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    !selectedTag && !estado
+                      ? 'bg-purple-200 text-purple-900'
+                      : 'bg-gray-200 text-gray-800'
+                  }`}>
+                    {totalLeads || allLeads.length}
+                  </span>
                 </button>
                 {availableTags.length > 0 ? (
-                  availableTags.slice(0, 10).map((tag) => (
-                    <button
-                      key={tag.id}
-                      onClick={() => {
-                        setSelectedTag(tag.name)
-                        setEstado('') // Limpiar filtro de estado al seleccionar tag
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1 ${
-                        selectedTag === tag.name
-                          ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Tag className="w-3 h-3" />
-                      {tag.name} ({getTagCount(tag.name)})
-                    </button>
-                  ))
+                  <div className="flex flex-wrap gap-2 max-h-96 overflow-y-auto">
+                    {availableTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => {
+                          setSelectedTag(tag.name)
+                          setEstado('') // Limpiar filtro de estado al seleccionar tag
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                          selectedTag === tag.name
+                            ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Tag className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{tag.name}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
+                          selectedTag === tag.name
+                            ? 'bg-purple-200 text-purple-900'
+                            : 'bg-gray-200 text-gray-800'
+                        }`}>
+                          {getTagCount(tag.name)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 ) : (
                   <div className="text-sm text-gray-500 italic">
                     Cargando tags...
@@ -633,7 +681,7 @@ function LeadsPage() {
                   Reintentar
                 </Button>
               </div>
-            ) : (selectedTag ? filteredLeadsByTag : leads).length === 0 ? (
+            ) : leads.length === 0 ? (
               search || selectedTag ? (
                 <EmptySearchState
                   query={search || selectedTag || ''}
@@ -666,7 +714,7 @@ function LeadsPage() {
               )
             ) : (
               <div className="space-y-3">
-                {(selectedTag ? filteredLeadsByTag : leads).map((lead, index) => {
+                {leads.map((lead, index) => {
                   // Parsear tags del lead
                   let leadTags: string[] = []
                   if (lead.tags) {
@@ -908,7 +956,7 @@ function LeadsPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
                 <div className="text-sm text-muted-foreground">
-                  Mostrando {((page - 1) * 10) + 1} - {Math.min(page * 10, selectedTag ? getFilteredTotalByTag() : totalLeads)} de {selectedTag ? getFilteredTotalByTag() : totalLeads} leads
+                  Mostrando {((page - 1) * 10) + 1} - {Math.min(page * 10, totalLeads)} de {totalLeads} leads
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button

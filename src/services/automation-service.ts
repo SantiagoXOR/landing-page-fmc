@@ -15,14 +15,278 @@ import {
 } from '@/types/automation'
 import { PipelineLead } from '@/types/pipeline'
 import { logger } from '@/lib/logger'
+import { ManychatService } from '@/server/services/manychat-service'
+
+// Importar las reglas directamente cuando estamos en el servidor
+let mockAutomationRules: AutomationRule[] | null = null
+
+// Función para obtener las reglas directamente (sin fetch) cuando estamos en el servidor
+async function getRulesDirectly(filters?: {
+  isActive?: boolean
+  trigger?: string
+  category?: string
+}): Promise<AutomationRule[]> {
+  // Lazy load de las reglas
+  if (!mockAutomationRules) {
+    // Importar dinámicamente las reglas del route handler
+    try {
+      const rulesModule = await import('@/app/api/automation/rules/route')
+      // Las reglas están en el módulo, pero necesitamos accederlas de otra forma
+      // Por ahora, las definimos aquí también
+      mockAutomationRules = [
+        {
+          id: 'rule-1',
+          name: 'Seguimiento Automático - Lead Nuevo',
+          description: 'Crear tarea de seguimiento cuando un lead entra en la etapa "Nuevo"',
+          isActive: true,
+          priority: 8,
+          trigger: { type: 'stage_change', toStageId: 'nuevo' },
+          conditions: [],
+          actions: [{
+            id: 'action-1',
+            type: 'create_task',
+            config: {
+              taskTitle: 'Contactar lead nuevo',
+              taskDescription: 'Realizar primer contacto con el lead para calificar interés',
+              taskType: 'call',
+              taskPriority: 'high',
+              taskDueInDays: 1,
+              taskAssignedTo: 'auto'
+            },
+            continueOnError: true,
+            retryCount: 2,
+            retryDelayMinutes: 5
+          }],
+          settings: {
+            maxExecutionsPerLead: 1,
+            allowedHours: { start: '09:00', end: '18:00' },
+            allowedDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+            timezone: 'America/Argentina/Buenos_Aires',
+            stopOnError: false,
+            notifyOnError: true,
+            logLevel: 'basic',
+            retentionDays: 30
+          },
+          createdAt: new Date('2024-01-15'),
+          updatedAt: new Date('2024-01-15'),
+          createdBy: 'admin',
+          executionCount: 45,
+          successCount: 43,
+          errorCount: 2
+        },
+        {
+          id: 'rule-2',
+          name: 'WhatsApp de Bienvenida',
+          description: 'Enviar mensaje de bienvenida por WhatsApp a leads de alta prioridad',
+          isActive: true,
+          priority: 9,
+          trigger: { type: 'lead_created' },
+          conditions: [
+            {
+              id: 'cond-1',
+              field: 'priority',
+              operator: 'in',
+              value: ['high', 'urgent'],
+              valueType: 'static'
+            },
+            {
+              id: 'cond-2',
+              field: 'origen',
+              operator: 'equals',
+              value: 'WhatsApp',
+              valueType: 'static'
+            }
+          ],
+          actions: [{
+            id: 'action-2',
+            type: 'send_whatsapp',
+            config: {
+              whatsappTemplate: 'bienvenida_lead',
+              whatsappMessage: '¡Hola {{nombre}}! Gracias por contactarnos. En breve un asesor se comunicará contigo para ayudarte con tu consulta sobre propiedades en Formosa.'
+            },
+            continueOnError: true,
+            retryCount: 3,
+            retryDelayMinutes: 10
+          }],
+          settings: {
+            maxExecutionsPerLead: 1,
+            logLevel: 'detailed',
+            retentionDays: 60,
+            stopOnError: false,
+            notifyOnError: true,
+            timezone: 'America/Argentina/Buenos_Aires'
+          },
+          createdAt: new Date('2024-01-20'),
+          updatedAt: new Date('2024-02-01'),
+          createdBy: 'manager',
+          executionCount: 28,
+          successCount: 26,
+          errorCount: 2
+        },
+        {
+          id: 'rule-3-rechazado',
+          name: 'Mensaje de Crédito Rechazado',
+          description: 'Enviar mensaje automático cuando un lead pasa a la etapa de crédito rechazado',
+          isActive: true,
+          priority: 9,
+          trigger: {
+            type: 'stage_change',
+            toStageId: 'rechazado'
+          },
+          conditions: [],
+          actions: [{
+            id: 'action-rechazado-1',
+            type: 'send_whatsapp',
+            config: {
+              whatsappMessage: 'Hola {{nombre}}, lamentamos informarte que tu solicitud de crédito no pudo ser aprobada en esta oportunidad. Si tienes alguna consulta o deseas más información, nuestro equipo está disponible para ayudarte. Gracias por confiar en nosotros.'
+            },
+            continueOnError: true,
+            retryCount: 2,
+            retryDelayMinutes: 5
+          }],
+          settings: {
+            maxExecutionsPerLead: 1,
+            allowedHours: { start: '09:00', end: '20:00' },
+            allowedDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+            timezone: 'America/Argentina/Buenos_Aires',
+            stopOnError: false,
+            notifyOnError: true,
+            logLevel: 'detailed',
+            retentionDays: 30
+          },
+          createdAt: new Date('2024-12-16'),
+          updatedAt: new Date('2024-12-16'),
+          createdBy: 'system',
+          executionCount: 0,
+          successCount: 0,
+          errorCount: 0
+        },
+        {
+          id: 'rule-3',
+          name: 'Recordatorio Propuesta Vencida',
+          description: 'Notificar cuando una propuesta lleva más de 7 días sin respuesta',
+          isActive: true,
+          priority: 6,
+          trigger: {
+            type: 'time_based',
+            schedule: {
+              type: 'interval',
+              intervalDays: 1
+            }
+          },
+          conditions: [
+            {
+              id: 'cond-3',
+              field: 'stageId',
+              operator: 'equals',
+              value: 'propuesta',
+              valueType: 'static'
+            },
+            {
+              id: 'cond-4',
+              field: 'stageEntryDate',
+              operator: 'less_than',
+              value: 7,
+              valueType: 'function',
+              dynamicValue: {
+                type: 'current_date',
+                parameter: 'days_ago'
+              }
+            }
+          ],
+          actions: [
+            {
+              id: 'action-3',
+              type: 'send_notification',
+              config: {
+                notificationTitle: 'Propuesta sin respuesta',
+                notificationMessage: 'El lead {{nombre}} tiene una propuesta pendiente hace {{dias_en_etapa}} días',
+                notificationRecipients: ['assigned_user', 'manager'],
+                notificationChannels: ['email', 'in_app']
+              },
+              continueOnError: true,
+              retryCount: 1,
+              retryDelayMinutes: 30
+            },
+            {
+              id: 'action-4',
+              type: 'create_task',
+              config: {
+                taskTitle: 'Seguimiento propuesta vencida',
+                taskDescription: 'Contactar al lead para conocer el estado de la propuesta',
+                taskType: 'follow_up',
+                taskPriority: 'medium',
+                taskDueInDays: 1
+              },
+              continueOnError: true,
+              retryCount: 0,
+              retryDelayMinutes: 0
+            }
+          ],
+          settings: {
+            maxExecutionsPerLead: 3,
+            allowedHours: { start: '08:00', end: '20:00' },
+            logLevel: 'detailed',
+            retentionDays: 90,
+            stopOnError: false,
+            notifyOnError: true,
+            timezone: 'America/Argentina/Buenos_Aires'
+          },
+          createdAt: new Date('2024-02-01'),
+          updatedAt: new Date('2024-02-15'),
+          createdBy: 'admin',
+          executionCount: 12,
+          successCount: 11,
+          errorCount: 1
+        }
+      ]
+    } catch (error) {
+      logger.error('Error loading automation rules directly', { error })
+      mockAutomationRules = []
+    }
+  }
+
+  let filteredRules = [...mockAutomationRules]
+
+  // Aplicar filtros
+  if (filters?.isActive !== undefined) {
+    filteredRules = filteredRules.filter(rule => rule.isActive === filters.isActive)
+  }
+
+  if (filters?.trigger) {
+    filteredRules = filteredRules.filter(rule => rule.trigger.type === filters.trigger)
+  }
+
+  // Ordenar por prioridad
+  filteredRules.sort((a, b) => b.priority - a.priority)
+
+  return filteredRules
+}
 
 export class AutomationService {
   private baseUrl: string
   private executionQueue: Map<string, AutomationExecution> = new Map()
   private isProcessing = false
 
-  constructor(baseUrl: string = '/api') {
-    this.baseUrl = baseUrl
+  constructor(baseUrl?: string) {
+    // Si no se proporciona baseUrl, detectar automáticamente
+    if (baseUrl) {
+      this.baseUrl = baseUrl
+    } else {
+      // En el servidor, construir URL absoluta
+      if (typeof window === 'undefined') {
+        // Server-side: usar URL absoluta
+        const serverUrl = 
+          process.env.NEXTAUTH_URL || 
+          process.env.NEXT_PUBLIC_SITE_URL || 
+          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+          'http://localhost:3000'
+        this.baseUrl = serverUrl + '/api'
+      } else {
+        // Client-side: usar URL relativa
+        this.baseUrl = '/api'
+      }
+    }
   }
 
   // ==================== GESTIÓN DE REGLAS ====================
@@ -35,14 +299,44 @@ export class AutomationService {
     trigger?: string
     category?: string
   }): Promise<AutomationRule[]> {
-    const queryParams = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
-    const response = await fetch(`${this.baseUrl}/automation/rules${queryParams}`)
-    
-    if (!response.ok) {
-      throw new Error('Error al obtener reglas de automatización')
+    // En el servidor, acceder directamente a las reglas sin usar fetch
+    if (typeof window === 'undefined') {
+      try {
+        return await getRulesDirectly(filters)
+      } catch (error) {
+        logger.error('Error getting automation rules directly', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          filters
+        })
+        throw error
+      }
     }
-    
-    return response.json()
+
+    // En el cliente, usar fetch
+    try {
+      const queryParams = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
+      const url = `${this.baseUrl}/automation/rules${queryParams}`
+      
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Error al obtener reglas de automatización: ${response.status} ${response.statusText} - ${errorText}`)
+      }
+      
+      return response.json()
+    } catch (error) {
+      logger.error('Error fetching automation rules via fetch', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        baseUrl: this.baseUrl,
+        filters
+      })
+      throw error
+    }
   }
 
   /**
@@ -390,11 +684,33 @@ export class AutomationService {
    * Obtener datos del lead
    */
   private async getLeadData(leadId: string): Promise<PipelineLead> {
-    const response = await fetch(`${this.baseUrl}/leads/${leadId}`)
-    if (!response.ok) {
-      throw new Error(`Lead ${leadId} not found`)
+    try {
+      const url = `${this.baseUrl}/leads/${leadId}`
+      
+      // Validar que la URL sea válida
+      if (typeof window === 'undefined' && !url.startsWith('http')) {
+        throw new Error(`Invalid URL for server-side fetch: ${url}. baseUrl should be absolute in server context.`)
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Lead ${leadId} not found: ${response.status} ${response.statusText} - ${errorText}`)
+      }
+      return response.json()
+    } catch (error) {
+      logger.error('Error fetching lead data', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        leadId,
+        baseUrl: this.baseUrl
+      })
+      throw error
     }
-    return response.json()
   }
 
   /**
@@ -402,10 +718,28 @@ export class AutomationService {
    */
   private async getRule(ruleId: string): Promise<AutomationRule | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/automation/rules/${ruleId}`)
+      const url = `${this.baseUrl}/automation/rules/${ruleId}`
+      
+      // Validar que la URL sea válida
+      if (typeof window === 'undefined' && !url.startsWith('http')) {
+        logger.warn(`Invalid URL for server-side fetch: ${url}`)
+        return null
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
       if (!response.ok) return null
       return response.json()
-    } catch {
+    } catch (error) {
+      logger.error('Error fetching rule', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        ruleId,
+        baseUrl: this.baseUrl
+      })
       return null
     }
   }
@@ -479,8 +813,81 @@ export class AutomationService {
   }
 
   private async executeWhatsAppAction(action: AutomationAction, execution: AutomationExecution): Promise<any> {
-    // Implementar envío de WhatsApp
-    return { sent: true, messageId: `whatsapp-${Date.now()}` }
+    try {
+      const lead = execution.leadData
+      const config = action.config || {}
+      
+      // Obtener mensaje del template o config
+      let message = config.whatsappMessage || ''
+      
+      // Reemplazar variables en el mensaje
+      if (message && lead) {
+        message = message
+          .replace(/\{\{nombre\}\}/g, lead.name || lead.firstName || 'Cliente')
+          .replace(/\{\{email\}\}/g, lead.email || '')
+          .replace(/\{\{telefono\}\}/g, lead.phone || '')
+          .replace(/\{\{etapa\}\}/g, lead.stageId || '')
+      }
+      
+      // Verificar que el lead tenga manychatId
+      if (!lead.manychatId) {
+        logger.warn('Lead no tiene manychatId, no se puede enviar mensaje de automatización', {
+          leadId: lead.id,
+          actionId: action.id
+        })
+        throw new Error('Lead no tiene manychatId asociado')
+      }
+      
+      const manychatId = typeof lead.manychatId === 'string' 
+        ? parseInt(lead.manychatId, 10) 
+        : lead.manychatId
+      
+      if (isNaN(manychatId) || manychatId === 0) {
+        throw new Error(`ManyChat ID inválido: ${lead.manychatId}`)
+      }
+      
+      // Enviar mensaje usando ManyChat
+      const result = await ManychatService.sendMessage(
+        manychatId,
+        [{
+          type: 'text',
+          text: message
+        }],
+        `automation-${execution.ruleId}`
+      )
+      
+      if (result.status === 'error') {
+        logger.error('Error enviando mensaje de automatización por ManyChat', {
+          leadId: lead.id,
+          manychatId,
+          error: result.error,
+          errorCode: result.error_code
+        })
+        throw new Error(result.error || 'Error enviando mensaje por ManyChat')
+      }
+      
+      logger.info('Mensaje de automatización enviado exitosamente', {
+        leadId: lead.id,
+        manychatId,
+        messageId: result.message_id,
+        ruleId: execution.ruleId
+      })
+      
+      return { 
+        sent: true, 
+        messageId: result.message_id || `whatsapp-${Date.now()}`,
+        manychatId,
+        channel: result.channel || 'whatsapp'
+      }
+    } catch (error) {
+      logger.error('Error ejecutando acción WhatsApp en automatización', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        leadId: execution.leadId,
+        actionId: action.id,
+        ruleId: execution.ruleId
+      })
+      throw error
+    }
   }
 
   private async executeCreateTaskAction(action: AutomationAction, execution: AutomationExecution): Promise<any> {

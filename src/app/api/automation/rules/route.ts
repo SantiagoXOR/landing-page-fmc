@@ -180,6 +180,49 @@ const mockAutomationRules: AutomationRule[] = [
     errorCount: 2
   },
   {
+    id: 'rule-3-rechazado',
+    name: 'Mensaje de Crédito Rechazado',
+    description: 'Enviar mensaje automático cuando un lead pasa a la etapa de crédito rechazado',
+    isActive: true,
+    priority: 9,
+    trigger: {
+      type: 'stage_change',
+      toStageId: 'rechazado'
+    },
+    conditions: [],
+    actions: [
+      {
+        id: 'action-rechazado-1',
+        type: 'send_whatsapp',
+        config: {
+          whatsappMessage: 'Hola {{nombre}}, lamentamos informarte que tu solicitud de crédito no pudo ser aprobada en esta oportunidad. Si tienes alguna consulta o deseas más información, nuestro equipo está disponible para ayudarte. Gracias por confiar en nosotros.'
+        },
+        continueOnError: true,
+        retryCount: 2,
+        retryDelayMinutes: 5
+      }
+    ],
+    settings: {
+      maxExecutionsPerLead: 1,
+      allowedHours: {
+        start: '09:00',
+        end: '20:00'
+      },
+      allowedDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+      timezone: 'America/Argentina/Buenos_Aires',
+      stopOnError: false,
+      notifyOnError: true,
+      logLevel: 'detailed',
+      retentionDays: 30
+    },
+    createdAt: new Date('2024-12-16'),
+    updatedAt: new Date('2024-12-16'),
+    createdBy: 'system',
+    executionCount: 0,
+    successCount: 0,
+    errorCount: 0
+  },
+  {
     id: 'rule-3',
     name: 'Recordatorio Propuesta Vencida',
     description: 'Notificar cuando una propuesta lleva más de 7 días sin respuesta',

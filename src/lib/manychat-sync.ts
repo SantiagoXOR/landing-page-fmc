@@ -56,7 +56,30 @@ export async function getTagForStage(stage: string): Promise<string | null> {
       return null
     }
 
-    return data?.manychat_tag || null
+    const tag = data?.manychat_tag || null
+    
+    // Validación crítica: Verificar que el tag sea correcto para PREAPROBADO y APROBADO
+    if (stage === 'PREAPROBADO' && tag !== 'credito-preaprobado') {
+      logger.error('CRITICAL: Tag incorrecto para PREAPROBADO en base de datos', {
+        stage,
+        tagFromDB: tag,
+        expectedTag: 'credito-preaprobado'
+      })
+      // Retornar el tag correcto aunque la BD tenga un error
+      return 'credito-preaprobado'
+    }
+    
+    if (stage === 'APROBADO' && tag !== 'credito-aprobado') {
+      logger.error('CRITICAL: Tag incorrecto para APROBADO en base de datos', {
+        stage,
+        tagFromDB: tag,
+        expectedTag: 'credito-aprobado'
+      })
+      // Retornar el tag correcto aunque la BD tenga un error
+      return 'credito-aprobado'
+    }
+
+    return tag
   } catch (error: any) {
     logger.error(`Error getting tag for stage ${stage}`, { error: error.message })
     return null
@@ -177,6 +200,15 @@ export async function syncPipelineToManychat(
       logger.warn(`No tag mapping found for stage ${newStage}`, { leadId, newStage })
       return false
     }
+    
+    // Log detallado para debugging de tags incorrectos
+    logger.info('Tag mapping for stage', {
+      leadId,
+      stage: newStage,
+      tag: newTag,
+      expectedTag: newStage === 'PREAPROBADO' ? 'credito-preaprobado' : 
+                    newStage === 'APROBADO' ? 'credito-aprobado' : 'unknown'
+    })
 
     // 3. Obtener tag de la etapa anterior (si existe)
     let previousTag: string | null = null

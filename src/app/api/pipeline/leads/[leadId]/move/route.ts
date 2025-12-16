@@ -175,7 +175,9 @@ export async function POST(
     logger.info('Stage mapping', {
       originalToStageId: toStageId,
       normalizedToStageId,
-      mappedToStageEnum: toStageEnum
+      mappedToStageEnum: toStageEnum,
+      fromStageMapping: stageMapping[normalizedFromStageId],
+      toStageMapping: stageMapping[normalizedToStageId]
     })
 
     // Actualizar en la base de datos usando el servicio de pipeline
@@ -661,6 +663,18 @@ async function assignStageTag(leadId: string, stageId: string, alreadySyncedToMa
       })
       return
     }
+    
+    // Log detallado para debugging de tags incorrectos
+    logger.info('Tag assignment for stage', {
+      leadId,
+      stageId,
+      stageEnum,
+      tag: tagToAdd,
+      expectedTag: stageEnum === 'PREAPROBADO' ? 'credito-preaprobado' : 
+                    stageEnum === 'APROBADO' ? 'credito-aprobado' : 'unknown',
+      tagMatches: (stageEnum === 'PREAPROBADO' && tagToAdd === 'credito-preaprobado') ||
+                  (stageEnum === 'APROBADO' && tagToAdd === 'credito-aprobado')
+    })
 
     // Obtener todos los tags de pipeline para filtrar
     const pipelineTagNames = await getPipelineTags()

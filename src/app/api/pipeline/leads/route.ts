@@ -470,15 +470,10 @@ export async function GET(request: NextRequest) {
     const scoreMax = searchParams.get('scoreMax')
 
     // Construir filtros para la consulta de leads
-    // Optimización: Reducir límite inicial para carga más rápida
-    // Si se necesita más, se puede usar paginación por etapa
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '200')
-    const offset = (page - 1) * limit
-    
+    // Para el pipeline, necesitamos obtener todos los leads sin límite estricto
     const filters: any = {
-      limit,
-      offset
+      limit: 10000, // Límite aumentado para incluir todos los leads del pipeline
+      offset: 0
     }
 
     if (search) {
@@ -637,15 +632,8 @@ export async function GET(request: NextRequest) {
       }))
     })
 
-    // Devolver los leads del pipeline con información de paginación
-    return NextResponse.json(pipelineLeads, {
-      headers: {
-        'X-Total-Count': total.toString(),
-        'X-Page': page.toString(),
-        'X-Limit': limit.toString(),
-        'X-Has-More': (offset + limit < total).toString()
-      }
-    })
+    // Devolver los leads del pipeline
+    return NextResponse.json(pipelineLeads)
 
   } catch (error: any) {
     const session = await getServerSession(authOptions).catch(() => null)

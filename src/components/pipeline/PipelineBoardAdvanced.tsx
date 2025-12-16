@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import Link from 'next/link'
 import { DndContext, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -577,17 +576,6 @@ function PipelineStageColumn({
     id: stage.id,
   })
 
-  // Ref para el contenedor virtualizado
-  const parentRef = useRef<HTMLDivElement>(null)
-
-  // Virtualización: solo renderizar leads visibles
-  const virtualizer = useVirtualizer({
-    count: leads.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 120, // Altura estimada de cada tarjeta (ajustar según necesidad)
-    overscan: 5, // Renderizar 5 elementos adicionales fuera del viewport
-  })
-
   return (
     <div className="flex-shrink-0 w-80" ref={setNodeRef}>
       <Card className={`h-full ${!canDrop && isDragOver ? 'opacity-50' : ''} ${isOver ? 'ring-2 ring-blue-500' : ''}`}>
@@ -637,56 +625,27 @@ function PipelineStageColumn({
           )}
         </CardHeader>
         
-        <CardContent className="p-0">
-          {leads.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground px-6">
+        <CardContent className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+          {leads.map((lead) => (
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              onClick={() => onLeadClick?.(lead)}
+              formatCurrency={formatCurrency}
+              formatRelativeDate={formatRelativeDate}
+              getPriorityColor={getPriorityColor}
+              getTagColor={getTagColor}
+              stages={stages}
+              onLeadMove={onLeadMove}
+              onLeadMoved={onLeadMoved}
+            />
+          ))}
+          
+          {leads.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm font-medium mb-1">No hay contactos en esta etapa</p>
               <p className="text-xs">Arrastra contactos aquí o crea uno nuevo</p>
-            </div>
-          ) : (
-            <div
-              ref={parentRef}
-              className="h-[calc(100vh-300px)] overflow-y-auto px-3 py-3"
-            >
-              <div
-                style={{
-                  height: `${virtualizer.getTotalSize()}px`,
-                  width: '100%',
-                  position: 'relative',
-                }}
-              >
-                {virtualizer.getVirtualItems().map((virtualItem) => {
-                  const lead = leads[virtualItem.index]
-                  return (
-                    <div
-                      key={virtualItem.key}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: `${virtualItem.size}px`,
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                    >
-                      <div className="pb-3">
-                        <LeadCard
-                          lead={lead}
-                          onClick={() => onLeadClick?.(lead)}
-                          formatCurrency={formatCurrency}
-                          formatRelativeDate={formatRelativeDate}
-                          getPriorityColor={getPriorityColor}
-                          getTagColor={getTagColor}
-                          stages={stages}
-                          onLeadMove={onLeadMove}
-                          onLeadMoved={onLeadMoved}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
             </div>
           )}
         </CardContent>

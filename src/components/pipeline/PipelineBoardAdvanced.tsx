@@ -581,6 +581,9 @@ function PipelineStageColumn({
   })
   const columnRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const isDraggingScrollRef = useRef(false)
+  const dragStartXRef = useRef(0)
+  const dragStartScrollLeftRef = useRef(0)
 
   // Función para hacer scroll a esta columna
   const scrollToColumn = useCallback(() => {
@@ -611,6 +614,11 @@ function PipelineStageColumn({
 
   // Handler para detectar clicks en espacios en blanco
   const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Si estamos haciendo drag para scroll, no hacer click
+    if (isDraggingScrollRef.current) {
+      return
+    }
+    
     // Si el click fue directamente en el CardContent (no en una tarjeta), hacer scroll
     if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.text-center')) {
       scrollToColumn()
@@ -626,6 +634,106 @@ function PipelineStageColumn({
       scrollToColumn()
     }
   }, [scrollToColumn])
+
+  // Handler para iniciar drag de scroll en espacios vacíos
+  const handleContentMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Solo activar si es click izquierdo y no es en una tarjeta
+    if (e.button !== 0) return
+    
+    const target = e.target as HTMLElement
+    const clickedCard = target.closest('[data-lead-card]')
+    
+    // Si se hizo click en una tarjeta, no hacer nada (dejar que el drag & drop funcione)
+    if (clickedCard) {
+      return
+    }
+    
+    // Verificar si es un espacio en blanco
+    if (target === e.currentTarget || target.closest('.text-center')) {
+      e.preventDefault()
+      isDraggingScrollRef.current = true
+      dragStartXRef.current = e.clientX
+      if (scrollContainerRef.current) {
+        dragStartScrollLeftRef.current = scrollContainerRef.current.scrollLeft
+      }
+      // Cambiar cursor para indicar que se puede arrastrar
+      if (contentRef.current) {
+        contentRef.current.style.cursor = 'grabbing'
+      }
+    } else {
+      // Verificar si es un espacio entre tarjetas
+      const isBlankSpace = !clickedCard && !target.closest('button') && !target.closest('a')
+      if (isBlankSpace) {
+        e.preventDefault()
+        isDraggingScrollRef.current = true
+        dragStartXRef.current = e.clientX
+        if (scrollContainerRef.current) {
+          dragStartScrollLeftRef.current = scrollContainerRef.current.scrollLeft
+        }
+        if (contentRef.current) {
+          contentRef.current.style.cursor = 'grabbing'
+        }
+      }
+    }
+  }, [])
+
+  // Handler para mover durante el drag de scroll
+  const handleContentMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingScrollRef.current || !scrollContainerRef.current) return
+    
+    e.preventDefault()
+    const deltaX = dragStartXRef.current - e.clientX
+    scrollContainerRef.current.scrollLeft = dragStartScrollLeftRef.current + deltaX
+  }, [])
+
+  // Handler para finalizar drag de scroll
+  const handleContentMouseUp = useCallback(() => {
+    if (isDraggingScrollRef.current) {
+      isDraggingScrollRef.current = false
+      if (contentRef.current) {
+        contentRef.current.style.cursor = 'pointer'
+      }
+    }
+  }, [])
+
+  // Handler para mouse leave durante drag
+  const handleContentMouseLeave = useCallback(() => {
+    if (isDraggingScrollRef.current) {
+      isDraggingScrollRef.current = false
+      if (contentRef.current) {
+        contentRef.current.style.cursor = 'pointer'
+      }
+    }
+  }, [])
+
+  // Agregar listeners globales para el drag de scroll
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDraggingScrollRef.current || !scrollContainerRef.current) return
+      
+      e.preventDefault()
+      const deltaX = dragStartXRef.current - e.clientX
+      scrollContainerRef.current.scrollLeft = dragStartScrollLeftRef.current + deltaX
+    }
+
+    const handleGlobalMouseUp = () => {
+      if (isDraggingScrollRef.current) {
+        isDraggingScrollRef.current = false
+        if (contentRef.current) {
+          contentRef.current.style.cursor = 'pointer'
+        }
+      }
+    }
+
+    // Siempre agregar los listeners, pero solo actuar si isDraggingScrollRef es true
+    document.addEventListener('mousemove', handleGlobalMouseMove)
+    document.addEventListener('mouseup', handleGlobalMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove)
+      document.removeEventListener('mouseup', handleGlobalMouseUp)
+    }
+  }, [])
 
   return (
     <div className="flex-shrink-0 w-80" ref={(node) => {
@@ -681,8 +789,12 @@ function PipelineStageColumn({
         
         <CardContent 
           ref={contentRef}
-          className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto cursor-pointer"
+          className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto cursor-pointer select-none"
           onClick={handleContentClick}
+          onMouseDown={handleContentMouseDown}
+          onMouseMove={handleContentMouseMove}
+          onMouseUp={handleContentMouseUp}
+          onMouseLeave={handleContentMouseLeave}
         >
           {leads.map((lead) => (
             <LeadCard
@@ -891,10 +1003,12 @@ const LeadCard = memo(function LeadCard({
 
   // Combinar handlers de long press con drag and drop
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Detener propagación para evitar que active el drag de scroll del contenedor
+    e.stopPropagation()
+    
     // Si hay dropdown abierto o estamos scrolleando, no permitir drag ni long press
     if (showDropdown || isScrollingRef.current) {
       e.preventDefault()
-      e.stopPropagation()
       return
     }
     
@@ -916,10 +1030,12 @@ const LeadCard = memo(function LeadCard({
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Detener propagación para evitar que active el drag de scroll del contenedor
+    e.stopPropagation()
+    
     // Si hay dropdown abierto, no permitir drag
     if (showDropdown) {
       e.preventDefault()
-      e.stopPropagation()
       return
     }
     

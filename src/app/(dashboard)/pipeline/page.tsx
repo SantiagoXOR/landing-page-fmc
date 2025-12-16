@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { PermissionGuard } from '@/components/auth/PermissionGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,26 +33,77 @@ import { pipelineService } from '@/services/pipeline-service'
 import { PipelineStage, PipelineLead, DragDropResult } from '@/types/pipeline'
 import { usePipelineMetrics, formatChange, getTrendColor, getTrendIcon } from '@/hooks/usePipelineMetrics'
 
+// Constantes para el caché en sessionStorage
+const CACHE_KEY = 'pipeline_data_cache'
+const CACHE_TIMESTAMP_KEY = 'pipeline_data_cache_timestamp'
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutos en milisegundos
+
+// Funciones de caché
+const getCachedData = (): { stages: PipelineStage[], leads: PipelineLead[], metrics?: any } | null => {
+  if (typeof window === 'undefined') return null
+  
+  try {
+    const cached = sessionStorage.getItem(CACHE_KEY)
+    const timestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY)
+    
+    if (!cached || !timestamp) return null
+    
+    const now = Date.now()
+    const cacheTime = parseInt(timestamp, 10)
+    
+    // Verificar si el caché ha expirado
+    if (now - cacheTime > CACHE_TTL) {
+      sessionStorage.removeItem(CACHE_KEY)
+      sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
+      return null
+    }
+    
+    return JSON.parse(cached)
+  } catch (error) {
+    console.error('Error reading cache:', error)
+    return null
+  }
+}
+
+const saveToCache = (data: { stages: PipelineStage[], leads: PipelineLead[], metrics?: any }) => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
+    sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+  } catch (error) {
+    console.error('Error saving cache:', error)
+    // Si hay error (por ejemplo, storage lleno), limpiar caché viejo
+    try {
+      sessionStorage.removeItem(CACHE_KEY)
+      sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
+      sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+    } catch (retryError) {
+      console.error('Error retrying cache save:', retryError)
+    }
+  }
+}
+
 function PipelinePage() {
   const { data: session } = useSession()
-  const [stages, setStages] = useState<PipelineStage[]>([])
-  const [leads, setLeads] = useState<PipelineLead[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  
+  // Intentar cargar datos iniciales desde caché
+  const cachedData = typeof window !== 'undefined' ? getCachedData() : null
+  const hasCachedData = cachedData && cachedData.stages && cachedData.leads
+  
+  const [stages, setStages] = useState<PipelineStage[]>(hasCachedData ? cachedData!.stages : [])
+  const [leads, setLeads] = useState<PipelineLead[]>(hasCachedData ? cachedData!.leads : [])
+  const [isLoading, setIsLoading] = useState(!hasCachedData) // Solo mostrar loading si no hay caché
   const [error, setError] = useState<string | null>(null)
-  const [metrics, setMetrics] = useState<any>(null)
+  const [metrics, setMetrics] = useState<any>(hasCachedData && cachedData!.metrics ? cachedData!.metrics : null)
   const [activeTab, setActiveTab] = useState('board')
   const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const isRefreshing = useRef(false)
   
   // Hook para métricas reales
   const { metrics: realMetrics, loading: metricsLoading, error: metricsError } = usePipelineMetrics('month')
-
-  // Cargar datos iniciales
-  useEffect(() => {
-    if (session) {
-      loadPipelineData()
-    }
-  }, [session])
 
   // Mapeo entre stageId de leads y IDs de stages del API
   const stageIdMapping: Record<string, string> = {
@@ -72,9 +123,11 @@ function PipelinePage() {
     'rechazado': 'rechazado'
   }
 
-  const loadPipelineData = async () => {
+  const loadPipelineData = async (showLoading = true) => {
     try {
-      setIsLoading(true)
+      if (showLoading) {
+        setIsLoading(true)
+      }
       setError(null)
 
       // Cargar etapas y leads en paralelo
@@ -89,7 +142,7 @@ function PipelinePage() {
         try {
           await pipelineService.createDefaultStages()
           // Recargar después de crear stages
-          return loadPipelineData()
+          return loadPipelineData(showLoading)
         } catch (createError) {
           console.error('Error creating default stages:', createError)
           setError('No se pudieron crear las etapas del pipeline. Contacta al administrador.')
@@ -111,6 +164,13 @@ function PipelinePage() {
       setStages(stagesData)
       setLeads(mappedLeads)
       
+      // Guardar en caché
+      const cacheData = {
+        stages: stagesData,
+        leads: mappedLeads
+      }
+      saveToCache(cacheData)
+      
       console.log('Pipeline data loaded:', {
         stagesCount: stagesData.length,
         leadsCount: mappedLeads.length,
@@ -118,10 +178,12 @@ function PipelinePage() {
         unmatchedLeads: mappedLeads.filter(l => !stagesData.some(s => s.id === l.stageId)).length
       })
 
-      // Cargar métricas
+      // Cargar métricas (no crítico, puede fallar)
       try {
         const metricsData = await pipelineService.getMetrics()
         setMetrics(metricsData)
+        // Actualizar caché con métricas
+        saveToCache({ ...cacheData, metrics: metricsData })
       } catch (metricsError) {
         console.error('Error loading metrics:', metricsError)
         // No es crítico, continuar sin métricas
@@ -131,9 +193,31 @@ function PipelinePage() {
       console.error('Error loading pipeline data:', error)
       setError(error instanceof Error ? error.message : 'Error al cargar datos del pipeline')
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    if (!session) return
+
+    // Verificar si hay datos en caché
+    const cachedData = getCachedData()
+    const hasCachedData = cachedData && cachedData.stages && cachedData.leads
+
+    // Si ya hay datos en caché, refrescar en segundo plano sin mostrar loading
+    if (hasCachedData) {
+      isRefreshing.current = true
+      loadPipelineData(false).finally(() => {
+        isRefreshing.current = false
+      })
+    } else {
+      // No hay caché, cargar normalmente con loading
+      loadPipelineData(true)
+    }
+  }, [session])
 
   // Manejar movimiento de leads
   const handleLeadMove = async (result: DragDropResult): Promise<boolean> => {
@@ -141,8 +225,8 @@ function PipelinePage() {
       await pipelineService.moveLead(result)
 
       // Actualizar el lead localmente
-      setLeads(prevLeads =>
-        prevLeads.map(lead =>
+      setLeads(prevLeads => {
+        const updatedLeads = prevLeads.map(lead =>
           lead.id === result.leadId
             ? {
                 ...lead,
@@ -151,7 +235,24 @@ function PipelinePage() {
               }
             : lead
         )
-      )
+        
+        // Actualizar caché con los leads actualizados
+        const cachedData = getCachedData()
+        if (cachedData) {
+          saveToCache({
+            ...cachedData,
+            leads: updatedLeads
+          })
+        } else {
+          // Si no hay caché, crear uno nuevo
+          saveToCache({
+            stages,
+            leads: updatedLeads
+          })
+        }
+        
+        return updatedLeads
+      })
 
       return true
     } catch (error) {
@@ -265,7 +366,7 @@ function PipelinePage() {
                 </div>
               </div>
               <Button
-                onClick={loadPipelineData}
+                onClick={() => loadPipelineData(true)}
                 className="mt-4"
                 variant="outline"
               >

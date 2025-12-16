@@ -411,6 +411,62 @@ export async function syncPipelineToManychat(
           })
         }
       }
+      
+      // 8.6. Envío directo de mensaje para Instagram cuando se asigna tag credito-preaprobado
+      // Instagram no permite "enviar fuera de ventana de 24 horas" en automatizaciones de ManyChat,
+      // por lo que enviamos el mensaje directamente desde el CRM
+      if (detectedChannel === 'instagram' && newTag === 'credito-preaprobado') {
+        try {
+          logger.info('Detectado Instagram + credito-preaprobado, enviando mensaje directo', {
+            leadId,
+            manychatId,
+            channel: detectedChannel,
+            tag: newTag
+          })
+          
+          // Mensaje específico para preaprobados de Instagram
+          const message = `¡Hola! 🎉 Tu crédito ya está preaprobado. ¡Visítanos en la concesionaria más cercana! 🚗✨\nhttps://www.formosafmc.com.ar/concesionarias`
+          
+          // Convertir manychatId a número si es string
+          const manychatIdNumber = typeof manychatId === 'string' 
+            ? parseInt(manychatId, 10) 
+            : manychatId
+          
+          if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
+            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, message)
+            
+            if (messageSent) {
+              logger.info('Mensaje de preaprobado enviado exitosamente a Instagram', {
+                leadId,
+                manychatId: manychatIdNumber,
+                channel: 'instagram',
+                messageLength: message.length
+              })
+            } else {
+              logger.warn('No se pudo enviar mensaje a Instagram (ManyChat retornó false)', {
+                leadId,
+                manychatId: manychatIdNumber,
+                channel: 'instagram'
+              })
+            }
+          } else {
+            logger.warn('manychatId inválido para enviar mensaje a Instagram', {
+              leadId,
+              manychatId,
+              manychatIdNumber
+            })
+          }
+        } catch (messageError: any) {
+          // No bloquear la sincronización si falla el envío
+          logger.warn('Error enviando mensaje directo a Instagram (no crítico, continuando con sincronización)', {
+            leadId,
+            manychatId,
+            channel: detectedChannel,
+            error: messageError.message,
+            errorStack: messageError.stack
+          })
+        }
+      }
     } catch (subscriberError: any) {
       logger.warn('No se pudo obtener subscriber para establecer origen', {
         leadId,

@@ -812,9 +812,10 @@ const LeadCard = memo(function LeadCard({
 
   // Detectar scroll para cancelar long press
   useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
+    const handleWheel = (e: Event) => {
+      const wheelEvent = e as WheelEvent
       // Si hay scroll horizontal, marcar que estamos scrolleando
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      if (Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)) {
         isScrollingRef.current = true
         // Cancelar cualquier long press en progreso
         longPressTriggeredRef.current = false

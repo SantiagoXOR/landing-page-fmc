@@ -67,6 +67,9 @@ export function PipelineBoardAdvanced({
   const [filters, setFilters] = useState<PipelineFilters>({})
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const isDraggingScrollRef = useRef(false)
+  const dragStartXRef = useRef(0)
+  const dragStartScrollLeftRef = useRef(0)
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -85,6 +88,31 @@ export function PipelineBoardAdvanced({
       }
     }
   }, [searchTerm])
+
+  // Agregar listeners globales para el drag de scroll del contenedor principal
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDraggingScrollRef.current || !scrollContainerRef.current) return
+      
+      e.preventDefault()
+      const deltaX = dragStartXRef.current - e.clientX
+      scrollContainerRef.current.scrollLeft = dragStartScrollLeftRef.current + deltaX
+    }
+
+    const handleGlobalMouseUp = () => {
+      if (isDraggingScrollRef.current) {
+        isDraggingScrollRef.current = false
+      }
+    }
+
+    document.addEventListener('mousemove', handleGlobalMouseMove)
+    document.addEventListener('mouseup', handleGlobalMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove)
+      document.removeEventListener('mouseup', handleGlobalMouseUp)
+    }
+  }, [])
 
   // Log para debugging
   console.log('PipelineBoardAdvanced render:', {
@@ -474,7 +502,51 @@ export function PipelineBoardAdvanced({
       >
         <div className="relative pipeline-scroll-top">
           {/* Contenedor con scrollbar arriba */}
-          <div ref={scrollContainerRef} className="overflow-x-auto pb-4">
+          <div 
+            ref={scrollContainerRef} 
+            className="overflow-x-auto pb-4 cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={(e) => {
+              // Solo activar si es click izquierdo y no es en una tarjeta o columna
+              if (e.button !== 0) return
+              
+              const target = e.target as HTMLElement
+              // Verificar si el click fue en una tarjeta, columna, botón o enlace
+              const clickedCard = target.closest('[data-lead-card]')
+              const clickedColumn = target.closest('[data-pipeline-column]')
+              const clickedButton = target.closest('button')
+              const clickedLink = target.closest('a')
+              
+              // Si se hizo click en una tarjeta, columna, botón o enlace, no hacer nada
+              if (clickedCard || clickedColumn || clickedButton || clickedLink) {
+                return
+              }
+              
+              // Es un espacio en blanco del contenedor, activar drag de scroll
+              e.preventDefault()
+              isDraggingScrollRef.current = true
+              dragStartXRef.current = e.clientX
+              if (scrollContainerRef.current) {
+                dragStartScrollLeftRef.current = scrollContainerRef.current.scrollLeft
+              }
+            }}
+            onMouseMove={(e) => {
+              if (!isDraggingScrollRef.current || !scrollContainerRef.current) return
+              
+              e.preventDefault()
+              const deltaX = dragStartXRef.current - e.clientX
+              scrollContainerRef.current.scrollLeft = dragStartScrollLeftRef.current + deltaX
+            }}
+            onMouseUp={() => {
+              if (isDraggingScrollRef.current) {
+                isDraggingScrollRef.current = false
+              }
+            }}
+            onMouseLeave={() => {
+              if (isDraggingScrollRef.current) {
+                isDraggingScrollRef.current = false
+              }
+            }}
+          >
             <div className="flex gap-6">
               {stages
                 .sort((a, b) => a.order - b.order)
@@ -706,7 +778,7 @@ function PipelineStageColumn({
     }
   }, [])
 
-  // Agregar listeners globales para el drag de scroll
+  // Agregar listeners globales para el drag de scroll (para continuar drag fuera del área)
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (!isDraggingScrollRef.current || !scrollContainerRef.current) return
@@ -736,10 +808,14 @@ function PipelineStageColumn({
   }, [])
 
   return (
-    <div className="flex-shrink-0 w-80" ref={(node) => {
-      setNodeRef(node)
-      columnRef.current = node
-    }}>
+    <div 
+      className="flex-shrink-0 w-80" 
+      data-pipeline-column
+      ref={(node) => {
+        setNodeRef(node)
+        columnRef.current = node
+      }}
+    >
       <Card className={`h-full ${!canDrop && isDragOver ? 'opacity-50' : ''} ${isOver ? 'ring-2 ring-blue-500' : ''}`}>
         <CardHeader 
           className="cursor-pointer hover:bg-muted/50 transition-colors"

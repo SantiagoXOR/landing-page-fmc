@@ -16,6 +16,8 @@ import {
 import { PipelineLead } from '@/types/pipeline'
 import { logger } from '@/lib/logger'
 import { ManychatService } from '@/server/services/manychat-service'
+import { ConversationService } from '@/server/services/conversation-service'
+import { supabase } from '@/lib/db'
 
 // Importar las reglas directamente cuando estamos en el servidor
 let mockAutomationRules: AutomationRule[] | null = null
@@ -845,6 +847,69 @@ export class AutomationService {
       if (isNaN(manychatId) || manychatId === 0) {
         throw new Error(`ManyChat ID inválido: ${lead.manychatId}`)
       }
+
+      // Verificar si hay conversaciones cerradas para este lead y reabrirlas si es necesario
+      // Esto asegura que los mensajes automatizados se puedan enviar incluso si la conversación estaba cerrada
+      try {
+        if (lead.id && supabase.client) {
+          const { data: conversations, error: conversationsError } = await supabase.client
+            .from('conversations')
+            .select('id, status, platform, platform_id')
+            .eq('lead_id', lead.id)
+            .eq('status', 'closed')
+            .limit(10)
+
+          if (conversationsError) {
+            logger.warn('Error obteniendo conversaciones cerradas', {
+              leadId: lead.id,
+              error: conversationsError.message
+            })
+          } else if (conversations && conversations.length > 0) {
+            logger.info('Encontradas conversaciones cerradas, reabriéndolas para permitir envío de automatización', {
+              leadId: lead.id,
+              closedConversationsCount: conversations.length
+            })
+
+            // Reabrir todas las conversaciones cerradas
+            for (const conv of conversations) {
+              try {
+                const { error: updateError } = await supabase.client
+                  .from('conversations')
+                  .update({ 
+                    status: 'open',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', conv.id)
+                
+                if (updateError) {
+                  logger.warn('Error reabriendo conversación', {
+                    conversationId: conv.id,
+                    error: updateError.message
+                  })
+                } else {
+                  logger.info('Conversación reabierta para automatización', {
+                    conversationId: conv.id,
+                    platform: conv.platform,
+                    leadId: lead.id
+                  })
+                }
+              } catch (reopenError) {
+                logger.warn('Error reabriendo conversación (excepción)', {
+                  conversationId: conv.id,
+                  error: reopenError instanceof Error ? reopenError.message : 'Unknown error'
+                })
+                // Continuar aunque falle reabrir una conversación
+              }
+            }
+          }
+        }
+      } catch (conversationCheckError) {
+        // No bloquear el envío si falla la verificación de conversaciones
+        logger.warn('Error verificando estado de conversaciones', {
+          leadId: lead.id,
+          error: conversationCheckError instanceof Error ? conversationCheckError.message : 'Unknown error'
+        })
+      }
       
       // Enviar mensaje usando ManyChat
       const result = await ManychatService.sendMessage(
@@ -869,15 +934,15 @@ export class AutomationService {
       logger.info('Mensaje de automatización enviado exitosamente', {
         leadId: lead.id,
         manychatId,
-        messageId: result.message_id,
+        messageId: result.data?.message_id,
         ruleId: execution.ruleId
       })
       
       return { 
         sent: true, 
-        messageId: result.message_id || `whatsapp-${Date.now()}`,
+        messageId: result.data?.message_id || `whatsapp-${Date.now()}`,
         manychatId,
-        channel: result.channel || 'whatsapp'
+        channel: 'whatsapp' // Manychat siempre usa WhatsApp para estos mensajes
       }
     } catch (error) {
       logger.error('Error ejecutando acción WhatsApp en automatización', {

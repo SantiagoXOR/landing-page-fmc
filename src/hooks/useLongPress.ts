@@ -16,6 +16,16 @@ export function useLongPress({
   const startPosRef = useRef<{ x: number; y: number } | null>(null)
   const hasMovedRef = useRef(false)
 
+  // Función para cancelar el long press manualmente
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = undefined
+    }
+    startPosRef.current = null
+    hasMovedRef.current = false
+  }, [])
+
   const start = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     targetRef.current = e.target
     hasMovedRef.current = false
@@ -81,6 +91,7 @@ export function useLongPress({
     onMouseUp: (e: React.MouseEvent) => clear(e, true),
     onMouseLeave: clear,
     onTouchEnd: (e: React.TouchEvent) => clear(e, true),
+    cancel, // Exponer función para cancelar manualmente
   }
 }
 

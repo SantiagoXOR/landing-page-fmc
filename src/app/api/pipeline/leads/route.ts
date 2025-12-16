@@ -470,15 +470,16 @@ export async function GET(request: NextRequest) {
     const scoreMax = searchParams.get('scoreMax')
 
     // Construir filtros para la consulta de leads
-    // Para el pipeline, necesitamos obtener todos los leads sin límite estricto
+    // Optimización: Reducir límite inicial para carga más rápida
+    // Si se necesita más, se puede usar paginación por etapa
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '200')
+    const offset = (page - 1) * limit
+    
     const filters: any = {
-      limit: 10000, // Límite aumentado para incluir todos los leads del pipeline
-      offset: 0
+      limit,
+      offset
     }
-
-    // Si hay stageId, mapear a pipeline_stage correspondientes para filtrar en la consulta
-    // Nota: El filtro real se hará después de obtener los datos del pipeline
-    // Por ahora no aplicamos filtro aquí ya que necesitamos obtener todos los leads primero
 
     if (search) {
       filters.search = search
@@ -491,18 +492,15 @@ export async function GET(request: NextRequest) {
     // Filtrar undefined para cumplir con el tipo string[] requerido
     const leadIds = leads.map(l => l.id).filter((id): id is string => id !== undefined)
     
-    // Obtener información del pipeline para todos los leads (current_stage)
-    const pipelineMap = await supabaseLeadService.getLeadPipelines(leadIds)
-    
-    // Obtener el evento más reciente para cada lead usando Supabase REST API
-    // Esto asegura que cada lead tenga su evento más reciente, incluso si tiene muchos eventos antiguos
-    const eventsMap = leadIds.length > 0 
-      ? await supabaseLeadService.getLatestEventsByLeadIds(leadIds)
-      : new Map<string, any>()
-
-    // Obtener asignaciones de leads (assignedTo) desde lead_pipeline
-    // Nota: lead_pipeline puede no existir para todos los leads, el método maneja errores gracefully
-    const assignmentMap = await supabaseLeadService.getLeadAssignments(leadIds)
+    // Optimización: Ejecutar todas las queries en paralelo en lugar de secuencialmente
+    // Esto reduce significativamente el tiempo de carga
+    const [pipelineMap, eventsMap, assignmentMap] = await Promise.all([
+      supabaseLeadService.getLeadPipelines(leadIds),
+      leadIds.length > 0 
+        ? supabaseLeadService.getLatestEventsByLeadIds(leadIds)
+        : Promise.resolve(new Map<string, any>()),
+      supabaseLeadService.getLeadAssignments(leadIds)
+    ])
 
     // Crear pipelines para leads que no los tienen
     const leadsWithoutPipeline: string[] = []
@@ -639,8 +637,15 @@ export async function GET(request: NextRequest) {
       }))
     })
 
-    // Devolver los leads del pipeline
-    return NextResponse.json(pipelineLeads)
+    // Devolver los leads del pipeline con información de paginación
+    return NextResponse.json(pipelineLeads, {
+      headers: {
+        'X-Total-Count': total.toString(),
+        'X-Page': page.toString(),
+        'X-Limit': limit.toString(),
+        'X-Has-More': (offset + limit < total).toString()
+      }
+    })
 
   } catch (error: any) {
     const session = await getServerSession(authOptions).catch(() => null)

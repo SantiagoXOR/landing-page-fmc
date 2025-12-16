@@ -235,16 +235,24 @@ function PipelinePage() {
         unmatchedLeads: mappedLeads.filter(l => !stagesData.some(s => s.id === l.stageId)).length
       })
 
-      // Cargar métricas (no crítico, puede fallar)
-      try {
-        const metricsData = await pipelineService.getMetrics()
-        setMetrics(metricsData)
-        // Actualizar caché con métricas
-        saveToCache({ ...cacheData, metrics: metricsData })
-      } catch (metricsError) {
-        console.error('Error loading metrics:', metricsError)
-        // No es crítico, continuar sin métricas
-      }
+      // Cargar métricas en segundo plano (no crítico, puede fallar)
+      // Esto permite que el pipeline se muestre primero y las métricas se carguen después
+      setTimeout(async () => {
+        try {
+          const metricsData = await pipelineService.getMetrics()
+          setMetrics(metricsData)
+          // Actualizar caché con métricas
+          const updatedCache = getCachedData()
+          if (updatedCache) {
+            saveToCache({ ...updatedCache, metrics: metricsData })
+          } else {
+            saveToCache({ ...cacheData, metrics: metricsData })
+          }
+        } catch (metricsError) {
+          console.error('Error loading metrics:', metricsError)
+          // No es crítico, continuar sin métricas
+        }
+      }, 100) // Pequeño delay para permitir que el pipeline se renderice primero
 
     } catch (error) {
       console.error('Error loading pipeline data:', error)
@@ -304,45 +312,104 @@ function PipelinePage() {
     }
   }, [session])
 
-  // Manejar movimiento de leads
+  // Manejar movimiento de leads desde dropdown (sin drag & drop)
+  const handleLeadMoved = (leadId: string, newStageId: string) => {
+    // Actualizar el lead localmente de forma optimista
+    setLeads(prevLeads => {
+      const updatedLeads = prevLeads.map(lead =>
+        lead.id === leadId
+          ? {
+              ...lead,
+              stageId: newStageId,
+              stageEntryDate: new Date()
+            }
+          : lead
+      )
+      
+      // Actualizar caché
+      const cachedData = getCachedData()
+      if (cachedData) {
+        saveToCache({
+          ...cachedData,
+          leads: updatedLeads
+        })
+      } else {
+        saveToCache({
+          stages,
+          leads: updatedLeads
+        })
+      }
+      
+      return updatedLeads
+    })
+  }
+
+  // Manejar movimiento de leads con actualización optimista
   const handleLeadMove = async (result: DragDropResult): Promise<boolean> => {
+    // Guardar el estado anterior para poder revertir si falla
+    const previousLeads = [...leads]
+    const leadToMove = leads.find(l => l.id === result.leadId)
+    
+    if (!leadToMove) {
+      console.error('Lead no encontrado para mover:', result.leadId)
+      return false
+    }
+
+    // ACTUALIZACIÓN OPTIMISTA: Actualizar el estado ANTES de llamar a la API
+    setLeads(prevLeads => {
+      const updatedLeads = prevLeads.map(lead =>
+        lead.id === result.leadId
+          ? {
+              ...lead,
+              stageId: result.destinationStageId,
+              stageEntryDate: new Date()
+            }
+          : lead
+      )
+      
+      // Actualizar caché inmediatamente con los leads actualizados
+      const cachedData = getCachedData()
+      if (cachedData) {
+        saveToCache({
+          ...cachedData,
+          leads: updatedLeads
+        })
+      } else {
+        saveToCache({
+          stages,
+          leads: updatedLeads
+        })
+      }
+      
+      return updatedLeads
+    })
+
+    // Llamar a la API en segundo plano
     try {
       await pipelineService.moveLead(result)
-
-      // Actualizar el lead localmente
-      setLeads(prevLeads => {
-        const updatedLeads = prevLeads.map(lead =>
-          lead.id === result.leadId
-            ? {
-                ...lead,
-                stageId: result.destinationStageId,
-                stageEntryDate: new Date()
-              }
-            : lead
-        )
-        
-        // Actualizar caché con los leads actualizados
-        const cachedData = getCachedData()
-        if (cachedData) {
-          saveToCache({
-            ...cachedData,
-            leads: updatedLeads
-          })
-        } else {
-          // Si no hay caché, crear uno nuevo
-          saveToCache({
-            stages,
-            leads: updatedLeads
-          })
-        }
-        
-        return updatedLeads
-      })
-
+      // Si la API tiene éxito, el estado ya está actualizado (optimistic update)
       return true
     } catch (error) {
       console.error('Error moving lead:', error)
-      toast.error('Error al mover el lead')
+      
+      // REVERTIR: Si la API falla, restaurar el estado anterior
+      setLeads(previousLeads)
+      
+      // Restaurar caché
+      const cachedData = getCachedData()
+      if (cachedData) {
+        saveToCache({
+          ...cachedData,
+          leads: previousLeads
+        })
+      } else {
+        saveToCache({
+          stages,
+          leads: previousLeads
+        })
+      }
+      
+      toast.error('Error al mover el lead. Los cambios se han revertido.')
       return false
     }
   }
@@ -617,6 +684,7 @@ function PipelinePage() {
             stages={stages}
             leads={leads}
             onLeadMove={handleLeadMove}
+            onLeadMoved={handleLeadMoved}
             onLeadClick={handleLeadClick}
             onStageClick={handleStageClick}
             onAddLead={handleAddLead}

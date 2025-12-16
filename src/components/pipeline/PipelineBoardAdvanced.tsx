@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import Link from 'next/link'
 import { DndContext, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,7 +20,9 @@ import {
   CheckCircle,
   HelpCircle,
   ArrowRight,
-  Loader2
+  Loader2,
+  Tag,
+  X
 } from 'lucide-react'
 import { usePipelineDragDrop } from '@/hooks/usePipelineDragDrop'
 import { PipelineStage, PipelineLead, DragDropResult, StageTransition } from '@/types/pipeline'
@@ -43,6 +46,7 @@ interface PipelineBoardAdvancedProps {
   onLeadClick?: (lead: PipelineLead) => void
   onStageClick?: (stage: PipelineStage) => void
   onAddLead?: (stageId: string) => void
+  onLeadMoved?: (leadId: string, newStageId: string) => void
   isLoading?: boolean
   className?: string
 }
@@ -54,6 +58,7 @@ export function PipelineBoardAdvanced({
   onLeadClick,
   onStageClick,
   onAddLead,
+  onLeadMoved,
   isLoading = false,
   className = ''
 }: PipelineBoardAdvancedProps) {
@@ -264,8 +269,8 @@ export function PipelineBoardAdvanced({
     return filtered
   }, [leadsByStage, debouncedSearchTerm, selectedFilters, filters])
 
-  // Obtener color de prioridad
-  const getPriorityColor = (priority: string) => {
+  // Obtener color de prioridad (memoizado)
+  const getPriorityColor = useCallback((priority: string) => {
     switch (priority) {
       case 'urgent': return 'bg-red-500'
       case 'high': return 'bg-orange-500'
@@ -273,10 +278,10 @@ export function PipelineBoardAdvanced({
       case 'low': return 'bg-green-500'
       default: return 'bg-gray-500'
     }
-  }
+  }, [])
 
-  // Función para obtener colores de tags según su tipo
-  const getTagColor = (tag: string): { bg: string; text: string; border: string } => {
+  // Función para obtener colores de tags según su tipo (memoizado)
+  const getTagColor = useCallback((tag: string): { bg: string; text: string; border: string } => {
     const tagLower = tag.toLowerCase().trim()
     
     // Tags relacionados con consultas
@@ -326,19 +331,19 @@ export function PipelineBoardAdvanced({
     
     // Default: gris neutro
     return { bg: '#F3F4F6', text: '#374151', border: '#D1D5DB' }
-  }
+  }, [])
 
-  // Formatear valor monetario
-  const formatCurrency = (value: number) => {
+  // Formatear valor monetario (memoizado)
+  const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
       currency: 'ARS',
       minimumFractionDigits: 0
     }).format(value)
-  }
+  }, [])
 
-  // Formatear fecha relativa
-  const formatRelativeDate = (date: Date | string) => {
+  // Formatear fecha relativa (memoizado)
+  const formatRelativeDate = useCallback((date: Date | string) => {
     if (!date) return 'Sin fecha'
 
     const dateObj = typeof date === 'string' ? new Date(date) : date
@@ -352,7 +357,7 @@ export function PipelineBoardAdvanced({
     if (diffInDays < 7) return `Hace ${diffInDays} días`
     if (diffInDays < 30) return `Hace ${Math.floor(diffInDays / 7)} semanas`
     return `Hace ${Math.floor(diffInDays / 30)} meses`
-  }
+  }, [])
 
   if (isLoading) {
     return (
@@ -495,6 +500,7 @@ export function PipelineBoardAdvanced({
                         getTagColor={getTagColor}
                         stages={stages}
                         onLeadMove={handleLeadMoveToStage}
+                        onLeadMoved={onLeadMoved}
                       />
                     </div>
                   )
@@ -547,6 +553,7 @@ interface PipelineStageColumnProps {
   getTagColor: (tag: string) => { bg: string; text: string; border: string }
   stages: PipelineStage[]
   onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
+  onLeadMoved?: (leadId: string, newStageId: string) => void
 }
 
 function PipelineStageColumn({
@@ -563,10 +570,22 @@ function PipelineStageColumn({
   getPriorityColor,
   getTagColor,
   stages,
-  onLeadMove
+  onLeadMove,
+  onLeadMoved
 }: PipelineStageColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
+  })
+
+  // Ref para el contenedor virtualizado
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  // Virtualización: solo renderizar leads visibles
+  const virtualizer = useVirtualizer({
+    count: leads.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 120, // Altura estimada de cada tarjeta (ajustar según necesidad)
+    overscan: 5, // Renderizar 5 elementos adicionales fuera del viewport
   })
 
   return (
@@ -618,26 +637,56 @@ function PipelineStageColumn({
           )}
         </CardHeader>
         
-        <CardContent className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
-          {leads.map((lead) => (
-            <LeadCard
-              key={lead.id}
-              lead={lead}
-              onClick={() => onLeadClick?.(lead)}
-              formatCurrency={formatCurrency}
-              formatRelativeDate={formatRelativeDate}
-              getPriorityColor={getPriorityColor}
-              getTagColor={getTagColor}
-              stages={stages}
-              onLeadMove={onLeadMove}
-            />
-          ))}
-          
-          {leads.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
+        <CardContent className="p-0">
+          {leads.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground px-6">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm font-medium mb-1">No hay contactos en esta etapa</p>
               <p className="text-xs">Arrastra contactos aquí o crea uno nuevo</p>
+            </div>
+          ) : (
+            <div
+              ref={parentRef}
+              className="h-[calc(100vh-300px)] overflow-y-auto px-3 py-3"
+            >
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                  const lead = leads[virtualItem.index]
+                  return (
+                    <div
+                      key={virtualItem.key}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualItem.size}px`,
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <div className="pb-3">
+                        <LeadCard
+                          lead={lead}
+                          onClick={() => onLeadClick?.(lead)}
+                          formatCurrency={formatCurrency}
+                          formatRelativeDate={formatRelativeDate}
+                          getPriorityColor={getPriorityColor}
+                          getTagColor={getTagColor}
+                          stages={stages}
+                          onLeadMove={onLeadMove}
+                          onLeadMoved={onLeadMoved}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </CardContent>
@@ -656,9 +705,10 @@ interface LeadCardProps {
   getTagColor: (tag: string) => { bg: string; text: string; border: string }
   stages: PipelineStage[]
   onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
+  onLeadMoved?: (leadId: string, newStageId: string) => void
 }
 
-function LeadCard({
+const LeadCard = memo(function LeadCard({
   lead,
   onClick,
   formatCurrency,
@@ -666,7 +716,8 @@ function LeadCard({
   getPriorityColor,
   getTagColor,
   stages,
-  onLeadMove
+  onLeadMove,
+  onLeadMoved
 }: LeadCardProps) {
   const {
     attributes,
@@ -696,19 +747,48 @@ function LeadCard({
 
   const [isMoving, setIsMoving] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [dropdownType, setDropdownType] = useState<'stage' | 'tags'>('stage')
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 })
+  const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingTags, setLoadingTags] = useState(false)
   const cardRef = useRef<HTMLDivElement | null>(null)
   const dragStartedRef = useRef(false)
+  const longPressTriggeredRef = useRef(false)
+  const startPosRef = useRef<{ x: number; y: number } | null>(null)
+  const isScrollingRef = useRef(false)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined
 
+  // Cargar tags disponibles cuando se abre el dropdown
+  const loadAvailableTags = async () => {
+    try {
+      setLoadingTags(true)
+      const response = await fetch('/api/manychat/tags')
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableTags(data.tags || [])
+      }
+    } catch (error) {
+      console.error('Error loading tags:', error)
+    } finally {
+      setLoadingTags(false)
+    }
+  }
+
   // Hook para detectar long press
   const longPressHandlers = useLongPress({
     onLongPress: (e) => {
+      // Si estamos scrolleando, no activar el long press
+      if (isScrollingRef.current) {
+        return
+      }
+      
       e.preventDefault()
       e.stopPropagation()
+      longPressTriggeredRef.current = true
       
       // Obtener posición del card para posicionar el dropdown
       if (cardRef.current) {
@@ -719,34 +799,101 @@ function LeadCard({
         })
       }
       
+      // Cargar tags disponibles
+      loadAvailableTags()
+      
+      // Abrir dropdown en modo 'stage' por defecto
+      setDropdownType('stage')
       setShowDropdown(true)
     },
     onClick: onClick,
     delay: 500
   })
 
+  // Detectar scroll para cancelar long press
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      // Si hay scroll horizontal, marcar que estamos scrolleando
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        isScrollingRef.current = true
+        // Cancelar cualquier long press en progreso
+        longPressTriggeredRef.current = false
+        longPressHandlers.cancel?.()
+        // Limpiar después de un breve delay
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current)
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
+          isScrollingRef.current = false
+        }, 150)
+      }
+    }
+
+    const handleScroll = () => {
+      isScrollingRef.current = true
+      // Cancelar cualquier long press en progreso
+      longPressTriggeredRef.current = false
+      longPressHandlers.cancel?.()
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        isScrollingRef.current = false
+      }, 150)
+    }
+
+    // Buscar el contenedor con scroll
+    const findScrollContainer = () => {
+      if (!cardRef.current) return window
+      let element = cardRef.current.parentElement
+      while (element) {
+        const style = window.getComputedStyle(element)
+        if (style.overflow === 'auto' || style.overflowX === 'auto' || 
+            style.overflow === 'scroll' || style.overflowX === 'scroll') {
+          return element
+        }
+        element = element.parentElement
+      }
+      return window
+    }
+
+    const container = findScrollContainer()
+    
+    container.addEventListener('wheel', handleWheel, { passive: true })
+    container.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+    }
+  }, [longPressHandlers])
+
   // Combinar handlers de long press con drag and drop
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Si hay dropdown abierto, no permitir drag
-    if (showDropdown) {
+    // Si hay dropdown abierto o estamos scrolleando, no permitir drag ni long press
+    if (showDropdown || isScrollingRef.current) {
       e.preventDefault()
       e.stopPropagation()
       return
     }
+    
     dragStartedRef.current = false
+    longPressTriggeredRef.current = false
+    
+    // Guardar posición inicial para detectar movimiento
+    startPosRef.current = { x: e.clientX, y: e.clientY }
+    
     // Ejecutar handler de long press primero
     longPressHandlers.onMouseDown(e)
-    // Permitir drag solo si listeners está disponible
-    // Usar un pequeño delay para dar tiempo al long press de detectar movimiento
-    setTimeout(() => {
-      if (!dragStartedRef.current && listeners) {
-        // Solo iniciar drag si no se ha detectado movimiento (lo que cancelaría el long press)
-        // Esto permite que el click normal funcione
-      }
-    }, 50)
-    // Permitir drag inmediatamente para que funcione el arrastre
-    if (listeners) {
-      listeners.onMouseDown?.(e)
+    
+    // Aplicar listeners de drag, pero el PointerSensor con activationConstraint
+    // solo activará el drag si hay movimiento de más de 8px
+    // Esto permite que el long press se complete antes de que el drag se active
+    if (listeners && listeners.onMouseDown) {
+      listeners.onMouseDown(e)
     }
   }
 
@@ -757,26 +904,95 @@ function LeadCard({
       e.stopPropagation()
       return
     }
+    
     dragStartedRef.current = false
+    longPressTriggeredRef.current = false
+    
+    // Guardar posición inicial
+    if (e.touches && e.touches.length > 0) {
+      startPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+    
     // Ejecutar handler de long press primero
     longPressHandlers.onTouchStart(e)
-    // Permitir drag solo si listeners está disponible
-    if (listeners) {
-      listeners.onTouchStart?.(e)
+    
+    // Aplicar listeners de drag
+    if (listeners && listeners.onTouchStart) {
+      listeners.onTouchStart(e)
     }
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    // Si detectamos movimiento, marcar que el drag ha comenzado
-    dragStartedRef.current = true
+    // Si ya se activó el long press, hay dropdown, o estamos scrolleando, no permitir drag
+    if (longPressTriggeredRef.current || showDropdown || isScrollingRef.current) {
+      // Si estamos scrolleando, cancelar el long press
+      if (isScrollingRef.current && longPressHandlers.onMouseLeave) {
+        longPressHandlers.onMouseLeave(e)
+      }
+      return
+    }
+    
+    // Verificar si hay movimiento significativo (más de 8px como el activationConstraint)
+    if (startPosRef.current) {
+      const distance = Math.sqrt(
+        Math.pow(e.clientX - startPosRef.current.x, 2) + 
+        Math.pow(e.clientY - startPosRef.current.y, 2)
+      )
+      
+      // Si se movió más de 8px, marcar que es un drag (pero no activar aún)
+      if (distance > 8) {
+        dragStartedRef.current = true
+      }
+    }
+    
+    // Continuar con el handler de long press para que pueda cancelar si detecta movimiento
     longPressHandlers.onMouseMove?.(e)
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    // Si detectamos movimiento, marcar que el drag ha comenzado
-    dragStartedRef.current = true
+    // Si ya se activó el long press o hay dropdown, no permitir drag
+    if (longPressTriggeredRef.current || showDropdown) {
+      return
+    }
+    
+    // Verificar si hay movimiento significativo
+    if (startPosRef.current && e.touches && e.touches.length > 0) {
+      const distance = Math.sqrt(
+        Math.pow(e.touches[0].clientX - startPosRef.current.x, 2) + 
+        Math.pow(e.touches[0].clientY - startPosRef.current.y, 2)
+      )
+      
+      if (distance > 8) {
+        dragStartedRef.current = true
+      }
+    }
+    
     longPressHandlers.onTouchMove?.(e)
   }
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    // Limpiar referencias
+    startPosRef.current = null
+    
+    // Ejecutar handler de long press
+    longPressHandlers.onMouseUp(e)
+    
+    // Reset flags
+    dragStartedRef.current = false
+    longPressTriggeredRef.current = false
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    startPosRef.current = null
+    
+    longPressHandlers.onTouchEnd(e)
+    
+    dragStartedRef.current = false
+    longPressTriggeredRef.current = false
+  }
+
+  // Los listeners se aplican directamente, pero el PointerSensor con activationConstraint
+  // solo activará el drag si hay movimiento de más de 8px, lo que permite que el long press se complete
 
   // Función para mover el lead a una etapa
   const handleMoveToStage = async (toStageId: string) => {
@@ -815,8 +1031,8 @@ function LeadCard({
       const stageName = stages.find(s => s.id === toStageId)?.name || toStageId
       toast.success(`Lead movido a ${stageName}`)
       
-      // Recargar la página para actualizar los datos
-      window.location.reload()
+      // Notificar al padre para actualizar el estado sin recargar
+      onLeadMoved?.(lead.id, toStageId)
     } catch (error: any) {
       console.error('handleMoveToStage: Error al mover', error)
       toast.error(error.message || 'Error al mover el lead')
@@ -829,8 +1045,93 @@ function LeadCard({
   const currentStageId = lead.stageId
   const availableStages = stages.filter(s => s.id !== currentStageId)
 
-  // Formatear tiempo en etapa de manera más clara
-  const formatTimeInStage = (days?: number) => {
+  // Funciones para gestionar tags
+  const handleAddTag = async (tagName: string) => {
+    try {
+      // Obtener el lead para encontrar el manychatId
+      const leadResponse = await fetch(`/api/leads/${lead.id}`)
+      if (!leadResponse.ok) {
+        throw new Error('No se pudo obtener el lead')
+      }
+
+      const leadData = await leadResponse.json()
+      
+      if (!leadData.manychatId) {
+        toast.error('Lead no está sincronizado con Manychat')
+        return
+      }
+
+      // Agregar tag vía API de Manychat
+      const response = await fetch('/api/manychat/tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscriberId: parseInt(leadData.manychatId),
+          tagName,
+          action: 'add',
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al agregar tag')
+      }
+
+      toast.success(`Tag "${tagName}" agregado`)
+      setShowDropdown(false)
+      // Notificar al padre para refrescar datos si es necesario
+      // Por ahora solo cerramos el dropdown, los tags se actualizarán en la próxima carga
+    } catch (error: any) {
+      console.error('Error adding tag:', error)
+      toast.error(error.message || 'Error al agregar tag')
+    }
+  }
+
+  const handleRemoveTag = async (tagName: string) => {
+    try {
+      const leadResponse = await fetch(`/api/leads/${lead.id}`)
+      if (!leadResponse.ok) {
+        throw new Error('No se pudo obtener el lead')
+      }
+
+      const leadData = await leadResponse.json()
+      
+      if (!leadData.manychatId) {
+        toast.error('Lead no está sincronizado con Manychat')
+        return
+      }
+
+      const response = await fetch('/api/manychat/tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscriberId: parseInt(leadData.manychatId),
+          tagName,
+          action: 'remove',
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al remover tag')
+      }
+
+      toast.success(`Tag "${tagName}" removido`)
+      setShowDropdown(false)
+      // Notificar al padre para refrescar datos si es necesario
+      // Por ahora solo cerramos el dropdown, los tags se actualizarán en la próxima carga
+    } catch (error: any) {
+      console.error('Error removing tag:', error)
+      toast.error(error.message || 'Error al remover tag')
+    }
+  }
+
+  // Formatear tiempo en etapa de manera más clara (memoizado)
+  const formatTimeInStage = useCallback((days?: number) => {
     if (days === undefined || days === null) return null
     if (days === 0) return 'Hoy'
     if (days === 1) return '1 día'
@@ -841,7 +1142,7 @@ function LeadCard({
     }
     const months = Math.floor(days / 30)
     return months === 1 ? '1 mes' : `${months} meses`
-  }
+  }, [])
 
   return (
     <>
@@ -852,6 +1153,7 @@ function LeadCard({
         }}
         style={style}
         {...attributes}
+        {...listeners}
         className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer relative ${
           isDragging ? 'opacity-50' : ''
         } ${showDropdown ? 'ring-2 ring-blue-500' : ''} ${isMoving ? 'opacity-75' : ''}`}
@@ -859,9 +1161,9 @@ function LeadCard({
         onTouchStart={handleTouchStart}
         onMouseMove={handleMouseMove}
         onTouchMove={handleTouchMove}
-        onMouseUp={longPressHandlers.onMouseUp}
+        onMouseUp={handleMouseUp}
         onMouseLeave={longPressHandlers.onMouseLeave}
-        onTouchEnd={longPressHandlers.onTouchEnd}
+        onTouchEnd={handleTouchEnd}
       >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
@@ -1076,7 +1378,7 @@ function LeadCard({
         {showDropdown && (
           <div className="absolute inset-0 bg-blue-50/50 border-2 border-blue-500 rounded-lg flex items-center justify-center z-10 pointer-events-none">
             <div className="text-xs text-blue-600 font-medium bg-white px-2 py-1 rounded shadow">
-              Selecciona una etapa...
+              {dropdownType === 'tags' ? 'Gestionar tags...' : 'Selecciona una etapa...'}
             </div>
           </div>
         )}
@@ -1110,7 +1412,7 @@ function LeadCard({
           <DropdownMenuContent 
             align="start"
             side="bottom"
-            className="w-56 max-h-96 overflow-y-auto z-[100]"
+            className="w-64 max-h-96 overflow-y-auto z-[100]"
             onCloseAutoFocus={(e) => {
               e.preventDefault()
               setShowDropdown(false)
@@ -1118,41 +1420,142 @@ function LeadCard({
             onEscapeKeyDown={() => setShowDropdown(false)}
             onInteractOutside={() => setShowDropdown(false)}
           >
-            <DropdownMenuLabel>
-              Mover a etapa
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {availableStages.length === 0 ? (
-              <DropdownMenuItem disabled>
-                No hay etapas disponibles
-              </DropdownMenuItem>
-            ) : (
-              availableStages
-                .sort((a, b) => a.order - b.order)
-                .map((stage) => (
-                  <DropdownMenuItem
-                    key={stage.id}
-                    onClick={() => handleMoveToStage(stage.id)}
-                    disabled={isMoving}
-                    className="cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: stage.color }}
-                        />
-                        <span>{stage.name}</span>
-                      </div>
-                      {isMoving ? (
-                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                      ) : (
-                        <ArrowRight className="h-4 w-4 ml-2 text-muted-foreground" />
-                      )}
-                    </div>
+            {/* Tabs para cambiar entre etapas y tags */}
+            <div className="flex border-b">
+              <button
+                onClick={() => setDropdownType('stage')}
+                className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                  dropdownType === 'stage'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Etapas
+              </button>
+              <button
+                onClick={() => {
+                  setDropdownType('tags')
+                  loadAvailableTags()
+                }}
+                className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                  dropdownType === 'tags'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Tags
+              </button>
+            </div>
+
+            {dropdownType === 'stage' ? (
+              <>
+                <DropdownMenuLabel className="px-3 py-2">
+                  Mover a etapa
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {availableStages.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No hay etapas disponibles
                   </DropdownMenuItem>
-                ))
+                ) : (
+                  availableStages
+                    .sort((a, b) => a.order - b.order)
+                    .map((stage) => (
+                      <DropdownMenuItem
+                        key={stage.id}
+                        onClick={() => handleMoveToStage(stage.id)}
+                        disabled={isMoving}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: stage.color }}
+                            />
+                            <span>{stage.name}</span>
+                          </div>
+                          {isMoving ? (
+                            <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                          ) : (
+                            <ArrowRight className="h-4 w-4 ml-2 text-muted-foreground" />
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                    ))
+                )}
+              </>
+            ) : (
+              <>
+                <DropdownMenuLabel className="px-3 py-2">
+                  Gestionar tags
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                
+                {/* Tags actuales del lead */}
+                {parsedTags.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-xs text-muted-foreground font-medium">
+                      Tags actuales
+                    </div>
+                    {parsedTags.map((tag: string) => {
+                      const tagColor = getTagColor(tag)
+                      return (
+                        <DropdownMenuItem
+                          key={tag}
+                          onClick={() => handleRemoveTag(tag)}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: tagColor.bg }}
+                              />
+                              <span>{tag}</span>
+                            </div>
+                            <X className="h-3 w-3 text-red-500" />
+                          </div>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
+                {/* Tags disponibles para agregar */}
+                <div className="px-3 py-2 text-xs text-muted-foreground font-medium">
+                  Agregar tag
+                </div>
+                {loadingTags ? (
+                  <DropdownMenuItem disabled>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Cargando tags...
+                  </DropdownMenuItem>
+                ) : availableTags.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No hay tags disponibles
+                  </DropdownMenuItem>
+                ) : (
+                  availableTags
+                    .filter(tag => !parsedTags.includes(tag.name))
+                    .slice(0, 10)
+                    .map((tag) => (
+                      <DropdownMenuItem
+                        key={tag.id}
+                        onClick={() => handleAddTag(tag.name)}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Tag className="h-3 w-3 text-muted-foreground" />
+                          <span>{tag.name}</span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))
+                )}
+              </>
             )}
+            
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setShowDropdown(false)}
@@ -1165,7 +1568,7 @@ function LeadCard({
       )}
     </>
   )
-}
+})
 
 // Componente para la tarjeta durante el drag
 interface LeadCardDraggingProps {

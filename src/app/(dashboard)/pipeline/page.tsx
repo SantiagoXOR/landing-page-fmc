@@ -46,21 +46,28 @@ const getCachedData = (): { stages: PipelineStage[], leads: PipelineLead[], metr
     const cached = sessionStorage.getItem(CACHE_KEY)
     const timestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY)
     
-    if (!cached || !timestamp) return null
+    if (!cached || !timestamp) {
+      console.log('🔍 No hay caché disponible')
+      return null
+    }
     
     const now = Date.now()
     const cacheTime = parseInt(timestamp, 10)
+    const age = now - cacheTime
     
     // Verificar si el caché ha expirado
-    if (now - cacheTime > CACHE_TTL) {
+    if (age > CACHE_TTL) {
+      console.log(`⏰ Caché expirado (edad: ${Math.round(age / 1000)}s, TTL: ${CACHE_TTL / 1000}s)`)
       sessionStorage.removeItem(CACHE_KEY)
       sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
       return null
     }
     
-    return JSON.parse(cached)
+    const data = JSON.parse(cached)
+    console.log(`✅ Caché encontrado (edad: ${Math.round(age / 1000)}s, stages: ${data.stages?.length || 0}, leads: ${data.leads?.length || 0})`)
+    return data
   } catch (error) {
-    console.error('Error reading cache:', error)
+    console.error('❌ Error reading cache:', error)
     return null
   }
 }
@@ -71,39 +78,89 @@ const saveToCache = (data: { stages: PipelineStage[], leads: PipelineLead[], met
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
     sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+    console.log(`💾 Caché guardado (stages: ${data.stages?.length || 0}, leads: ${data.leads?.length || 0})`)
   } catch (error) {
-    console.error('Error saving cache:', error)
+    console.error('❌ Error saving cache:', error)
     // Si hay error (por ejemplo, storage lleno), limpiar caché viejo
     try {
       sessionStorage.removeItem(CACHE_KEY)
       sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
       sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+      console.log('✅ Caché guardado después de limpiar espacio')
     } catch (retryError) {
-      console.error('Error retrying cache save:', retryError)
+      console.error('❌ Error retrying cache save:', retryError)
     }
   }
 }
 
 function PipelinePage() {
   const { data: session } = useSession()
+  const hasLoadedRef = useRef(false)
+  const isRefreshing = useRef(false)
   
-  // Intentar cargar datos iniciales desde caché
-  const cachedData = typeof window !== 'undefined' ? getCachedData() : null
-  const hasCachedData = cachedData && cachedData.stages && cachedData.leads
+  // Inicializar estado - verificar caché solo en el cliente
+  const getInitialState = () => {
+    if (typeof window === 'undefined') {
+      return {
+        stages: [] as PipelineStage[],
+        leads: [] as PipelineLead[],
+        metrics: null,
+        isLoading: true
+      }
+    }
+    
+    const cachedData = getCachedData()
+    const hasCachedData = cachedData && cachedData.stages && cachedData.leads
+    
+    if (hasCachedData) {
+      return {
+        stages: cachedData.stages,
+        leads: cachedData.leads,
+        metrics: cachedData.metrics || null,
+        isLoading: false // No mostrar loading si hay caché
+      }
+    }
+    
+    return {
+      stages: [] as PipelineStage[],
+      leads: [] as PipelineLead[],
+      metrics: null,
+      isLoading: true
+    }
+  }
   
-  const [stages, setStages] = useState<PipelineStage[]>(hasCachedData ? cachedData!.stages : [])
-  const [leads, setLeads] = useState<PipelineLead[]>(hasCachedData ? cachedData!.leads : [])
-  const [isLoading, setIsLoading] = useState(!hasCachedData) // Solo mostrar loading si no hay caché
+  const initialState = getInitialState()
+  const [stages, setStages] = useState<PipelineStage[]>(initialState.stages)
+  const [leads, setLeads] = useState<PipelineLead[]>(initialState.leads)
+  const [isLoading, setIsLoading] = useState(initialState.isLoading)
   const [error, setError] = useState<string | null>(null)
-  const [metrics, setMetrics] = useState<any>(hasCachedData && cachedData!.metrics ? cachedData!.metrics : null)
+  const [metrics, setMetrics] = useState<any>(initialState.metrics)
   const [activeTab, setActiveTab] = useState('board')
   const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const isRefreshing = useRef(false)
   
   // Hook para métricas reales
   const { metrics: realMetrics, loading: metricsLoading, error: metricsError } = usePipelineMetrics('month')
+
+  // Verificar y aplicar caché inmediatamente después del montaje en el cliente
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    // Si el estado está vacío pero hay caché, aplicarlo inmediatamente
+    if ((stages.length === 0 || leads.length === 0) && isLoading) {
+      const cachedData = getCachedData()
+      if (cachedData && cachedData.stages && cachedData.leads && cachedData.stages.length > 0) {
+        console.log('📦 Aplicando caché al estado después del montaje...')
+        setStages(cachedData.stages)
+        setLeads(cachedData.leads)
+        if (cachedData.metrics) {
+          setMetrics(cachedData.metrics)
+        }
+        setIsLoading(false)
+      }
+    }
+  }, []) // Solo ejecutar una vez al montar
 
   // Mapeo entre stageId de leads y IDs de stages del API
   const stageIdMapping: Record<string, string> = {
@@ -199,23 +256,51 @@ function PipelinePage() {
     }
   }
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales - solo una vez al montar en el cliente
   useEffect(() => {
+    // Solo ejecutar en el cliente
+    if (typeof window === 'undefined') return
+    // Evitar múltiples ejecuciones
+    if (hasLoadedRef.current) return
     if (!session) return
+    
+    hasLoadedRef.current = true
 
-    // Verificar si hay datos en caché
+    // Verificar si hay datos en caché (verificar nuevamente en el cliente)
     const cachedData = getCachedData()
-    const hasCachedData = cachedData && cachedData.stages && cachedData.leads
+    const hasCachedData = cachedData && cachedData.stages && cachedData.leads && cachedData.stages.length > 0
 
-    // Si ya hay datos en caché, refrescar en segundo plano sin mostrar loading
     if (hasCachedData) {
+      // Si hay caché pero el estado no se inicializó correctamente, actualizarlo
+      if (stages.length === 0 || leads.length === 0) {
+        console.log('📦 Aplicando caché al estado desde useEffect...')
+        setStages(cachedData.stages)
+        setLeads(cachedData.leads)
+        if (cachedData.metrics) {
+          setMetrics(cachedData.metrics)
+        }
+        setIsLoading(false)
+      }
+      
+      // Ya tenemos datos del caché, solo refrescar en segundo plano SIN mostrar loading
+      console.log('📦 Usando datos del caché, refrescando en segundo plano...')
       isRefreshing.current = true
+      // Asegurarse de que isLoading esté en false antes de refrescar
+      setIsLoading(false)
       loadPipelineData(false).finally(() => {
         isRefreshing.current = false
       })
     } else {
-      // No hay caché, cargar normalmente con loading
-      loadPipelineData(true)
+      // No hay caché válido, cargar normalmente con loading
+      console.log('🔄 No hay caché, cargando datos...')
+      // Solo mostrar loading si realmente no hay datos
+      if (stages.length === 0 && leads.length === 0) {
+        loadPipelineData(true)
+      } else {
+        // Si hay datos pero no caché, solo refrescar sin loading
+        setIsLoading(false)
+        loadPipelineData(false)
+      }
     }
   }, [session])
 

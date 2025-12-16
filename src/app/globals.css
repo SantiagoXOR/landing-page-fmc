@@ -645,3 +645,18 @@ html {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Pipeline scrollbar arriba */
+.pipeline-scroll-top {
+  display: flex;
+  flex-direction: column-reverse;
+  overflow: visible;
+}
+
+.pipeline-scroll-top .overflow-x-auto {
+  transform: scaleY(-1);
+}
+
+.pipeline-scroll-top .overflow-x-auto > * {
+  transform: scaleY(-1);
+}

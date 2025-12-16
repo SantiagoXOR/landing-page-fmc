@@ -467,34 +467,40 @@ export function PipelineBoardAdvanced({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-6 overflow-x-auto pb-4">
-          {stages
-            .sort((a, b) => a.order - b.order)
-            .map((stage) => {
-              const stageLeads = filteredLeads[stage.id] || []
-              const stats = getStageStats(stage.id)
-              const canDrop = canDropInStage(stage.id, activeId || undefined)
+        <div className="relative pipeline-scroll-top">
+          {/* Contenedor con scrollbar arriba */}
+          <div className="overflow-x-auto pb-4">
+            <div className="flex gap-6">
+              {stages
+                .sort((a, b) => a.order - b.order)
+                .map((stage) => {
+                  const stageLeads = filteredLeads[stage.id] || []
+                  const stats = getStageStats(stage.id)
+                  const canDrop = canDropInStage(stage.id, activeId || undefined)
 
-              return (
-                <PipelineStageColumn
-                  key={stage.id}
-                  stage={stage}
-                  leads={stageLeads}
-                  stats={stats}
-                  canDrop={canDrop}
-                  isDragOver={activeId !== null}
-                  onLeadClick={onLeadClick}
-                  onStageClick={onStageClick}
-                  onAddLead={onAddLead}
-                  formatCurrency={formatCurrency}
-                  formatRelativeDate={formatRelativeDate}
-                  getPriorityColor={getPriorityColor}
-                  getTagColor={getTagColor}
-                  stages={stages}
-                  onLeadMove={handleLeadMoveToStage}
-                />
-              )
-            })}
+                  return (
+                    <div key={stage.id}>
+                      <PipelineStageColumn
+                        stage={stage}
+                        leads={stageLeads}
+                        stats={stats}
+                        canDrop={canDrop}
+                        isDragOver={activeId !== null}
+                        onLeadClick={onLeadClick}
+                        onStageClick={onStageClick}
+                        onAddLead={onAddLead}
+                        formatCurrency={formatCurrency}
+                        formatRelativeDate={formatRelativeDate}
+                        getPriorityColor={getPriorityColor}
+                        getTagColor={getTagColor}
+                        stages={stages}
+                        onLeadMove={handleLeadMoveToStage}
+                      />
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
         </div>
 
         {/* Drag Overlay */}

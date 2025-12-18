@@ -1530,32 +1530,55 @@ const LeadCard = memo(function LeadCard({
         })()}
 
         {/* Mostrar teléfono después del CUIL */}
-        {lead.telefono && (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Teléfono:</span>
-            <div className="flex items-center gap-1">
-              <span className="font-medium text-gray-900 truncate max-w-[120px]">{lead.telefono}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const copyToClipboard = async (text: string) => {
-                    try {
-                      await navigator.clipboard.writeText(text)
-                      toast.success('Teléfono copiado al portapapeles')
-                    } catch (err) {
-                      toast.error('Error al copiar al portapapeles')
-                    }
-                  }
-                  copyToClipboard(lead.telefono)
-                }}
-                className="p-0.5 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-                title="Copiar teléfono"
-              >
-                <Copy className="h-3 w-3 text-muted-foreground" />
-              </button>
+        {(() => {
+          // Función para validar si es un teléfono válido (no un ID de ManyChat)
+          const isValidPhone = (phone: string | undefined | null): boolean => {
+            if (!phone) return false
+            // Si empieza con "manychat_", es un ID de ManyChat, no un teléfono
+            if (phone.trim().toLowerCase().startsWith('manychat_')) return false
+            // Si es solo números o tiene formato de teléfono (con +, espacios, guiones), es válido
+            // Eliminar espacios, guiones y paréntesis para validar
+            const cleaned = phone.replace(/[\s\-\(\)]/g, '')
+            // Debe tener al menos 8 dígitos y puede empezar con +
+            return /^\+?\d{8,}$/.test(cleaned)
+          }
+
+          const validPhone = isValidPhone(lead.telefono) ? lead.telefono : null
+
+          // Función para copiar al portapapeles
+          const copyToClipboard = async (text: string, fieldName: string) => {
+            try {
+              await navigator.clipboard.writeText(text)
+              toast.success(`${fieldName} copiado al portapapeles`)
+            } catch (err) {
+              toast.error('Error al copiar al portapapeles')
+            }
+          }
+
+          // Mostrar teléfono solo si es válido, o mostrar guion si no hay teléfono válido
+          return (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Teléfono:</span>
+              {validPhone ? (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium text-gray-900 truncate max-w-[120px]">{validPhone}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copyToClipboard(validPhone, 'Teléfono')
+                    }}
+                    className="p-0.5 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                    title="Copiar teléfono"
+                  >
+                    <Copy className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Información de tiempo mejorada */}
         {lead.timeInStage !== undefined && (
@@ -1947,12 +1970,31 @@ function LeadCardDragging({
         })()}
 
         {/* Mostrar teléfono después del CUIL */}
-        {lead.telefono && (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Teléfono:</span>
-            <span className="font-medium truncate max-w-[120px]">{lead.telefono}</span>
-          </div>
-        )}
+        {(() => {
+          // Función para validar si es un teléfono válido (no un ID de ManyChat)
+          const isValidPhone = (phone: string | undefined | null): boolean => {
+            if (!phone) return false
+            // Si empieza con "manychat_", es un ID de ManyChat, no un teléfono
+            if (phone.trim().toLowerCase().startsWith('manychat_')) return false
+            // Si es solo números o tiene formato de teléfono (con +, espacios, guiones), es válido
+            const cleaned = phone.replace(/[\s\-\(\)]/g, '')
+            // Debe tener al menos 8 dígitos y puede empezar con +
+            return /^\+?\d{8,}$/.test(cleaned)
+          }
+
+          const validPhone = isValidPhone(lead.telefono) ? lead.telefono : null
+
+          return (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Teléfono:</span>
+              {validPhone ? (
+                <span className="font-medium truncate max-w-[120px]">{validPhone}</span>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

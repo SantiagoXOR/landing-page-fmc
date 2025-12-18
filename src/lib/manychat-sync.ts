@@ -28,6 +28,7 @@ export interface SyncPipelineParams {
   newStage: string
   userId?: string
   notes?: string
+  rejectionMessage?: string // Mensaje de rechazo seleccionado para Instagram
 }
 
 export interface PipelineStageTag {
@@ -77,6 +78,16 @@ export async function getTagForStage(stage: string): Promise<string | null> {
       })
       // Retornar el tag correcto aunque la BD tenga un error
       return 'credito-aprobado'
+    }
+    
+    if (stage === 'RECHAZADO' && tag !== 'credito-rechazado') {
+      logger.error('CRITICAL: Tag incorrecto para RECHAZADO en base de datos', {
+        stage,
+        tagFromDB: tag,
+        expectedTag: 'credito-rechazado'
+      })
+      // Retornar el tag correcto aunque la BD tenga un error
+      return 'credito-rechazado'
     }
 
     return tag
@@ -178,7 +189,7 @@ async function logManychatSync(params: {
 export async function syncPipelineToManychat(
   params: SyncPipelineParams
 ): Promise<boolean> {
-  const { leadId, manychatId, previousStage, newStage, userId, notes } = params
+  const { leadId, manychatId, previousStage, newStage, userId, notes, rejectionMessage } = params
 
   logger.info('Starting pipeline sync to ManyChat', {
     leadId,
@@ -459,6 +470,59 @@ export async function syncPipelineToManychat(
         } catch (messageError: any) {
           // No bloquear la sincronización si falla el envío
           logger.warn('Error enviando mensaje directo a Instagram (no crítico, continuando con sincronización)', {
+            leadId,
+            manychatId,
+            channel: detectedChannel,
+            error: messageError.message,
+            errorStack: messageError.stack
+          })
+        }
+      }
+
+      // 8.7. Envío directo de mensaje de rechazo para Instagram cuando se asigna tag credito-rechazado
+      // Similar a preaprobados, Instagram requiere envío directo desde el CRM
+      if (detectedChannel === 'instagram' && newTag === 'credito-rechazado' && rejectionMessage) {
+        try {
+          logger.info('Detectado Instagram + credito-rechazado, enviando mensaje de rechazo directo', {
+            leadId,
+            manychatId,
+            channel: detectedChannel,
+            tag: newTag,
+            hasRejectionMessage: !!rejectionMessage
+          })
+          
+          // Convertir manychatId a número si es string
+          const manychatIdNumber = typeof manychatId === 'string' 
+            ? parseInt(manychatId, 10) 
+            : manychatId
+          
+          if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
+            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, rejectionMessage)
+            
+            if (messageSent) {
+              logger.info('Mensaje de rechazo enviado exitosamente a Instagram', {
+                leadId,
+                manychatId: manychatIdNumber,
+                channel: 'instagram',
+                messageLength: rejectionMessage.length
+              })
+            } else {
+              logger.warn('No se pudo enviar mensaje de rechazo a Instagram (ManyChat retornó false)', {
+                leadId,
+                manychatId: manychatIdNumber,
+                channel: 'instagram'
+              })
+            }
+          } else {
+            logger.warn('manychatId inválido para enviar mensaje de rechazo a Instagram', {
+              leadId,
+              manychatId,
+              manychatIdNumber
+            })
+          }
+        } catch (messageError: any) {
+          // No bloquear la sincronización si falla el envío
+          logger.warn('Error enviando mensaje de rechazo directo a Instagram (no crítico, continuando con sincronización)', {
             leadId,
             manychatId,
             channel: detectedChannel,

@@ -24,6 +24,8 @@ import {
 import { usePipeline } from '@/hooks/usePipeline'
 import { PipelineStage, LossReason } from '@/server/services/pipeline-service'
 import { usePermissions } from '@/components/auth/PermissionGuard'
+import { REJECTION_MESSAGES, REJECTION_MESSAGE_OPTIONS } from '@/lib/rejection-messages'
+import { useEffect } from 'react'
 
 interface PipelineStageIndicatorProps {
   leadId: string
@@ -51,6 +53,31 @@ export function PipelineStageIndicator({
 
   const [showLossReasonDialog, setShowLossReasonDialog] = useState(false)
   const [selectedStage, setSelectedStage] = useState<PipelineStage | null>(null)
+  const [leadOrigin, setLeadOrigin] = useState<string | null>(null)
+  const [selectedRejectionMessage, setSelectedRejectionMessage] = useState<string | null>(null)
+  const [loadingLead, setLoadingLead] = useState(false)
+
+  // Obtener información del lead para determinar si es Instagram
+  useEffect(() => {
+    const fetchLeadInfo = async () => {
+      try {
+        setLoadingLead(true)
+        const response = await fetch(`/api/leads/${leadId}`)
+        if (response.ok) {
+          const leadData = await response.json()
+          setLeadOrigin(leadData.origen || null)
+        }
+      } catch (error) {
+        console.error('Error fetching lead info:', error)
+      } finally {
+        setLoadingLead(false)
+      }
+    }
+
+    if (leadId) {
+      fetchLeadInfo()
+    }
+  }, [leadId])
 
   const stage = currentStage || pipeline?.current_stage || 'CLIENTE_NUEVO'
   const canEdit = checkPermission('leads:write')
@@ -92,9 +119,11 @@ export function PipelineStageIndicator({
   }
 
   // Manejar transición a nueva etapa
-  const handleStageTransition = async (newStage: PipelineStage, notes?: string, lossReason?: LossReason) => {
+  const handleStageTransition = async (newStage: PipelineStage, notes?: string, lossReason?: LossReason, rejectionMessage?: string) => {
     try {
-      await moveToStage(leadId, newStage, notes, lossReason)
+      await moveToStage(leadId, newStage, notes, lossReason, rejectionMessage)
+      // Resetear estado después de la transición
+      setSelectedRejectionMessage(null)
     } catch (error) {
       console.error('Error transitioning stage:', error)
     }
@@ -211,55 +240,136 @@ export function PipelineStageIndicator({
         </CardContent>
       )}
 
-      {/* Modal para motivo de pérdida - implementar después */}
+      {/* Modal para motivo de pérdida y selección de mensaje de rechazo para Instagram */}
       {showLossReasonDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
-                <span>Motivo de pérdida</span>
+                <span>
+                  {leadOrigin === 'instagram' && (selectedStage === 'RECHAZADO' || selectedStage === 'CIERRE_PERDIDO')
+                    ? 'Rechazar Lead - Seleccionar Mensaje'
+                    : 'Motivo de pérdida'}
+                </CardTitle>
               </CardTitle>
               <CardDescription>
-                Selecciona el motivo por el cual se perdió este lead
+                {leadOrigin === 'instagram' && (selectedStage === 'RECHAZADO' || selectedStage === 'CIERRE_PERDIDO')
+                  ? 'Selecciona el mensaje que se enviará al cliente por Instagram'
+                  : 'Selecciona el motivo por el cual se perdió este lead'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-2">
-                {[
-                  { value: 'PRECIO', label: 'Precio muy alto' },
-                  { value: 'COMPETENCIA', label: 'Eligió competencia' },
-                  { value: 'PRESUPUESTO', label: 'Sin presupuesto' },
-                  { value: 'TIMING', label: 'Mal momento' },
-                  { value: 'NO_INTERES', label: 'Perdió interés' },
-                  { value: 'NO_CONTACTO', label: 'No se pudo contactar' },
-                  { value: 'OTRO', label: 'Otro motivo' }
-                ].map((reason) => (
+              {/* Mostrar selector de mensajes de rechazo si es Instagram */}
+              {leadOrigin === 'instagram' && (selectedStage === 'RECHAZADO' || selectedStage === 'CIERRE_PERDIDO') && (
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-gray-700">
+                    Mensaje de rechazo para Instagram:
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {REJECTION_MESSAGE_OPTIONS.map((messageOption) => (
+                      <Button
+                        key={messageOption.id}
+                        variant={selectedRejectionMessage === messageOption.id ? "default" : "outline"}
+                        onClick={() => setSelectedRejectionMessage(messageOption.id)}
+                        className="justify-start text-left h-auto py-3 px-4"
+                      >
+                        <div className="flex flex-col items-start w-full">
+                          <div className="font-medium mb-1">{messageOption.label}</div>
+                          <div className="text-xs text-gray-600 line-clamp-2">
+                            {messageOption.message.substring(0, 100)}...
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                  {selectedRejectionMessage && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                      <div className="text-xs font-medium text-gray-700 mb-1">Mensaje completo:</div>
+                      <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                        {REJECTION_MESSAGES[selectedRejectionMessage as keyof typeof REJECTION_MESSAGES]?.message}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mostrar motivos de pérdida si no es Instagram o si ya se seleccionó mensaje */}
+              {(!(leadOrigin === 'instagram' && (selectedStage === 'RECHAZADO' || selectedStage === 'CIERRE_PERDIDO')) || selectedRejectionMessage) && (
+                <div className="space-y-3">
+                  {leadOrigin === 'instagram' && selectedRejectionMessage && (
+                    <div className="text-sm font-medium text-gray-700 border-t pt-3">
+                      Motivo de pérdida (opcional):
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { value: 'PRECIO', label: 'Precio muy alto' },
+                      { value: 'COMPETENCIA', label: 'Eligió competencia' },
+                      { value: 'PRESUPUESTO', label: 'Sin presupuesto' },
+                      { value: 'TIMING', label: 'Mal momento' },
+                      { value: 'NO_INTERES', label: 'Perdió interés' },
+                      { value: 'NO_CONTACTO', label: 'No se pudo contactar' },
+                      { value: 'OTRO', label: 'Otro motivo' }
+                    ].map((reason) => (
+                      <Button
+                        key={reason.value}
+                        variant="outline"
+                        onClick={() => {
+                          const rejectionMsg = leadOrigin === 'instagram' && selectedRejectionMessage
+                            ? REJECTION_MESSAGES[selectedRejectionMessage as keyof typeof REJECTION_MESSAGES]?.message
+                            : undefined
+                          
+                          handleStageTransition(
+                            selectedStage!,
+                            `Motivo: ${reason.label}`,
+                            reason.value as LossReason,
+                            rejectionMsg
+                          )
+                          setShowLossReasonDialog(false)
+                          setSelectedStage(null)
+                          setSelectedRejectionMessage(null)
+                        }}
+                        className="justify-start"
+                      >
+                        {reason.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Botón para rechazar directamente con mensaje (solo Instagram) */}
+              {leadOrigin === 'instagram' && selectedRejectionMessage && (selectedStage === 'RECHAZADO' || selectedStage === 'CIERRE_PERDIDO') && (
+                <div className="border-t pt-4">
                   <Button
-                    key={reason.value}
-                    variant="outline"
+                    variant="destructive"
                     onClick={() => {
+                      const rejectionMsg = REJECTION_MESSAGES[selectedRejectionMessage as keyof typeof REJECTION_MESSAGES]?.message
                       handleStageTransition(
                         selectedStage!,
-                        `Motivo: ${reason.label}`,
-                        reason.value as LossReason
+                        undefined,
+                        undefined,
+                        rejectionMsg
                       )
                       setShowLossReasonDialog(false)
                       setSelectedStage(null)
+                      setSelectedRejectionMessage(null)
                     }}
-                    className="justify-start"
+                    className="w-full"
                   >
-                    {reason.label}
+                    Rechazar y Enviar Mensaje
                   </Button>
-                ))}
-              </div>
+                </div>
+              )}
               
-              <div className="flex justify-end space-x-2">
+              <div className="flex justify-end space-x-2 pt-2 border-t">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setShowLossReasonDialog(false)
                     setSelectedStage(null)
+                    setSelectedRejectionMessage(null)
                   }}
                 >
                   Cancelar

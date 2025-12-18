@@ -15,7 +15,8 @@ const MoveLeadSchema = z.object({
   fromStageId: z.string().min(1, 'ID de etapa origen es requerido'),
   toStageId: z.string().min(1, 'ID de etapa destino es requerido'),
   notes: z.string().optional(),
-  reason: z.string().optional()
+  reason: z.string().optional(),
+  rejectionMessage: z.string().optional() // Mensaje de rechazo seleccionado para Instagram
 })
 
 /**
@@ -78,7 +79,7 @@ export async function POST(
       throw error
     }
 
-    const { fromStageId, toStageId, notes, reason } = validatedData
+    const { fromStageId, toStageId, notes, reason, rejectionMessage } = validatedData
 
     logger.info('Moving lead', {
       leadId,
@@ -415,7 +416,8 @@ export async function POST(
           previousStage: fromStageEnum,
           newStage: toStageEnum,
           userId: session.user.id,
-          notes
+          notes,
+          rejectionMessage: toStageEnum === 'RECHAZADO' ? rejectionMessage : undefined
         })
 
         manychatSynced = true

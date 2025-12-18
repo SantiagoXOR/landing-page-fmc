@@ -111,30 +111,41 @@ export function usePipeline(leadId?: string) {
     id: string, 
     newStage: PipelineStage, 
     notes?: string, 
-    lossReason?: LossReason
+    lossReason?: LossReason,
+    rejectionMessage?: string
   ) => {
     try {
       setTransitioning(true)
       
-      const response = await fetch(`/api/pipeline/${id}`, {
-        method: 'PATCH',
+      // Obtener el pipeline actual para determinar fromStageId
+      const currentPipeline = pipeline || await loadPipeline(id)
+      const fromStageId = currentPipeline?.current_stage || 'CLIENTE_NUEVO'
+      
+      // Usar el endpoint de move que soporta rejectionMessage
+      const response = await fetch(`/api/pipeline/leads/${id}/move`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          new_stage: newStage,
+          fromStageId,
+          toStageId: newStage,
           notes,
-          loss_reason: lossReason
+          reason: lossReason,
+          rejectionMessage
         })
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Error moving lead')
+        throw new Error(errorData.error || errorData.message || 'Error moving lead')
       }
 
-      const updatedPipeline = await response.json()
-      setPipeline(updatedPipeline)
+      const result = await response.json()
+      
+      // El endpoint de move devuelve un objeto con transition, no el pipeline completo
+      // Necesitamos recargar el pipeline para obtener el estado actualizado
+      await loadPipeline(id)
       
       // Actualizar transiciones permitidas
       await loadAllowedTransitions(newStage)
@@ -148,8 +159,10 @@ export function usePipeline(leadId?: string) {
         const leadResponse = await fetch(`/api/leads/${id}`)
         if (leadResponse.ok) {
           const leadData = await leadResponse.json()
+          // Usar el pipeline recargado o el ID del lead para la notificación
+          const pipelineId = pipeline?.id || `pipeline-${id}`
           notifyPipelineChanged({
-            id: updatedPipeline.id,
+            id: pipelineId,
             nombre: 'Pipeline',
             etapa: getStageDisplayName(newStage),
             leadId: id,
@@ -166,7 +179,8 @@ export function usePipeline(leadId?: string) {
         description: `Lead movido a ${getStageDisplayName(newStage)}`
       })
 
-      return updatedPipeline
+      // Retornar el pipeline recargado
+      return pipeline || await loadPipeline(id)
     } catch (error) {
       logger.error('Error moving lead:', error)
       addToast({

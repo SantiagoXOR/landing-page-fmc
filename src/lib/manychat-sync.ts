@@ -503,9 +503,10 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Usar message tag ACCOUNT_UPDATE para enviar mensajes fuera de la ventana de 24 horas
-            // Esto es requerido por ManyChat/Facebook cuando el suscriptor no ha interactuado recientemente
-            const messageTag = 'ACCOUNT_UPDATE'
+            // Usar message tag ISSUE_RESOLUTION para notificaciones de resultado de solicitud
+            // ACCOUNT_UPDATE es solo para cambios de cuenta (password, settings), no para resultados de solicitudes
+            // ISSUE_RESOLUTION es más apropiado para notificar sobre el resultado de una solicitud procesada
+            const messageTag = 'ISSUE_RESOLUTION'
             
             // Enviar mensaje y obtener respuesta completa para verificar detalles
             const messages: ManychatMessage[] = [

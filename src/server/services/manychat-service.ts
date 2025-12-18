@@ -1393,6 +1393,13 @@ export class ManychatService {
         details: response.details,
         messagesSent: messages.length
       })
+    } else {
+      logger.info('ManyChat sendContent respuesta exitosa', {
+        subscriberId,
+        messageId: response.data?.message_id,
+        status: response.status,
+        hasData: !!response.data
+      })
     }
 
     return response as ManychatSendMessageResponse

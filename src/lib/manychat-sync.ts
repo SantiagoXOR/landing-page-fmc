@@ -11,7 +11,7 @@ import {
   getSubscriberTags
 } from './manychat-client'
 import { ManychatService } from '@/server/services/manychat-service'
-import { ManychatSubscriber as ManychatSubscriberType } from '@/types/manychat'
+import { ManychatSubscriber as ManychatSubscriberType, ManychatMessage } from '@/types/manychat'
 import { logger } from './logger'
 
 // Cliente Supabase
@@ -505,22 +505,35 @@ export async function syncPipelineToManychat(
             // Usar message tag ACCOUNT_UPDATE para enviar mensajes fuera de la ventana de 24 horas
             // Esto es requerido por ManyChat/Facebook cuando el suscriptor no ha interactuado recientemente
             const messageTag = 'ACCOUNT_UPDATE'
-            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, rejectionMessage, messageTag)
             
-            if (messageSent) {
+            // Enviar mensaje y obtener respuesta completa para verificar detalles
+            const messages: ManychatMessage[] = [
+              {
+                type: 'text',
+                text: rejectionMessage,
+              },
+            ]
+            const response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            
+            if (response.status === 'success') {
               logger.info('Mensaje de rechazo enviado exitosamente a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
                 messageLength: rejectionMessage.length,
-                messageTag
+                messageTag,
+                messageId: response.data?.message_id,
+                responseData: JSON.stringify(response.data)
               })
             } else {
-              logger.warn('No se pudo enviar mensaje de rechazo a Instagram (ManyChat retornó false)', {
+              logger.error('Error al enviar mensaje de rechazo a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
-                messageTag
+                messageTag,
+                error: response.error,
+                errorCode: response.error_code,
+                details: response.details
               })
             }
           } else {

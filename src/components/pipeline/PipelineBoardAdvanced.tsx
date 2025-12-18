@@ -964,6 +964,42 @@ const LeadCard = memo(function LeadCard({
   const startPosRef = useRef<{ x: number; y: number } | null>(null)
   const isScrollingRef = useRef(false)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Función para actualizar la posición del dropdown
+  const updateDropdownPosition = useCallback(() => {
+    if (cardRef.current && showDropdown) {
+      const rect = cardRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + 4
+      })
+    }
+  }, [showDropdown])
+  
+  // Actualizar posición cuando se abre el dropdown o cuando hay scroll
+  useEffect(() => {
+    if (!showDropdown) return
+    
+    updateDropdownPosition()
+    
+    // Actualizar posición en scroll
+    const handleScroll = () => {
+      updateDropdownPosition()
+    }
+    
+    // Actualizar posición en resize
+    const handleResize = () => {
+      updateDropdownPosition()
+    }
+    
+    window.addEventListener('scroll', handleScroll, true) // true para capturar scroll en todos los contenedores
+    window.addEventListener('resize', handleResize)
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [showDropdown, updateDropdownPosition])
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -998,11 +1034,13 @@ const LeadCard = memo(function LeadCard({
       longPressTriggeredRef.current = true
       
       // Obtener posición del card para posicionar el dropdown
+      // Calcular posición considerando el scroll del contenedor
       if (cardRef.current) {
         const rect = cardRef.current.getBoundingClientRect()
+        // Usar coordenadas del viewport directamente (getBoundingClientRect ya las da relativas al viewport)
         setDropdownPosition({
           x: rect.left + rect.width / 2,
-          y: rect.top
+          y: rect.bottom + 4 // Posicionar justo debajo de la tarjeta
         })
       }
       
@@ -1714,18 +1752,22 @@ const LeadCard = memo(function LeadCard({
       {showDropdown && (
         <DropdownMenu open={showDropdown} onOpenChange={setShowDropdown}>
           <DropdownMenuTrigger asChild>
-            <div 
-              className="fixed pointer-events-none"
+            <button
+              className="fixed pointer-events-none opacity-0"
               style={{
                 left: dropdownPosition.x,
-                top: dropdownPosition.y + 10,
+                top: dropdownPosition.y,
                 transform: 'translateX(-50%)',
+                width: '1px',
+                height: '1px',
               }}
+              aria-hidden="true"
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             align="start"
             side="bottom"
+            sideOffset={4}
             className="w-64 max-h-96 overflow-y-auto z-[100]"
             onCloseAutoFocus={(e) => {
               e.preventDefault()

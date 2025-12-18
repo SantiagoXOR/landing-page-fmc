@@ -444,10 +444,11 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Usar message tag ISSUE_RESOLUTION para notificaciones de resultado de solicitud
-            // ACCOUNT_UPDATE es solo para cambios de cuenta (password, settings)
-            // ISSUE_RESOLUTION es más apropiado para notificar sobre el resultado de una solicitud procesada
-            const messageTag = 'ISSUE_RESOLUTION'
+            // Usar message tag ACCOUNT_UPDATE - es el único tag soportado por ManyChat para notificaciones
+            // Aunque técnicamente es para cambios de cuenta, es el único disponible para notificar sobre
+            // el estado de una solicitud de crédito cuando el suscriptor no ha interactuado en 24+ horas
+            // ManyChat solo soporta: ACCOUNT_UPDATE, POST_PURCHASE_UPDATE, CONFIRMED_EVENT_UPDATE
+            const messageTag = 'ACCOUNT_UPDATE'
             const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, message, messageTag)
             
             if (messageSent) {
@@ -503,10 +504,11 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Usar message tag ISSUE_RESOLUTION para notificaciones de resultado de solicitud
-            // ACCOUNT_UPDATE es solo para cambios de cuenta (password, settings), no para resultados de solicitudes
-            // ISSUE_RESOLUTION es más apropiado para notificar sobre el resultado de una solicitud procesada
-            const messageTag = 'ISSUE_RESOLUTION'
+            // Usar message tag ACCOUNT_UPDATE - es el único tag soportado por ManyChat para notificaciones
+            // Aunque técnicamente es para cambios de cuenta, es el único disponible para notificar sobre
+            // el estado de una solicitud de crédito cuando el suscriptor no ha interactuado en 24+ horas
+            // ManyChat solo soporta: ACCOUNT_UPDATE, POST_PURCHASE_UPDATE, CONFIRMED_EVENT_UPDATE
+            const messageTag = 'ACCOUNT_UPDATE'
             
             // Enviar mensaje y obtener respuesta completa para verificar detalles
             const messages: ManychatMessage[] = [

@@ -21,7 +21,8 @@ import {
   ArrowRight,
   Loader2,
   Tag,
-  X
+  X,
+  Copy
 } from 'lucide-react'
 import { usePipelineDragDrop } from '@/hooks/usePipelineDragDrop'
 import { PipelineStage, PipelineLead, DragDropResult, StageTransition } from '@/types/pipeline'
@@ -1399,7 +1400,9 @@ const LeadCard = memo(function LeadCard({
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground truncate">{lead.telefono}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {lead.origen || 'N/A'}
+          </p>
         </div>
 
         <div className="flex items-center gap-1 ml-2">
@@ -1496,20 +1499,63 @@ const LeadCard = memo(function LeadCard({
             ? (typeof cuilValue === 'object' && cuilValue !== null && 'value' in cuilValue ? cuilValue.value : cuilValue)
             : null
           
+          // Función para copiar al portapapeles
+          const copyToClipboard = async (text: string, fieldName: string) => {
+            try {
+              await navigator.clipboard.writeText(text)
+              toast.success(`${fieldName} copiado al portapapeles`)
+            } catch (err) {
+              toast.error('Error al copiar al portapapeles')
+            }
+          }
+          
           return displayValue ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">CUIL:</span>
-              <span className="font-medium text-gray-900">{String(displayValue)}</span>
+              <div className="flex items-center gap-1">
+                <span className="font-medium text-gray-900">{String(displayValue)}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    copyToClipboard(String(displayValue), 'CUIL')
+                  }}
+                  className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                  title="Copiar CUIL"
+                >
+                  <Copy className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Origen:</span>
-              <Badge variant="outline" className="text-xs">
-                {lead.origen}
-              </Badge>
-            </div>
-          )
+          ) : null
         })()}
+
+        {/* Mostrar teléfono después del CUIL */}
+        {lead.telefono && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Teléfono:</span>
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-gray-900 truncate max-w-[120px]">{lead.telefono}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const copyToClipboard = async (text: string) => {
+                    try {
+                      await navigator.clipboard.writeText(text)
+                      toast.success('Teléfono copiado al portapapeles')
+                    } catch (err) {
+                      toast.error('Error al copiar al portapapeles')
+                    }
+                  }
+                  copyToClipboard(lead.telefono)
+                }}
+                className="p-0.5 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                title="Copiar teléfono"
+              >
+                <Copy className="h-3 w-3 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Información de tiempo mejorada */}
         {lead.timeInStage !== undefined && (
@@ -1805,7 +1851,9 @@ function LeadCardDragging({
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-sm truncate">{lead.nombre}</h4>
-          <p className="text-xs text-muted-foreground truncate">{lead.telefono}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {lead.origen || 'N/A'}
+          </p>
         </div>
 
         <div className="flex items-center gap-1 ml-2">
@@ -1895,15 +1943,16 @@ function LeadCardDragging({
               <span className="text-muted-foreground">CUIL:</span>
               <span className="font-medium">{String(displayValue)}</span>
             </div>
-          ) : (
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Origen:</span>
-              <Badge variant="outline" className="text-xs">
-                {lead.origen}
-              </Badge>
-            </div>
-          )
+          ) : null
         })()}
+
+        {/* Mostrar teléfono después del CUIL */}
+        {lead.telefono && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Teléfono:</span>
+            <span className="font-medium truncate max-w-[120px]">{lead.telefono}</span>
+          </div>
+        )}
       </div>
     </div>
   )

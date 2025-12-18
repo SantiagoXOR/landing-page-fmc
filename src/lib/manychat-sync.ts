@@ -573,28 +573,49 @@ export async function syncPipelineToManychat(
               const responseData = (response as any).data || response
               const fullResponse = response as any
               
+              // Verificar si hay un message_id o algún indicador de entrega confirmada
+              const messageId = responseData?.message_id || responseData?.id || (fullResponse as any)?.message_id
+              const hasMessageId = !!messageId
+              // Si la respuesta solo tiene "status": "success" sin más datos, es sospechoso
+              const responseKeys = responseData ? Object.keys(responseData) : []
+              const onlyHasStatus = responseKeys.length === 1 && responseKeys[0] === 'status'
+              const hasDeliveryConfirmation = hasMessageId || (!onlyHasStatus && responseKeys.length > 0)
+              
               logger.info('Mensaje de rechazo enviado exitosamente a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
                 messageLength: rejectionMessage.length,
                 messageTag,
-                messageId: responseData?.message_id || responseData?.id || 'N/A',
+                messageId: messageId || 'N/A',
                 responseData: JSON.stringify(responseData),
                 fullResponse: JSON.stringify(fullResponse),
+                hasMessageId,
+                hasDeliveryConfirmation,
+                responseKeys,
+                onlyHasStatus,
+                fallbackUsed: lastError ? `Fallback de ${lastError.error} a ${messageTag}` : undefined,
                 // Advertencia si no hay datos de confirmación
-                warning: !responseData ? 'Respuesta sin datos de confirmación - verificar entrega' : undefined,
-                fallbackUsed: lastError ? `Fallback de ${lastError.error} a ${messageTag}` : undefined
+                warning: !hasDeliveryConfirmation ? '⚠️ Respuesta sin datos de confirmación de entrega - verificar si el mensaje llegó al destinatario' : undefined
               })
               
-              // Advertencia si la respuesta no tiene datos de confirmación
-              if (!responseData || Object.keys(responseData).length === 0) {
-                logger.warn('ManyChat aceptó el mensaje pero no retornó datos de confirmación - puede que Facebook/Instagram lo haya rechazado silenciosamente', {
+              // Advertencia si la respuesta no tiene datos de confirmación de entrega
+              if (!hasDeliveryConfirmation) {
+                logger.warn('⚠️ ManyChat aceptó el mensaje pero no retornó message_id - Facebook/Instagram puede haber rechazado el mensaje silenciosamente', {
                   leadId,
                   manychatId: manychatIdNumber,
                   channel: 'instagram',
                   messageTag,
-                  fullResponse: JSON.stringify(fullResponse)
+                  fullResponse: JSON.stringify(fullResponse),
+                  responseKeys,
+                  onlyHasStatus,
+                  recommendation: `El tag ${messageTag} fue aceptado por ManyChat pero la respuesta solo contiene {"status":"success"} sin message_id. Esto puede indicar que Facebook/Instagram rechazó el mensaje porque el contenido no cumple con las políticas de ese tag. Verificar manualmente si el mensaje llegó al destinatario en Instagram Direct.`
+                })
+              } else {
+                logger.info('✅ Mensaje enviado con confirmación de entrega (message_id presente)', {
+                  leadId,
+                  manychatId: manychatIdNumber,
+                  messageId: messageId
                 })
               }
             } else {

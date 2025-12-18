@@ -444,20 +444,25 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, message)
+            // Usar message tag ACCOUNT_UPDATE para enviar mensajes fuera de la ventana de 24 horas
+            // Esto es requerido por ManyChat/Facebook cuando el suscriptor no ha interactuado recientemente
+            const messageTag = 'ACCOUNT_UPDATE'
+            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, message, messageTag)
             
             if (messageSent) {
               logger.info('Mensaje de preaprobado enviado exitosamente a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
-                messageLength: message.length
+                messageLength: message.length,
+                messageTag
               })
             } else {
               logger.warn('No se pudo enviar mensaje a Instagram (ManyChat retornó false)', {
                 leadId,
                 manychatId: manychatIdNumber,
-                channel: 'instagram'
+                channel: 'instagram',
+                messageTag
               })
             }
           } else {
@@ -497,20 +502,25 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, rejectionMessage)
+            // Usar message tag ACCOUNT_UPDATE para enviar mensajes fuera de la ventana de 24 horas
+            // Esto es requerido por ManyChat/Facebook cuando el suscriptor no ha interactuado recientemente
+            const messageTag = 'ACCOUNT_UPDATE'
+            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, rejectionMessage, messageTag)
             
             if (messageSent) {
               logger.info('Mensaje de rechazo enviado exitosamente a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
-                messageLength: rejectionMessage.length
+                messageLength: rejectionMessage.length,
+                messageTag
               })
             } else {
               logger.warn('No se pudo enviar mensaje de rechazo a Instagram (ManyChat retornó false)', {
                 leadId,
                 manychatId: manychatIdNumber,
-                channel: 'instagram'
+                channel: 'instagram',
+                messageTag
               })
             }
           } else {

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { DndContext, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
@@ -23,7 +23,8 @@ import {
   Loader2,
   Tag,
   X,
-  Copy
+  Copy,
+  AlertTriangle
 } from 'lucide-react'
 import { usePipelineDragDrop } from '@/hooks/usePipelineDragDrop'
 import { PipelineStage, PipelineLead, DragDropResult, StageTransition } from '@/types/pipeline'
@@ -39,6 +40,7 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { useLongPress } from '@/hooks/useLongPress'
+import { REJECTION_MESSAGES, REJECTION_MESSAGE_OPTIONS } from '@/lib/rejection-messages'
 
 interface PipelineBoardAdvancedProps {
   stages: PipelineStage[]
@@ -959,6 +961,10 @@ const LeadCard = memo(function LeadCard({
   const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string }>>([])
   const [loadingTags, setLoadingTags] = useState(false)
   const [copiedField, setCopiedField] = useState<'cuil' | 'telefono' | null>(null)
+  const [showRejectionModal, setShowRejectionModal] = useState(false)
+  const [pendingStageId, setPendingStageId] = useState<string | null>(null)
+  const [selectedRejectionMessage, setSelectedRejectionMessage] = useState<string | null>(null)
+  const [leadOrigin, setLeadOrigin] = useState<string | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
   const dragStartedRef = useRef(false)
   const longPressTriggeredRef = useRef(false)
@@ -986,6 +992,32 @@ const LeadCard = memo(function LeadCard({
     }
   }, [showDropdown])
   
+  // Obtener información del lead para determinar si es Instagram
+  useEffect(() => {
+    // Primero intentar usar el origen del lead directamente
+    if (lead.origen) {
+      setLeadOrigin(lead.origen)
+      return
+    }
+
+    // Si no está disponible, obtenerlo de la API
+    const fetchLeadInfo = async () => {
+      try {
+        const response = await fetch(`/api/leads/${lead.id}`)
+        if (response.ok) {
+          const leadData = await response.json()
+          setLeadOrigin(leadData.origen || null)
+        }
+      } catch (error) {
+        console.error('Error fetching lead info:', error)
+      }
+    }
+
+    if (lead.id) {
+      fetchLeadInfo()
+    }
+  }, [lead.id, lead.origen])
+
   // Actualizar posición cuando se abre el dropdown o cuando hay scroll
   useEffect(() => {
     if (!showDropdown) return
@@ -1263,14 +1295,14 @@ const LeadCard = memo(function LeadCard({
   // solo activará el drag si hay movimiento de más de 8px, lo que permite que el long press se complete
 
   // Función para mover el lead a una etapa
-  const handleMoveToStage = async (toStageId: string) => {
+  const handleMoveToStage = async (toStageId: string, rejectionMessage?: string) => {
     if (isMoving) {
       console.log('handleMoveToStage: Ya hay un movimiento en proceso', { isMoving })
       return
     }
     
     try {
-      console.log('handleMoveToStage: Iniciando movimiento', { leadId: lead.id, leadName: lead.nombre, fromStageId: lead.stageId, toStageId })
+      console.log('handleMoveToStage: Iniciando movimiento', { leadId: lead.id, leadName: lead.nombre, fromStageId: lead.stageId, toStageId, rejectionMessage })
       setIsMoving(true)
       
       // Llamar directamente a la API en lugar de usar onLeadMove (que es para drag & drop)
@@ -1284,6 +1316,7 @@ const LeadCard = memo(function LeadCard({
         body: JSON.stringify({
           fromStageId,
           toStageId,
+          rejectionMessage: rejectionMessage || undefined,
         }),
       })
 
@@ -1296,6 +1329,9 @@ const LeadCard = memo(function LeadCard({
       console.log('handleMoveToStage: Movimiento exitoso', result)
       
       setShowDropdown(false)
+      setShowRejectionModal(false)
+      setPendingStageId(null)
+      setSelectedRejectionMessage(null)
       const stageName = stages.find(s => s.id === toStageId)?.name || toStageId
       toast.success(`Lead movido a ${stageName}`)
       
@@ -1306,6 +1342,29 @@ const LeadCard = memo(function LeadCard({
       toast.error(error.message || 'Error al mover el lead')
     } finally {
       setIsMoving(false)
+    }
+  }
+
+  // Función para manejar el click en una etapa desde el dropdown
+  const handleStageClick = (stageId: string) => {
+    // Verificar si la etapa es RECHAZADO y si el lead es de Instagram
+    const targetStage = stages.find(s => s.id === stageId)
+    const stageIdLower = stageId.toLowerCase()
+    const stageNameLower = targetStage?.name?.toLowerCase() || ''
+    const isRechazado = stageIdLower === 'rechazado' || 
+                       stageIdLower.includes('rechazado') || 
+                       stageNameLower.includes('rechazado') ||
+                       stageIdLower === 'cerrado-perdido' ||
+                       stageNameLower.includes('perdido')
+    
+    if (isRechazado && leadOrigin === 'instagram') {
+      // Mostrar modal de selección de mensaje
+      setPendingStageId(stageId)
+      setShowRejectionModal(true)
+      setShowDropdown(false)
+    } else {
+      // Mover directamente sin modal
+      handleMoveToStage(stageId)
     }
   }
 
@@ -1843,7 +1902,7 @@ const LeadCard = memo(function LeadCard({
                       .map((stage) => (
                         <button
                           key={stage.id}
-                          onClick={() => handleMoveToStage(stage.id)}
+                          onClick={() => handleStageClick(stage.id)}
                           disabled={isMoving}
                           className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -1940,6 +1999,89 @@ const LeadCard = memo(function LeadCard({
             </div>
           </div>
         </>,
+        document.body
+      )}
+
+      {/* Modal para selección de mensaje de rechazo para Instagram */}
+      {showRejectionModal && typeof window !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <span>Rechazar Lead - Seleccionar Mensaje</span>
+              </CardTitle>
+              <CardDescription>
+                Selecciona el mensaje que se enviará al cliente por Instagram
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Selector de mensajes de rechazo */}
+              <div className="space-y-3">
+                <div className="text-sm font-medium text-gray-700">
+                  Mensaje de rechazo para Instagram:
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {REJECTION_MESSAGE_OPTIONS.map((messageOption) => (
+                    <Button
+                      key={messageOption.id}
+                      variant={selectedRejectionMessage === messageOption.id ? "default" : "outline"}
+                      onClick={() => setSelectedRejectionMessage(messageOption.id)}
+                      className="justify-start text-left h-auto py-3 px-4"
+                    >
+                      <div className="flex flex-col items-start w-full">
+                        <div className="font-medium mb-1">{messageOption.label}</div>
+                        <div className="text-xs text-gray-600 line-clamp-2">
+                          {messageOption.message.substring(0, 100)}...
+                        </div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+                {selectedRejectionMessage && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                    <div className="text-xs font-medium text-gray-700 mb-1">Mensaje completo:</div>
+                    <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                      {REJECTION_MESSAGES[selectedRejectionMessage as keyof typeof REJECTION_MESSAGES]?.message}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón para rechazar con mensaje */}
+              {selectedRejectionMessage && (
+                <div className="border-t pt-4">
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      const rejectionMsg = REJECTION_MESSAGES[selectedRejectionMessage as keyof typeof REJECTION_MESSAGES]?.message
+                      if (pendingStageId) {
+                        handleMoveToStage(pendingStageId, rejectionMsg)
+                      }
+                    }}
+                    className="w-full"
+                    disabled={isMoving}
+                  >
+                    {isMoving ? 'Moviendo...' : 'Rechazar y Enviar Mensaje'}
+                  </Button>
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowRejectionModal(false)
+                    setPendingStageId(null)
+                    setSelectedRejectionMessage(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>,
         document.body
       )}
     </>

@@ -1361,11 +1361,13 @@ export class ManychatService {
     })
 
     // Construir el body según si hay message tag o no
+    // IMPORTANTE: Para Instagram, debemos especificar el tipo de canal en el content
     const body: any = {
       subscriber_id: subscriberId,
       data: {
         version: 'v2',
         content: {
+          type: 'instagram', // Especificar tipo de canal para Instagram
           messages,
         },
       },

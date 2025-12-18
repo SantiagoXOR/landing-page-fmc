@@ -504,11 +504,11 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Usar message tag ACCOUNT_UPDATE - es el único tag soportado por ManyChat para notificaciones
-            // Aunque técnicamente es para cambios de cuenta, es el único disponible para notificar sobre
-            // el estado de una solicitud de crédito cuando el suscriptor no ha interactuado en 24+ horas
+            // Intentar primero con POST_PURCHASE_UPDATE (más apropiado para actualizaciones de solicitud/transacción)
+            // Si falla, intentar con ACCOUNT_UPDATE como fallback
             // ManyChat solo soporta: ACCOUNT_UPDATE, POST_PURCHASE_UPDATE, CONFIRMED_EVENT_UPDATE
-            const messageTag = 'ACCOUNT_UPDATE'
+            let messageTag = 'POST_PURCHASE_UPDATE'
+            let lastError: any = null
             
             // Enviar mensaje y obtener respuesta completa para verificar detalles
             const messages: ManychatMessage[] = [
@@ -517,7 +517,25 @@ export async function syncPipelineToManychat(
                 text: rejectionMessage,
               },
             ]
-            const response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            
+            // Intentar primero con POST_PURCHASE_UPDATE
+            let response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            
+            // Si falla con "Unsupported message tag", intentar con ACCOUNT_UPDATE
+            if (response.status === 'error' && 
+                (response.error_code === 'HTTP_400' || 
+                 response.details?.messages?.some((m: any) => m.message?.includes('Unsupported message tag')))) {
+              logger.warn('POST_PURCHASE_UPDATE no soportado, intentando con ACCOUNT_UPDATE', {
+                leadId,
+                manychatId: manychatIdNumber,
+                originalError: response.error,
+                originalDetails: response.details
+              })
+              
+              messageTag = 'ACCOUNT_UPDATE'
+              lastError = response
+              response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            }
             
             if (response.status === 'success') {
               // Verificar la respuesta completa para asegurar que el mensaje realmente se envió
@@ -534,7 +552,8 @@ export async function syncPipelineToManychat(
                 responseData: JSON.stringify(responseData),
                 fullResponse: JSON.stringify(fullResponse),
                 // Advertencia si no hay datos de confirmación
-                warning: !responseData ? 'Respuesta sin datos de confirmación - verificar entrega' : undefined
+                warning: !responseData ? 'Respuesta sin datos de confirmación - verificar entrega' : undefined,
+                fallbackUsed: lastError ? `Fallback de ${lastError.error} a ${messageTag}` : undefined
               })
               
               // Advertencia si la respuesta no tiene datos de confirmación
@@ -548,7 +567,7 @@ export async function syncPipelineToManychat(
                 })
               }
             } else {
-              logger.error('Error al enviar mensaje de rechazo a Instagram', {
+              logger.error('Error al enviar mensaje de rechazo a Instagram (intentó ambos tags)', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
@@ -556,7 +575,12 @@ export async function syncPipelineToManychat(
                 error: response.error,
                 errorCode: response.error_code,
                 details: response.details,
-                fullResponse: JSON.stringify(response)
+                fullResponse: JSON.stringify(response),
+                previousAttempt: lastError ? {
+                  tag: 'POST_PURCHASE_UPDATE',
+                  error: lastError.error,
+                  errorCode: lastError.error_code
+                } : undefined
               })
             }
           } else {

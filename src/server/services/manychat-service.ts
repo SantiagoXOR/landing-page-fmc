@@ -1360,20 +1360,27 @@ export class ManychatService {
       hasTag: !!tag
     })
 
+    // Construir el body según si hay message tag o no
+    const body: any = {
+      subscriber_id: subscriberId,
+      data: {
+        version: 'v2',
+        content: {
+          messages,
+        },
+      },
+    }
+
+    // Si hay tag, agregarlo como message_tag en el nivel superior (requerido para mensajes fuera de 24h)
+    if (tag) {
+      body.message_tag = tag
+    }
+
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest<ManychatSendMessageResponse>({
         method: 'POST',
         endpoint: `/fb/sending/sendContent`,
-        body: {
-          subscriber_id: subscriberId,
-          data: {
-            version: 'v2',
-            content: {
-              messages,
-            },
-            tag,
-          },
-        },
+        body,
       })
     )
 
@@ -1449,20 +1456,27 @@ export class ManychatService {
       hasTag: !!tag
     })
 
+    // Construir el body según si hay message tag o no
+    const body: any = {
+      phone: normalizedPhone,
+      data: {
+        version: 'v2',
+        content: {
+          messages,
+        },
+      },
+    }
+
+    // Si hay tag, agregarlo como message_tag en el nivel superior (requerido para mensajes fuera de 24h)
+    if (tag) {
+      body.message_tag = tag
+    }
+
     const response = await this.executeWithRateLimit(() =>
       this.makeRequest<ManychatSendMessageResponse>({
         method: 'POST',
         endpoint: `/fb/sending/sendContent`,
-        body: {
-          phone: normalizedPhone,
-          data: {
-            version: 'v2',
-            content: {
-              messages,
-            },
-            tag,
-          },
-        },
+        body,
       })
     )
 

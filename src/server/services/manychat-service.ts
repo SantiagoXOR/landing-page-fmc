@@ -1396,9 +1396,10 @@ export class ManychatService {
     } else {
       logger.info('ManyChat sendContent respuesta exitosa', {
         subscriberId,
-        messageId: response.data?.message_id,
+        messageId: (response.data as any)?.message_id || 'N/A',
         status: response.status,
-        hasData: !!response.data
+        hasData: !!response.data,
+        responseData: response.data ? JSON.stringify(response.data) : 'N/A'
       })
     }
 

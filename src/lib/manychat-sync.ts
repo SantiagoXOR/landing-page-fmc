@@ -522,8 +522,8 @@ export async function syncPipelineToManychat(
                 channel: 'instagram',
                 messageLength: rejectionMessage.length,
                 messageTag,
-                messageId: response.data?.message_id,
-                responseData: JSON.stringify(response.data)
+                messageId: (response.data as any)?.message_id || 'N/A',
+                responseData: response.data ? JSON.stringify(response.data) : 'N/A'
               })
             } else {
               logger.error('Error al enviar mensaje de rechazo a Instagram', {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { DndContext, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -1748,33 +1749,34 @@ const LeadCard = memo(function LeadCard({
         )}
       </div>
 
-      {/* Dropdown Menu */}
-      {showDropdown && (
-        <DropdownMenu open={showDropdown} onOpenChange={setShowDropdown}>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="fixed pointer-events-none opacity-0"
-              style={{
-                left: dropdownPosition.x,
-                top: dropdownPosition.y,
-                transform: 'translateX(-50%)',
-                width: '1px',
-                height: '1px',
-              }}
-              aria-hidden="true"
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent 
-            align="start"
-            side="bottom"
-            sideOffset={4}
-            className="w-64 max-h-96 overflow-y-auto z-[100]"
-            onCloseAutoFocus={(e) => {
-              e.preventDefault()
+      {/* Dropdown Menu - Renderizado con portal para control total del posicionamiento */}
+      {showDropdown && typeof window !== 'undefined' && createPortal(
+        <>
+          {/* Overlay para cerrar al hacer click fuera */}
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={(e) => {
+              // No cerrar si se hace click en la tarjeta misma
+              const target = e.target as HTMLElement
+              if (cardRef.current && cardRef.current.contains(target)) {
+                return
+              }
               setShowDropdown(false)
             }}
-            onEscapeKeyDown={() => setShowDropdown(false)}
-            onInteractOutside={() => setShowDropdown(false)}
+          />
+          {/* Dropdown Menu */}
+          <div
+            className="fixed w-64 max-h-96 overflow-y-auto rounded-md border bg-popover shadow-lg z-[9999] animate-in fade-in-0 zoom-in-95"
+            style={{
+              left: `${dropdownPosition.x}px`,
+              top: `${dropdownPosition.y + 8}px`,
+              transform: 'translateX(-50%)',
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowDropdown(false)
+              }
+            }}
           >
             {/* Tabs para cambiar entre etapas y tags */}
             <div className="flex border-b">
@@ -1803,27 +1805,27 @@ const LeadCard = memo(function LeadCard({
               </button>
             </div>
 
-            {dropdownType === 'stage' ? (
-              <>
-                <DropdownMenuLabel className="px-3 py-2">
-                  Mover a etapa
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {availableStages.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    No hay etapas disponibles
-                  </DropdownMenuItem>
-                ) : (
-                  availableStages
-                    .sort((a, b) => a.order - b.order)
-                    .map((stage) => (
-                      <DropdownMenuItem
-                        key={stage.id}
-                        onClick={() => handleMoveToStage(stage.id)}
-                        disabled={isMoving}
-                        className="cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between w-full">
+            <div className="p-1">
+              {dropdownType === 'stage' ? (
+                <>
+                  <div className="px-3 py-2 text-sm font-semibold">
+                    Mover a etapa
+                  </div>
+                  <div className="h-px bg-muted -mx-1 my-1" />
+                  {availableStages.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground cursor-not-allowed">
+                      No hay etapas disponibles
+                    </div>
+                  ) : (
+                    availableStages
+                      .sort((a, b) => a.order - b.order)
+                      .map((stage) => (
+                        <button
+                          key={stage.id}
+                          onClick={() => handleMoveToStage(stage.id)}
+                          disabled={isMoving}
+                          className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                           <div className="flex items-center gap-2">
                             <div 
                               className="w-2 h-2 rounded-full"
@@ -1836,33 +1838,31 @@ const LeadCard = memo(function LeadCard({
                           ) : (
                             <ArrowRight className="h-4 w-4 ml-2 text-muted-foreground" />
                           )}
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                )}
-              </>
-            ) : (
-              <>
-                <DropdownMenuLabel className="px-3 py-2">
-                  Gestionar tags
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                
-                {/* Tags actuales del lead */}
-                {parsedTags.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 text-xs text-muted-foreground font-medium">
-                      Tags actuales
-                    </div>
-                    {parsedTags.map((tag: string) => {
-                      const tagColor = getTagColor(tag)
-                      return (
-                        <DropdownMenuItem
-                          key={tag}
-                          onClick={() => handleRemoveTag(tag)}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex items-center justify-between w-full">
+                        </button>
+                      ))
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="px-3 py-2 text-sm font-semibold">
+                    Gestionar tags
+                  </div>
+                  <div className="h-px bg-muted -mx-1 my-1" />
+                  
+                  {/* Tags actuales del lead */}
+                  {parsedTags.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-xs text-muted-foreground font-medium">
+                        Tags actuales
+                      </div>
+                      {parsedTags.map((tag: string) => {
+                        const tagColor = getTagColor(tag)
+                        return (
+                          <button
+                            key={tag}
+                            onClick={() => handleRemoveTag(tag)}
+                            className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+                          >
                             <div className="flex items-center gap-2">
                               <div 
                                 className="w-2 h-2 rounded-full"
@@ -1871,56 +1871,55 @@ const LeadCard = memo(function LeadCard({
                               <span>{tag}</span>
                             </div>
                             <X className="h-3 w-3 text-red-500" />
-                          </div>
-                        </DropdownMenuItem>
-                      )
-                    })}
-                    <DropdownMenuSeparator />
-                  </>
-                )}
+                          </button>
+                        )
+                      })}
+                      <div className="h-px bg-muted -mx-1 my-1" />
+                    </>
+                  )}
 
-                {/* Tags disponibles para agregar */}
-                <div className="px-3 py-2 text-xs text-muted-foreground font-medium">
-                  Agregar tag
-                </div>
-                {loadingTags ? (
-                  <DropdownMenuItem disabled>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Cargando tags...
-                  </DropdownMenuItem>
-                ) : availableTags.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    No hay tags disponibles
-                  </DropdownMenuItem>
-                ) : (
-                  availableTags
-                    .filter(tag => !parsedTags.includes(tag.name))
-                    .slice(0, 10)
-                    .map((tag) => (
-                      <DropdownMenuItem
-                        key={tag.id}
-                        onClick={() => handleAddTag(tag.name)}
-                        className="cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2">
+                  {/* Tags disponibles para agregar */}
+                  <div className="px-3 py-2 text-xs text-muted-foreground font-medium">
+                    Agregar tag
+                  </div>
+                  {loadingTags ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando tags...
+                    </div>
+                  ) : availableTags.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground cursor-not-allowed">
+                      No hay tags disponibles
+                    </div>
+                  ) : (
+                    availableTags
+                      .filter(tag => !parsedTags.includes(tag.name))
+                      .slice(0, 10)
+                      .map((tag) => (
+                        <button
+                          key={tag.id}
+                          onClick={() => handleAddTag(tag.name)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+                        >
                           <Tag className="h-3 w-3 text-muted-foreground" />
                           <span>{tag.name}</span>
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                )}
-              </>
-            )}
-            
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setShowDropdown(false)}
-              className="text-muted-foreground"
-            >
-              Cancelar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                        </button>
+                      ))
+                  )}
+                </>
+              )}
+              
+              <div className="h-px bg-muted -mx-1 my-1" />
+              <button
+                onClick={() => setShowDropdown(false)}
+                className="w-full px-2 py-1.5 text-sm text-muted-foreground rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer text-left"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body
       )}
     </>
   )

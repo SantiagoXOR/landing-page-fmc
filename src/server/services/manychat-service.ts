@@ -1384,6 +1384,19 @@ export class ManychatService {
       })
     )
 
+    // Log detallado de la respuesta completa
+    logger.info('ManyChat sendContent respuesta completa', {
+      subscriberId,
+      status: response.status,
+      fullResponse: JSON.stringify(response),
+      hasData: !!(response as any).data,
+      dataKeys: response.status === 'success' ? Object.keys((response as any) || {}) : [],
+      error: (response as any).error,
+      errorCode: (response as any).error_code,
+      details: (response as any).details,
+      messagesSent: messages.length
+    })
+
     // Log detallado de la respuesta
     if (response.status === 'error') {
       logger.error('Error en respuesta de ManyChat sendContent', {
@@ -1391,15 +1404,19 @@ export class ManychatService {
         error: response.error,
         errorCode: response.error_code,
         details: response.details,
-        messagesSent: messages.length
+        messagesSent: messages.length,
+        fullResponse: JSON.stringify(response)
       })
     } else {
+      // Verificar si la respuesta tiene información de entrega
+      const responseData = (response as any).data || response
       logger.info('ManyChat sendContent respuesta exitosa', {
         subscriberId,
-        messageId: (response.data as any)?.message_id || 'N/A',
+        messageId: responseData?.message_id || responseData?.id || 'N/A',
         status: response.status,
-        hasData: !!response.data,
-        responseData: response.data ? JSON.stringify(response.data) : 'N/A'
+        hasData: !!responseData,
+        responseData: JSON.stringify(responseData),
+        fullResponse: JSON.stringify(response)
       })
     }
 

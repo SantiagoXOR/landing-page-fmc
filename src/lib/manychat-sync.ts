@@ -444,9 +444,10 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Usar message tag ACCOUNT_UPDATE para enviar mensajes fuera de la ventana de 24 horas
-            // Esto es requerido por ManyChat/Facebook cuando el suscriptor no ha interactuado recientemente
-            const messageTag = 'ACCOUNT_UPDATE'
+            // Usar message tag ISSUE_RESOLUTION para notificaciones de resultado de solicitud
+            // ACCOUNT_UPDATE es solo para cambios de cuenta (password, settings)
+            // ISSUE_RESOLUTION es más apropiado para notificar sobre el resultado de una solicitud procesada
+            const messageTag = 'ISSUE_RESOLUTION'
             const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, message, messageTag)
             
             if (messageSent) {
@@ -516,15 +517,33 @@ export async function syncPipelineToManychat(
             const response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
             
             if (response.status === 'success') {
+              // Verificar la respuesta completa para asegurar que el mensaje realmente se envió
+              const responseData = (response as any).data || response
+              const fullResponse = response as any
+              
               logger.info('Mensaje de rechazo enviado exitosamente a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
                 messageLength: rejectionMessage.length,
                 messageTag,
-                messageId: (response.data as any)?.message_id || 'N/A',
-                responseData: response.data ? JSON.stringify(response.data) : 'N/A'
+                messageId: responseData?.message_id || responseData?.id || 'N/A',
+                responseData: JSON.stringify(responseData),
+                fullResponse: JSON.stringify(fullResponse),
+                // Advertencia si no hay datos de confirmación
+                warning: !responseData ? 'Respuesta sin datos de confirmación - verificar entrega' : undefined
               })
+              
+              // Advertencia si la respuesta no tiene datos de confirmación
+              if (!responseData || Object.keys(responseData).length === 0) {
+                logger.warn('ManyChat aceptó el mensaje pero no retornó datos de confirmación - puede que Facebook/Instagram lo haya rechazado silenciosamente', {
+                  leadId,
+                  manychatId: manychatIdNumber,
+                  channel: 'instagram',
+                  messageTag,
+                  fullResponse: JSON.stringify(fullResponse)
+                })
+              }
             } else {
               logger.error('Error al enviar mensaje de rechazo a Instagram', {
                 leadId,
@@ -533,7 +552,8 @@ export async function syncPipelineToManychat(
                 messageTag,
                 error: response.error,
                 errorCode: response.error_code,
-                details: response.details
+                details: response.details,
+                fullResponse: JSON.stringify(response)
               })
             }
           } else {

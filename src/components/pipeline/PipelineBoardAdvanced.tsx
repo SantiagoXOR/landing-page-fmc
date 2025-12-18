@@ -957,6 +957,7 @@ const LeadCard = memo(function LeadCard({
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 })
   const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string }>>([])
   const [loadingTags, setLoadingTags] = useState(false)
+  const [copiedField, setCopiedField] = useState<'cuil' | 'telefono' | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
   const dragStartedRef = useRef(false)
   const longPressTriggeredRef = useRef(false)
@@ -1500,10 +1501,15 @@ const LeadCard = memo(function LeadCard({
             : null
           
           // Función para copiar al portapapeles
-          const copyToClipboard = async (text: string, fieldName: string) => {
+          const copyToClipboard = async (text: string, fieldName: string, fieldType: 'cuil' | 'telefono') => {
             try {
               await navigator.clipboard.writeText(text)
+              setCopiedField(fieldType)
               toast.success(`${fieldName} copiado al portapapeles`)
+              // Resetear el estado después de 2 segundos
+              setTimeout(() => {
+                setCopiedField(null)
+              }, 2000)
             } catch (err) {
               toast.error('Error al copiar al portapapeles')
             }
@@ -1516,13 +1522,22 @@ const LeadCard = memo(function LeadCard({
                 <span className="font-medium text-gray-900">{String(displayValue)}</span>
                 <button
                   onClick={(e) => {
+                    e.preventDefault()
                     e.stopPropagation()
-                    copyToClipboard(String(displayValue), 'CUIL')
+                    copyToClipboard(String(displayValue), 'CUIL', 'cuil')
                   }}
-                  className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  className="p-0.5 hover:bg-gray-100 rounded transition-all active:scale-95"
                   title="Copiar CUIL"
                 >
-                  <Copy className="h-3 w-3 text-muted-foreground" />
+                  {copiedField === 'cuil' ? (
+                    <CheckCircle className="h-3 w-3 text-green-600 animate-in fade-in duration-200" />
+                  ) : (
+                    <Copy className="h-3 w-3 text-muted-foreground" />
+                  )}
                 </button>
               </div>
             </div>
@@ -1546,10 +1561,15 @@ const LeadCard = memo(function LeadCard({
           const validPhone = isValidPhone(lead.telefono) ? lead.telefono : null
 
           // Función para copiar al portapapeles
-          const copyToClipboard = async (text: string, fieldName: string) => {
+          const copyToClipboard = async (text: string, fieldName: string, fieldType: 'cuil' | 'telefono') => {
             try {
               await navigator.clipboard.writeText(text)
+              setCopiedField(fieldType)
               toast.success(`${fieldName} copiado al portapapeles`)
+              // Resetear el estado después de 2 segundos
+              setTimeout(() => {
+                setCopiedField(null)
+              }, 2000)
             } catch (err) {
               toast.error('Error al copiar al portapapeles')
             }
@@ -1564,13 +1584,22 @@ const LeadCard = memo(function LeadCard({
                   <span className="font-medium text-gray-900 truncate max-w-[120px]">{validPhone}</span>
                   <button
                     onClick={(e) => {
+                      e.preventDefault()
                       e.stopPropagation()
-                      copyToClipboard(validPhone, 'Teléfono')
+                      copyToClipboard(validPhone, 'Teléfono', 'telefono')
                     }}
-                    className="p-0.5 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    className="p-0.5 hover:bg-gray-100 rounded transition-all active:scale-95 flex-shrink-0"
                     title="Copiar teléfono"
                   >
-                    <Copy className="h-3 w-3 text-muted-foreground" />
+                    {copiedField === 'telefono' ? (
+                      <CheckCircle className="h-3 w-3 text-green-600 animate-in fade-in duration-200" />
+                    ) : (
+                      <Copy className="h-3 w-3 text-muted-foreground" />
+                    )}
                   </button>
                 </div>
               ) : (

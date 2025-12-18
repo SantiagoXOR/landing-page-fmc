@@ -251,7 +251,7 @@ export function PipelineStageIndicator({
                   {leadOrigin === 'instagram' && (selectedStage === 'RECHAZADO' || selectedStage === 'CIERRE_PERDIDO')
                     ? 'Rechazar Lead - Seleccionar Mensaje'
                     : 'Motivo de pérdida'}
-                </CardTitle>
+                </span>
               </CardTitle>
               <CardDescription>
                 {leadOrigin === 'instagram' && (selectedStage === 'RECHAZADO' || selectedStage === 'CIERRE_PERDIDO')

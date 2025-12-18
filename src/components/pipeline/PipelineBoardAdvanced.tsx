@@ -2022,30 +2022,38 @@ const LeadCard = memo(function LeadCard({
                   Mensaje de rechazo para Instagram:
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                  {REJECTION_MESSAGE_OPTIONS.map((messageOption) => (
-                    <Button
-                      key={messageOption.id}
-                      variant={selectedRejectionMessage === messageOption.id ? "default" : "outline"}
-                      onClick={() => setSelectedRejectionMessage(messageOption.id)}
-                      className="justify-start text-left h-auto py-3 px-4"
-                    >
-                      <div className="flex flex-col items-start w-full">
-                        <div className="font-medium mb-1">{messageOption.label}</div>
-                        <div className="text-xs text-gray-600 line-clamp-2">
-                          {messageOption.message.substring(0, 100)}...
+                  {REJECTION_MESSAGE_OPTIONS.map((messageOption) => {
+                    const isSelected = selectedRejectionMessage === messageOption.id
+                    return (
+                      <Button
+                        key={messageOption.id}
+                        variant={isSelected ? "default" : "outline"}
+                        onClick={() => setSelectedRejectionMessage(messageOption.id)}
+                        className="justify-start text-left h-auto py-3 px-4"
+                      >
+                        <div className="flex flex-col items-start w-full">
+                          <div className={`font-medium mb-1 ${isSelected ? 'text-white' : 'text-gray-900'}`}>
+                            {messageOption.label}
+                          </div>
+                          <div className={`text-xs line-clamp-2 ${isSelected ? 'text-gray-100' : 'text-gray-600'}`}>
+                            {messageOption.message.substring(0, 100)}...
+                          </div>
                         </div>
-                      </div>
-                    </Button>
-                  ))}
+                      </Button>
+                    )
+                  })}
                 </div>
-                {selectedRejectionMessage && (
-                  <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                    <div className="text-xs font-medium text-gray-700 mb-1">Mensaje completo:</div>
-                    <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                      {REJECTION_MESSAGES[selectedRejectionMessage as keyof typeof REJECTION_MESSAGES]?.message}
+                {selectedRejectionMessage && (() => {
+                  const selectedOption = REJECTION_MESSAGE_OPTIONS.find(opt => opt.id === selectedRejectionMessage)
+                  return selectedOption ? (
+                    <div className="mt-3 p-4 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="text-sm font-semibold text-gray-900 mb-2">Mensaje completo:</div>
+                      <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                        {selectedOption.message}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null
+                })()}
               </div>
 
               {/* Botón para rechazar con mensaje */}
@@ -2054,8 +2062,9 @@ const LeadCard = memo(function LeadCard({
                   <Button
                     variant="destructive"
                     onClick={() => {
-                      const rejectionMsg = REJECTION_MESSAGES[selectedRejectionMessage as keyof typeof REJECTION_MESSAGES]?.message
-                      if (pendingStageId) {
+                      const selectedOption = REJECTION_MESSAGE_OPTIONS.find(opt => opt.id === selectedRejectionMessage)
+                      const rejectionMsg = selectedOption?.message
+                      if (pendingStageId && rejectionMsg) {
                         handleMoveToStage(pendingStageId, rejectionMsg)
                       }
                     }}

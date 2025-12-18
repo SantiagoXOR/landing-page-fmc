@@ -1044,13 +1044,21 @@ const LeadCard = memo(function LeadCard({
       longPressTriggeredRef.current = true
       
       // Obtener posición del card para posicionar el dropdown
-      // Calcular posición considerando el scroll del contenedor
+      // Calcular posición considerando el scroll del contenedor y espacio disponible
       if (cardRef.current) {
         const rect = cardRef.current.getBoundingClientRect()
-        // Usar coordenadas del viewport directamente (getBoundingClientRect ya las da relativas al viewport)
+        const viewportHeight = window.innerHeight
+        const dropdownHeight = 400 // Altura aproximada del dropdown
+        const spaceBelow = viewportHeight - rect.bottom
+        const spaceAbove = rect.top
+        
+        // Si no hay espacio suficiente abajo pero sí arriba, mostrar arriba
+        const showAbove = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight
+        
         setDropdownPosition({
           x: rect.left + rect.width / 2,
-          y: rect.bottom + 4 // Posicionar justo debajo de la tarjeta
+          y: showAbove ? rect.top - 8 : rect.bottom + 8,
+          showAbove
         })
       }
       

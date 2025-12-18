@@ -444,27 +444,58 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Usar message tag ACCOUNT_UPDATE - es el único tag soportado por ManyChat para notificaciones
-            // Aunque técnicamente es para cambios de cuenta, es el único disponible para notificar sobre
-            // el estado de una solicitud de crédito cuando el suscriptor no ha interactuado en 24+ horas
-            // ManyChat solo soporta: ACCOUNT_UPDATE, POST_PURCHASE_UPDATE, CONFIRMED_EVENT_UPDATE
-            const messageTag = 'ACCOUNT_UPDATE'
-            const messageSent = await ManychatService.sendTextMessage(manychatIdNumber, message, messageTag)
+            // Intentar primero con POST_PURCHASE_UPDATE (más apropiado para actualizaciones de solicitud/transacción)
+            // Si falla, intentar con ACCOUNT_UPDATE como fallback
+            let messageTag = 'POST_PURCHASE_UPDATE'
+            let lastError: any = null
             
-            if (messageSent) {
+            const messages: ManychatMessage[] = [
+              {
+                type: 'text',
+                text: message,
+              },
+            ]
+            
+            // Intentar primero con POST_PURCHASE_UPDATE
+            let response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            
+            // Si falla con "Unsupported message tag", intentar con ACCOUNT_UPDATE
+            if (response.status === 'error' && 
+                (response.error_code === 'HTTP_400' || 
+                 response.details?.messages?.some((m: any) => m.message?.includes('Unsupported message tag')))) {
+              logger.warn('POST_PURCHASE_UPDATE no soportado para preaprobado, intentando con ACCOUNT_UPDATE', {
+                leadId,
+                manychatId: manychatIdNumber,
+                originalError: response.error
+              })
+              
+              messageTag = 'ACCOUNT_UPDATE'
+              lastError = response
+              response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            }
+            
+            if (response.status === 'success') {
               logger.info('Mensaje de preaprobado enviado exitosamente a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
                 messageLength: message.length,
-                messageTag
+                messageTag,
+                fallbackUsed: lastError ? `Fallback de ${lastError.error} a ${messageTag}` : undefined
               })
             } else {
-              logger.warn('No se pudo enviar mensaje a Instagram (ManyChat retornó false)', {
+              logger.warn('No se pudo enviar mensaje a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
-                messageTag
+                messageTag,
+                error: response.error,
+                errorCode: response.error_code,
+                details: response.details,
+                previousAttempt: lastError ? {
+                  tag: 'POST_PURCHASE_UPDATE',
+                  error: lastError.error
+                } : undefined
               })
             }
           } else {

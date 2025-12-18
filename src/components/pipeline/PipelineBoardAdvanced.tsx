@@ -955,7 +955,7 @@ const LeadCard = memo(function LeadCard({
   const [isMoving, setIsMoving] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [dropdownType, setDropdownType] = useState<'stage' | 'tags'>('stage')
-  const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 })
+  const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0, showAbove: false })
   const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string }>>([])
   const [loadingTags, setLoadingTags] = useState(false)
   const [copiedField, setCopiedField] = useState<'cuil' | 'telefono' | null>(null)
@@ -966,13 +966,22 @@ const LeadCard = memo(function LeadCard({
   const isScrollingRef = useRef(false)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Función para actualizar la posición del dropdown
+  // Función para actualizar la posición del dropdown con detección de espacio
   const updateDropdownPosition = useCallback(() => {
     if (cardRef.current && showDropdown) {
       const rect = cardRef.current.getBoundingClientRect()
+      const viewportHeight = window.innerHeight
+      const dropdownHeight = 400 // Altura aproximada del dropdown (max-h-96 = 384px + padding)
+      const spaceBelow = viewportHeight - rect.bottom
+      const spaceAbove = rect.top
+      
+      // Si no hay espacio suficiente abajo pero sí arriba, mostrar arriba
+      const showAbove = spaceBelow < dropdownHeight && spaceAbove > dropdownHeight
+      
       setDropdownPosition({
         x: rect.left + rect.width / 2,
-        y: rect.bottom + 4
+        y: showAbove ? rect.top - 8 : rect.bottom + 8,
+        showAbove
       })
     }
   }, [showDropdown])
@@ -1769,8 +1778,12 @@ const LeadCard = memo(function LeadCard({
             className="fixed w-64 max-h-96 overflow-y-auto rounded-md border bg-popover shadow-lg z-[9999] animate-in fade-in-0 zoom-in-95"
             style={{
               left: `${dropdownPosition.x}px`,
-              top: `${dropdownPosition.y + 8}px`,
-              transform: 'translateX(-50%)',
+              top: dropdownPosition.showAbove 
+                ? `${dropdownPosition.y}px` 
+                : `${dropdownPosition.y}px`,
+              transform: dropdownPosition.showAbove 
+                ? 'translateX(-50%) translateY(-100%)' 
+                : 'translateX(-50%)',
             }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {

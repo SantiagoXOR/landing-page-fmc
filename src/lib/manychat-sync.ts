@@ -709,10 +709,22 @@ export async function syncPipelineToManychat(
                 
                 // Nota importante: Aunque el envío directo falló, el tag ya fue agregado,
                 // por lo que las automatizaciones de ManyChat deberían funcionar
-                logger.info('ℹ️ Nota: El tag "credito-rechazado" será agregado al suscriptor después de este bloque, lo que activará las automatizaciones de ManyChat', {
+                logger.warn('📋 IMPORTANTE: Mensaje no entregado directamente - Configurar automatización en ManyChat', {
                   leadId,
                   manychatId: manychatIdNumber,
-                  note: 'Las automatizaciones de ManyChat pueden enviar el mensaje cuando el suscriptor interactúe, evitando las restricciones de message tags'
+                  channel: 'instagram',
+                  tag: 'credito-rechazado',
+                  messageTag,
+                  problem: 'Facebook/Instagram rechazó el mensaje silenciosamente aunque ManyChat lo aceptó',
+                  solution: 'El tag "credito-rechazado" será agregado al suscriptor. Configurar en ManyChat una automatización que:',
+                  instructions: [
+                    '1. Trigger: "Tag Added" → "credito-rechazado"',
+                    '2. Condición: Custom Field "origen" = "instagram"',
+                    '3. Acción: "Send Message" con el mensaje de rechazo',
+                    '4. Esto enviará el mensaje cuando el usuario interactúe (dentro de ventana de 24h)',
+                    '5. Alternativa: Usar "User Says" trigger para enviar cuando el usuario escriba cualquier mensaje'
+                  ],
+                  note: 'Esta es la única forma confiable de enviar mensajes fuera de la ventana de 24 horas en Instagram según las políticas de Meta'
                 })
               } else {
                 logger.info('✅ Mensaje enviado con confirmación de entrega (message_id presente)', {

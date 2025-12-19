@@ -644,7 +644,15 @@ export async function syncPipelineToManychat(
                   fullResponse: JSON.stringify(fullResponse),
                   responseKeys,
                   onlyHasStatus,
-                  recommendation: `El tag ${messageTag} fue aceptado por ManyChat pero la respuesta solo contiene {"status":"success"} sin message_id. Esto puede indicar que Facebook/Instagram rechazó el mensaje porque el contenido no cumple con las políticas de ese tag. Verificar manualmente si el mensaje llegó al destinatario en Instagram Direct.`
+                  recommendation: `El tag ${messageTag} fue aceptado por ManyChat pero la respuesta solo contiene {"status":"success"} sin message_id. Esto indica que Facebook/Instagram rechazó el mensaje silenciosamente. IMPORTANTE: El tag "credito-rechazado" ya fue agregado al suscriptor, por lo que las automatizaciones de ManyChat deberían enviar el mensaje cuando el suscriptor interactúe. Verificar en ManyChat que existe una automatización configurada para el tag "credito-rechazado" que envíe el mensaje de rechazo.`
+                })
+                
+                // Nota importante: Aunque el envío directo falló, el tag ya fue agregado,
+                // por lo que las automatizaciones de ManyChat deberían funcionar
+                logger.info('ℹ️ Nota: El tag "credito-rechazado" será agregado al suscriptor después de este bloque, lo que activará las automatizaciones de ManyChat', {
+                  leadId,
+                  manychatId: manychatIdNumber,
+                  note: 'Las automatizaciones de ManyChat pueden enviar el mensaje cuando el suscriptor interactúe, evitando las restricciones de message tags'
                 })
               } else {
                 logger.info('✅ Mensaje enviado con confirmación de entrega (message_id presente)', {

@@ -444,9 +444,13 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Intentar primero con POST_PURCHASE_UPDATE (más apropiado para actualizaciones de solicitud/transacción)
-            // Si falla, intentar con ACCOUNT_UPDATE como fallback
-            let messageTag = 'POST_PURCHASE_UPDATE'
+            // Según la documentación oficial de Meta:
+            // ACCOUNT_UPDATE está permitido para "change in application status (e.g., credit card or job applications)"
+            // Esto incluye aprobaciones Y preaprobaciones de aplicaciones de crédito.
+            // POST_PURCHASE_UPDATE es para actualizaciones de compras (envío, confirmaciones), NO para preaprobaciones.
+            // Por lo tanto, usamos ACCOUNT_UPDATE directamente para preaprobaciones de crédito.
+            // Referencia: https://developers.facebook.com/docs/messenger-platform/send-messages/message-tags#account_update
+            let messageTag = 'ACCOUNT_UPDATE'
             let lastError: any = null
             
             const messages: ManychatMessage[] = [
@@ -456,33 +460,59 @@ export async function syncPipelineToManychat(
               },
             ]
             
-            // Intentar primero con POST_PURCHASE_UPDATE
+            // Intentar primero con ACCOUNT_UPDATE (tag correcto según documentación oficial)
             let response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
             
-            // Si falla con "Unsupported message tag", intentar con ACCOUNT_UPDATE
+            // Si falla con "Unsupported message tag" o error 400, intentar con POST_PURCHASE_UPDATE como fallback
+            // (aunque no es el tag ideal, algunos casos pueden requerirlo)
             if (response.status === 'error' && 
                 (response.error_code === 'HTTP_400' || 
                  response.details?.messages?.some((m: any) => m.message?.includes('Unsupported message tag')))) {
-              logger.warn('POST_PURCHASE_UPDATE no soportado para preaprobado, intentando con ACCOUNT_UPDATE', {
+              logger.warn('ACCOUNT_UPDATE rechazado para preaprobado, intentando con POST_PURCHASE_UPDATE como fallback', {
                 leadId,
                 manychatId: manychatIdNumber,
-                originalError: response.error
+                originalError: response.error,
+                originalDetails: response.details,
+                note: 'POST_PURCHASE_UPDATE no es el tag ideal para preaprobaciones de crédito según la documentación oficial'
               })
               
-              messageTag = 'ACCOUNT_UPDATE'
+              messageTag = 'POST_PURCHASE_UPDATE'
               lastError = response
               response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
             }
             
             if (response.status === 'success') {
+              // Verificar si hay message_id en la respuesta
+              const responseData = (response as any).data || response
+              const fullResponse = response as any
+              const messageId = responseData?.message_id || responseData?.id || (fullResponse as any)?.message_id
+              const hasMessageId = !!messageId
+              const responseKeys = responseData ? Object.keys(responseData) : []
+              const onlyHasStatus = responseKeys.length === 1 && responseKeys[0] === 'status'
+              const hasDeliveryConfirmation = hasMessageId || (!onlyHasStatus && responseKeys.length > 0)
+              
               logger.info('Mensaje de preaprobado enviado exitosamente a Instagram', {
                 leadId,
                 manychatId: manychatIdNumber,
                 channel: 'instagram',
                 messageLength: message.length,
                 messageTag,
+                messageId: messageId || 'N/A',
+                hasMessageId,
+                hasDeliveryConfirmation,
                 fallbackUsed: lastError ? `Fallback de ${lastError.error} a ${messageTag}` : undefined
               })
+              
+              if (!hasDeliveryConfirmation) {
+                logger.warn('⚠️ ManyChat aceptó el mensaje de preaprobado pero no retornó message_id - Facebook/Instagram puede haber rechazado el mensaje silenciosamente', {
+                  leadId,
+                  manychatId: manychatIdNumber,
+                  channel: 'instagram',
+                  messageTag,
+                  fullResponse: JSON.stringify(fullResponse),
+                  recommendation: `El tag ${messageTag} fue aceptado por ManyChat pero la respuesta solo contiene {"status":"success"} sin message_id. Verificar manualmente si el mensaje llegó al destinatario en Instagram Direct.`
+                })
+              }
             } else {
               logger.warn('No se pudo enviar mensaje a Instagram', {
                 leadId,
@@ -493,7 +523,7 @@ export async function syncPipelineToManychat(
                 errorCode: response.error_code,
                 details: response.details,
                 previousAttempt: lastError ? {
-                  tag: 'POST_PURCHASE_UPDATE',
+                  tag: 'ACCOUNT_UPDATE',
                   error: lastError.error
                 } : undefined
               })
@@ -535,10 +565,13 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Intentar primero con POST_PURCHASE_UPDATE (más apropiado para actualizaciones de solicitud/transacción)
-            // Si falla, intentar con ACCOUNT_UPDATE como fallback
-            // ManyChat solo soporta: ACCOUNT_UPDATE, POST_PURCHASE_UPDATE, CONFIRMED_EVENT_UPDATE
-            let messageTag = 'POST_PURCHASE_UPDATE'
+            // Según la documentación oficial de Meta:
+            // ACCOUNT_UPDATE está permitido para "change in application status (e.g., credit card or job applications)"
+            // Esto incluye aprobaciones Y rechazos de aplicaciones de crédito.
+            // POST_PURCHASE_UPDATE es para actualizaciones de compras (envío, confirmaciones), NO para rechazos de crédito.
+            // Por lo tanto, usamos ACCOUNT_UPDATE directamente para rechazos de crédito.
+            // Referencia: https://developers.facebook.com/docs/messenger-platform/send-messages/message-tags#account_update
+            let messageTag = 'ACCOUNT_UPDATE'
             let lastError: any = null
             
             // Enviar mensaje y obtener respuesta completa para verificar detalles
@@ -549,21 +582,23 @@ export async function syncPipelineToManychat(
               },
             ]
             
-            // Intentar primero con POST_PURCHASE_UPDATE
+            // Intentar primero con ACCOUNT_UPDATE (tag correcto según documentación oficial)
             let response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
             
-            // Si falla con "Unsupported message tag", intentar con ACCOUNT_UPDATE
+            // Si falla con "Unsupported message tag" o error 400, intentar con POST_PURCHASE_UPDATE como fallback
+            // (aunque no es el tag ideal, algunos casos pueden requerirlo)
             if (response.status === 'error' && 
                 (response.error_code === 'HTTP_400' || 
                  response.details?.messages?.some((m: any) => m.message?.includes('Unsupported message tag')))) {
-              logger.warn('POST_PURCHASE_UPDATE no soportado, intentando con ACCOUNT_UPDATE', {
+              logger.warn('ACCOUNT_UPDATE rechazado, intentando con POST_PURCHASE_UPDATE como fallback', {
                 leadId,
                 manychatId: manychatIdNumber,
                 originalError: response.error,
-                originalDetails: response.details
+                originalDetails: response.details,
+                note: 'POST_PURCHASE_UPDATE no es el tag ideal para rechazos de crédito según la documentación oficial'
               })
               
-              messageTag = 'ACCOUNT_UPDATE'
+              messageTag = 'POST_PURCHASE_UPDATE'
               lastError = response
               response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
             }

@@ -643,10 +643,11 @@ export async function syncPipelineToManychat(
               })
               
               response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            }
             
             // Estrategia 3: Si ACCOUNT_UPDATE falla, intentar con POST_PURCHASE_UPDATE como último recurso
             // (aunque no es el tag ideal según la documentación oficial)
-            if (response.status === 'error' && 
+            if (response && response.status === 'error' && 
                 (response.error_code === 'HTTP_400' || 
                  response.details?.messages?.some((m: any) => m.message?.includes('Unsupported message tag')))) {
               logger.warn('ACCOUNT_UPDATE rechazado, intentando con POST_PURCHASE_UPDATE como último recurso', {

@@ -565,14 +565,37 @@ export async function syncPipelineToManychat(
             : manychatId
           
           if (!isNaN(manychatIdNumber) && manychatIdNumber > 0) {
-            // Según la documentación oficial de Meta:
-            // ACCOUNT_UPDATE está permitido para "change in application status (e.g., credit card or job applications)"
-            // Esto incluye aprobaciones Y rechazos de aplicaciones de crédito.
-            // POST_PURCHASE_UPDATE es para actualizaciones de compras (envío, confirmaciones), NO para rechazos de crédito.
-            // Por lo tanto, usamos ACCOUNT_UPDATE directamente para rechazos de crédito.
-            // Referencia: https://developers.facebook.com/docs/messenger-platform/send-messages/message-tags#account_update
-            let messageTag = 'ACCOUNT_UPDATE'
-            let lastError: any = null
+            // Estrategia de envío con múltiples intentos:
+            // 1. Si el usuario está dentro de 24 horas, intentar sin tag (más confiable)
+            // 2. Si está fuera o falla, intentar con ACCOUNT_UPDATE (tag correcto según documentación oficial)
+            // 3. Si falla, intentar con POST_PURCHASE_UPDATE como fallback
+            // 4. Si todo falla, registrar advertencia (el tag se agregará y las automatizaciones pueden enviar)
+            
+            // Verificar si el usuario está dentro de las 24 horas
+            let isWithin24Hours = false
+            try {
+              const subscriberInfo = await getManychatSubscriber(manychatId)
+              if (subscriberInfo?.last_interaction) {
+                const lastInteraction = new Date(subscriberInfo.last_interaction)
+                const now = new Date()
+                const hoursSinceInteraction = (now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60)
+                isWithin24Hours = hoursSinceInteraction < 24
+                
+                logger.info('Verificando ventana de 24 horas para envío de mensaje', {
+                  leadId,
+                  manychatId: manychatIdNumber,
+                  lastInteraction: subscriberInfo.last_interaction,
+                  hoursSinceInteraction: Math.round(hoursSinceInteraction * 100) / 100,
+                  isWithin24Hours
+                })
+              }
+            } catch (timeCheckError: any) {
+              logger.warn('No se pudo verificar ventana de 24 horas, asumiendo fuera de ventana', {
+                leadId,
+                manychatId: manychatIdNumber,
+                error: timeCheckError.message
+              })
+            }
             
             // Enviar mensaje y obtener respuesta completa para verificar detalles
             const messages: ManychatMessage[] = [
@@ -582,15 +605,51 @@ export async function syncPipelineToManychat(
               },
             ]
             
-            // Intentar primero con ACCOUNT_UPDATE (tag correcto según documentación oficial)
-            let response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            let messageTag: string | undefined = undefined
+            let lastError: any = null
+            let response: any = null
             
-            // Si falla con "Unsupported message tag" o error 400, intentar con POST_PURCHASE_UPDATE como fallback
-            // (aunque no es el tag ideal, algunos casos pueden requerirlo)
+            // Estrategia 1: Si está dentro de 24 horas, intentar sin tag primero
+            if (isWithin24Hours) {
+              logger.info('Usuario está dentro de ventana de 24 horas, intentando envío sin message tag', {
+                leadId,
+                manychatId: manychatIdNumber
+              })
+              
+              response = await ManychatService.sendMessage(manychatIdNumber, messages, undefined)
+              
+              // Si falla sin tag, continuar con tags
+              if (response.status === 'error') {
+                logger.warn('Envío sin tag falló, intentando con message tags', {
+                  leadId,
+                  manychatId: manychatIdNumber,
+                  error: response.error
+                })
+                lastError = response
+              }
+            }
+            
+            // Estrategia 2: Intentar con ACCOUNT_UPDATE (tag correcto según documentación oficial)
+            // Según la documentación oficial de Meta:
+            // ACCOUNT_UPDATE está permitido para "change in application status (e.g., credit card or job applications)"
+            // Esto incluye aprobaciones Y rechazos de aplicaciones de crédito.
+            // Referencia: https://developers.facebook.com/docs/messenger-platform/send-messages/message-tags#account_update
+            if (!response || response.status === 'error') {
+              messageTag = 'ACCOUNT_UPDATE'
+              logger.info('Intentando envío con ACCOUNT_UPDATE (tag correcto para rechazos de crédito)', {
+                leadId,
+                manychatId: manychatIdNumber,
+                wasWithin24Hours: isWithin24Hours
+              })
+              
+              response = await ManychatService.sendMessage(manychatIdNumber, messages, messageTag)
+            
+            // Estrategia 3: Si ACCOUNT_UPDATE falla, intentar con POST_PURCHASE_UPDATE como último recurso
+            // (aunque no es el tag ideal según la documentación oficial)
             if (response.status === 'error' && 
                 (response.error_code === 'HTTP_400' || 
                  response.details?.messages?.some((m: any) => m.message?.includes('Unsupported message tag')))) {
-              logger.warn('ACCOUNT_UPDATE rechazado, intentando con POST_PURCHASE_UPDATE como fallback', {
+              logger.warn('ACCOUNT_UPDATE rechazado, intentando con POST_PURCHASE_UPDATE como último recurso', {
                 leadId,
                 manychatId: manychatIdNumber,
                 originalError: response.error,

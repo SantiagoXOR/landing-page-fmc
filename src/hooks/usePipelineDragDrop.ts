@@ -52,22 +52,25 @@ export function usePipelineDragDrop({
   )
 
   // Organizar leads por etapa
+  // Respetar el orden del backend (que ya ordena prioritarios con ventana de 24hs primero)
   const leadsByStage = useCallback(() => {
     const organized: Record<string, PipelineLead[]> = {}
+    
+    // Crear un mapa de índices para mantener el orden del backend
+    const leadOrderMap = new Map<string, number>()
+    leads.forEach((lead, index) => {
+      if (lead.id) {
+        leadOrderMap.set(lead.id, index)
+      }
+    })
     
     stages.forEach(stage => {
       organized[stage.id] = leads.filter(lead => lead.stageId === stage.id)
         .sort((a, b) => {
-          // Ordenar por prioridad y luego por fecha de entrada a la etapa
-          const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 }
-          const aPriority = priorityOrder[a.priority] || 1
-          const bPriority = priorityOrder[b.priority] || 1
-          
-          if (aPriority !== bPriority) {
-            return bPriority - aPriority
-          }
-          
-          return new Date(a.stageEntryDate).getTime() - new Date(b.stageEntryDate).getTime()
+          // Mantener el orden del backend usando el índice original
+          const aIndex = leadOrderMap.get(a.id || '') ?? 0
+          const bIndex = leadOrderMap.get(b.id || '') ?? 0
+          return aIndex - bIndex
         })
     })
     

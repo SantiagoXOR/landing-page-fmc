@@ -597,6 +597,59 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Crear mapa para relacionar PipelineLead con lead original (para acceder a createdAt)
+    const leadOriginalMap = new Map<string, any>()
+    leads.forEach(lead => {
+      if (lead.id) {
+        leadOriginalMap.set(lead.id, lead)
+      }
+    })
+
+    // Ordenar leads: prioritarios con ventana de 24hs primero, en orden ascendente
+    const now = new Date()
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+    const priorityLeadsWith24hWindow: PipelineLead[] = []
+    const otherLeads: PipelineLead[] = []
+
+    for (const pipelineLead of pipelineLeads) {
+      // Verificar si es prioritario (high o urgent)
+      const isPriority = pipelineLead.priority === 'high' || pipelineLead.priority === 'urgent'
+      
+      if (isPriority && pipelineLead.id) {
+        // Obtener el lead original para acceder a createdAt
+        const originalLead = leadOriginalMap.get(pipelineLead.id)
+        if (originalLead && originalLead.createdAt) {
+          const leadCreatedAt = new Date(originalLead.createdAt)
+          // Verificar si tiene ventana de 24hs activa (24hs o menos desde que ingresó)
+          if (leadCreatedAt >= twentyFourHoursAgo) {
+            priorityLeadsWith24hWindow.push(pipelineLead)
+            continue
+          }
+        }
+      }
+      
+      // Si no cumple los criterios, agregar al grupo de otros leads
+      otherLeads.push(pipelineLead)
+    }
+
+    // Ordenar los leads prioritarios con ventana de 24hs en orden ascendente por createdAt
+    priorityLeadsWith24hWindow.sort((a, b) => {
+      const leadA = leadOriginalMap.get(a.id!)
+      const leadB = leadOriginalMap.get(b.id!)
+      
+      if (!leadA || !leadA.createdAt) return 1
+      if (!leadB || !leadB.createdAt) return -1
+      
+      const dateA = new Date(leadA.createdAt).getTime()
+      const dateB = new Date(leadB.createdAt).getTime()
+      
+      return dateA - dateB // Orden ascendente (más antiguos primero)
+    })
+
+    // Combinar: primero los prioritarios con ventana de 24hs, luego el resto
+    pipelineLeads = [...priorityLeadsWith24hWindow, ...otherLeads]
+
     // Agrupar leads por estado original y stageId para debugging
     const leadsByEstado = leads.reduce((acc, lead) => {
       const estado = lead.estado || 'SIN_ESTADO'

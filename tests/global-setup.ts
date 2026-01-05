@@ -9,8 +9,9 @@ async function globalSetup(config: FullConfig) {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   
+  const targetURL = baseURL || 'http://localhost:3000';
+  
   try {
-    const targetURL = baseURL || 'http://localhost:3000';
     console.log(`📡 Verificando conectividad con ${targetURL}...`);
     await page.goto(targetURL, {
       waitUntil: 'networkidle',

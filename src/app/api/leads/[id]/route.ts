@@ -81,6 +81,20 @@ export async function PATCH(
 
     const lead = await leadService.updateLead(params.id, validatedData, session.user?.id || '')
 
+    // Verificar si se actualizó el CUIL y mover automáticamente si corresponde
+    if (validatedData.cuil !== undefined) {
+      try {
+        const { PipelineAutoMoveService } = await import('@/server/services/pipeline-auto-move-service')
+        await PipelineAutoMoveService.checkAndMoveLeadWithCUIL(params.id)
+      } catch (autoMoveError: any) {
+        // No bloquear la actualización del lead si falla el auto-move
+        logger.warn('Error en auto-move después de actualizar lead (no crítico)', {
+          leadId: params.id,
+          error: autoMoveError.message
+        })
+      }
+    }
+
     // Sincronizar automáticamente con ManyChat si está configurado
     if (ManychatService.isConfigured()) {
       try {

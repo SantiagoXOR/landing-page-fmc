@@ -73,6 +73,7 @@ export interface PipelineLead {
   scoreColor?: string // Color para visualización (hex)
   scoreLabel?: string // Etiqueta descriptiva del score
   cuil?: string // CUIL/CUIT del lead
+  createdAt?: string | Date // Fecha de creación del lead (ISO string o Date)
 }
 
 export interface LeadActivity {

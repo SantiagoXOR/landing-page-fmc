@@ -1,0 +1,106 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - img "FMC Logo" [ref=e8]
+      - navigation [ref=e9]:
+        - link "Inicio" [ref=e11] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e12] [cursor=pointer]:
+            - img [ref=e13] [cursor=pointer]
+            - generic [ref=e16] [cursor=pointer]: Inicio
+        - link "Chats" [ref=e18] [cursor=pointer]:
+          - /url: /chats
+          - generic [ref=e19] [cursor=pointer]:
+            - img [ref=e20] [cursor=pointer]
+            - generic [ref=e22] [cursor=pointer]: Chats
+        - heading "Entrenamiento" [level=3] [ref=e25]
+        - link "Asistentes" [ref=e27] [cursor=pointer]:
+          - /url: /asistentes
+          - generic [ref=e28] [cursor=pointer]:
+            - img [ref=e29] [cursor=pointer]
+            - generic [ref=e32] [cursor=pointer]: Asistentes
+        - heading "CRM" [level=3] [ref=e35]
+        - link "Smart Tags" [ref=e37] [cursor=pointer]:
+          - /url: /tags
+          - generic [ref=e38] [cursor=pointer]:
+            - img [ref=e39] [cursor=pointer]
+            - generic [ref=e42] [cursor=pointer]: Smart Tags
+        - link "Contactos 0" [ref=e44] [cursor=pointer]:
+          - /url: /leads
+          - generic [ref=e45] [cursor=pointer]:
+            - img [ref=e46] [cursor=pointer]
+            - generic [ref=e51] [cursor=pointer]: Contactos
+          - generic [ref=e53] [cursor=pointer]: "0"
+        - link "Ventas" [ref=e55] [cursor=pointer]:
+          - /url: /pipeline
+          - generic [ref=e56] [cursor=pointer]:
+            - img [ref=e57] [cursor=pointer]
+            - generic [ref=e60] [cursor=pointer]: Ventas
+        - link "Documentos 12" [ref=e62] [cursor=pointer]:
+          - /url: /documents
+          - generic [ref=e63] [cursor=pointer]:
+            - img [ref=e64] [cursor=pointer]
+            - generic [ref=e67] [cursor=pointer]: Documentos
+          - generic [ref=e69] [cursor=pointer]: "12"
+        - link "Reportes" [ref=e71] [cursor=pointer]:
+          - /url: /reports
+          - generic [ref=e72] [cursor=pointer]:
+            - img [ref=e73] [cursor=pointer]
+            - generic [ref=e75] [cursor=pointer]: Reportes
+        - heading "Chatbot" [level=3] [ref=e78]
+        - link "Dashboard" [ref=e80] [cursor=pointer]:
+          - /url: /manychat/dashboard
+          - generic [ref=e81] [cursor=pointer]:
+            - img [ref=e82] [cursor=pointer]
+            - generic [ref=e85] [cursor=pointer]: Dashboard
+        - link "Configuración" [ref=e87] [cursor=pointer]:
+          - /url: /settings/manychat
+          - generic [ref=e88] [cursor=pointer]:
+            - img [ref=e89] [cursor=pointer]
+            - generic [ref=e92] [cursor=pointer]: Configuración
+        - heading "Sistema" [level=3] [ref=e95]
+        - link "Settings" [ref=e97] [cursor=pointer]:
+          - /url: /settings
+          - generic [ref=e98] [cursor=pointer]:
+            - img [ref=e99] [cursor=pointer]
+            - generic [ref=e102] [cursor=pointer]: Settings
+      - generic [ref=e103]:
+        - button "1" [ref=e105] [cursor=pointer]:
+          - img
+          - generic [ref=e106] [cursor=pointer]: "1"
+        - generic [ref=e107]:
+          - generic [ref=e108]:
+            - generic [ref=e110]: S
+            - generic [ref=e111]:
+              - paragraph [ref=e112]: Santiago Martinez
+              - paragraph [ref=e113]: santiago@xor.com.ar
+          - button "Cerrar Sesión" [ref=e114] [cursor=pointer]:
+            - img
+            - generic [ref=e115] [cursor=pointer]: Cerrar Sesión
+    - main [ref=e117]:
+      - generic [ref=e118]:
+        - generic [ref=e120]:
+          - generic [ref=e123]:
+            - heading "Buenas tardes, Santiago Martinez 👋" [level=1] [ref=e124]
+            - generic [ref=e125]:
+              - generic [ref=e126]: Hoy
+              - generic [ref=e127]: lunes, 5 de ene de 2026
+          - generic [ref=e129]:
+            - button [ref=e130] [cursor=pointer]:
+              - img
+            - link "Nuevo" [ref=e131] [cursor=pointer]:
+              - /url: /leads/new
+              - img
+              - generic [ref=e132] [cursor=pointer]: Nuevo
+        - generic [ref=e172]:
+          - img [ref=e173]
+          - generic [ref=e175]: Cargando pipeline...
+  - generic [ref=e176]:
+    - img [ref=e178]
+    - button "Open Tanstack query devtools" [ref=e226] [cursor=pointer]:
+      - img [ref=e227] [cursor=pointer]
+  - alert [ref=e275]
+```

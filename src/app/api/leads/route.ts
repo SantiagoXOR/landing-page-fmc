@@ -364,6 +364,19 @@ async function postHandler(
       })
     }
 
+    // Verificar si el lead tiene CUIL y moverlo automáticamente a LISTO_ANALISIS
+    // si está en CLIENTE_NUEVO o CONSULTANDO_CREDITO
+    try {
+      const { PipelineAutoMoveService } = await import('@/server/services/pipeline-auto-move-service')
+      await PipelineAutoMoveService.checkAndMoveLeadWithCUIL(lead.id!)
+    } catch (autoMoveError: any) {
+      // No bloquear la creación del lead si falla el auto-move
+      logger.warn('Error en auto-move después de crear lead (no crítico)', {
+        leadId: lead.id,
+        error: autoMoveError.message
+      })
+    }
+
     logger.info('Lead created successfully', {
       leadId: lead.id,
       estado: finalEstado,

@@ -877,6 +877,19 @@ export class ManychatWebhookService {
             // Actualizar actividad
             await this.updateLeadActivity(leadId)
 
+            // Si se actualizó el campo CUIL/CUIT, verificar si se debe mover automáticamente
+            if (dbFieldName === 'cuil' && customField.value) {
+              try {
+                const { PipelineAutoMoveService } = await import('./pipeline-auto-move-service')
+                await PipelineAutoMoveService.checkAndMoveLeadWithCUIL(leadId)
+              } catch (autoMoveError: any) {
+                logger.warn('Error en auto-move después de actualizar CUIL (no crítico)', {
+                  leadId,
+                  error: autoMoveError.message
+                })
+              }
+            }
+
             return { success: true, leadId }
           }
         } catch (directUpdateError: any) {
@@ -908,6 +921,20 @@ export class ManychatWebhookService {
 
       // Actualizar actividad
       await this.updateLeadActivity(leadId)
+
+      // Si se actualizó el campo CUIL/CUIT, verificar si se debe mover automáticamente
+      const fieldNameLower = customField.name.toLowerCase()
+      if ((fieldNameLower === 'cuil' || fieldNameLower === 'cuit') && customField.value) {
+        try {
+          const { PipelineAutoMoveService } = await import('./pipeline-auto-move-service')
+          await PipelineAutoMoveService.checkAndMoveLeadWithCUIL(leadId)
+        } catch (autoMoveError: any) {
+          logger.warn('Error en auto-move después de actualizar CUIL vía sincronización (no crítico)', {
+            leadId,
+            error: autoMoveError.message
+          })
+        }
+      }
 
       logger.info('✅ Custom field actualizado vía sincronización completa', {
         leadId,

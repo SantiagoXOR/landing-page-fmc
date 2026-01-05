@@ -1,0 +1,465 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e5]:
+      - img "BAJAJ logo" [ref=e8]
+      - img "CORVEN logo" [ref=e11]
+      - img "GILERA logo" [ref=e14]
+      - img "HONDA logo" [ref=e17]
+      - img "KELLER logo" [ref=e20]
+      - img "MONDIAL logo" [ref=e23]
+      - img "MOTOMEL logo" [ref=e26]
+      - img "SUZUKI logo" [ref=e29]
+      - img "YAMAHA logo" [ref=e32]
+      - img "ZANELLA logo" [ref=e35]
+      - img "BAJAJ logo" [ref=e38]
+      - img "CORVEN logo" [ref=e41]
+      - img "GILERA logo" [ref=e44]
+      - img "HONDA logo" [ref=e47]
+      - img "KELLER logo" [ref=e50]
+      - img "MONDIAL logo" [ref=e53]
+      - img "MOTOMEL logo" [ref=e56]
+      - img "SUZUKI logo" [ref=e59]
+      - img "YAMAHA logo" [ref=e62]
+      - img "ZANELLA logo" [ref=e65]
+    - navigation [ref=e66]:
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - img "FMC" [ref=e69]
+          - generic [ref=e70]: FORMOSA MOTO CRÉDITO
+        - button "Toggle mobile menu" [ref=e71] [cursor=pointer]:
+          - img [ref=e72] [cursor=pointer]
+  - generic [ref=e74]:
+    - generic:
+      - generic:
+        - img
+        - generic [ref=e77]:
+          - link [ref=e78] [cursor=pointer]:
+            - /url: "#solicitud"
+            - text: Solicitar crédito
+          - link [ref=e79] [cursor=pointer]:
+            - /url: https://wa.me/543704069592
+            - text: WhatsApp
+        - img
+  - generic [ref=e82]:
+    - generic [ref=e83]:
+      - img "FMC" [ref=e87]
+      - generic [ref=e89]:
+        - generic [ref=e91]:
+          - img [ref=e92]
+          - heading "Tasa fija" [level=3] [ref=e96]
+          - paragraph [ref=e97]: 75%
+        - generic [ref=e99]:
+          - img [ref=e100]
+          - heading "Tasa UVA:" [level=3] [ref=e103]
+          - paragraph [ref=e104]: 20% + UVAs
+        - generic [ref=e106]:
+          - img [ref=e107]
+          - generic [ref=e111]:
+            - heading "Financiación" [level=3] [ref=e112]
+            - paragraph [ref=e113]: hasta $12.000.000
+    - generic [ref=e114]:
+      - heading "Con los mejores créditos, la moto de tus sueños está a solo un paso." [level=2] [ref=e115]:
+        - text: Con los mejores créditos,
+        - generic [ref=e116]: la moto de tus sueños
+        - generic [ref=e117]: está a solo un paso.
+      - paragraph [ref=e118]: ¡Hacelo realidad hoy!
+      - generic [ref=e120]:
+        - generic [ref=e121]:
+          - img [ref=e123]
+          - paragraph [ref=e127]: Financiá en hasta 36 meses (UVA o tasa fija)
+        - generic [ref=e128]:
+          - img [ref=e130]
+          - paragraph [ref=e133]: Obtené la aprobación en tan solo 24 horas
+        - generic [ref=e134]:
+          - img [ref=e136]
+          - paragraph [ref=e138]: Pago cómodo con débito automático en tu caja de ahorro
+        - generic [ref=e139]:
+          - img [ref=e141]
+          - paragraph [ref=e144]: Disfrutá de tu caja de ahorro sin costos de mantenimiento
+  - generic [ref=e149]:
+    - generic [ref=e150]:
+      - heading "SOLICITAR CRÉDITO" [level=2] [ref=e151]
+      - paragraph [ref=e152]: Completá el formulario y recibí tu propuesta de financiación personalizada en minutos
+    - generic [ref=e155]:
+      - generic [ref=e156]:
+        - generic [ref=e157]:
+          - generic [ref=e159]: "1"
+          - generic [ref=e162]: "2"
+          - generic [ref=e165]: "3"
+        - progressbar [ref=e166]
+        - generic [ref=e168]:
+          - generic [ref=e169]: DATOS PERSONALES
+          - generic [ref=e170]: VEHÍCULO
+          - generic [ref=e171]: FINALIZAR
+      - generic [ref=e172]:
+        - generic [ref=e173]:
+          - generic [ref=e174]:
+            - heading "DATOS PERSONALES" [level=3] [ref=e175]
+            - paragraph [ref=e176]: Ingresa tu información personal para procesar tu solicitud
+          - generic [ref=e177]:
+            - generic [ref=e178]:
+              - generic [ref=e179]: Nombre *
+              - textbox "Nombre *" [ref=e180]
+              - paragraph [ref=e181]: Como figura en tu DNI
+            - generic [ref=e182]:
+              - generic [ref=e183]: Apellido *
+              - textbox "Apellido *" [ref=e184]
+              - paragraph [ref=e185]: Como figura en tu DNI
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - generic [ref=e188]: DNI/CUIT *
+              - textbox "DNI/CUIT *" [ref=e189]
+              - paragraph [ref=e190]: Sin puntos ni espacios
+            - generic [ref=e191]:
+              - generic [ref=e192]: Teléfono *
+              - textbox "Teléfono *" [ref=e193]
+              - paragraph [ref=e194]: WhatsApp o celular con código de área
+          - generic [ref=e195]:
+            - generic [ref=e196]:
+              - generic [ref=e197]: Email *
+              - textbox "Email *" [ref=e198]
+              - paragraph [ref=e199]: Para enviarte tu propuesta
+            - generic [ref=e200]:
+              - generic [ref=e201]: Ingresos Mensuales *
+              - textbox "Ingresos Mensuales *" [ref=e202]
+              - paragraph [ref=e203]: Monto mensual aproximado
+          - generic [ref=e205]:
+            - generic [ref=e206]: Zona *
+            - combobox [ref=e207] [cursor=pointer]:
+              - generic: Seleccioná tu zona
+              - img [ref=e208] [cursor=pointer]
+            - combobox [ref=e210]
+            - paragraph [ref=e211]: Localidad o zona principal dentro de la provincia de Formosa
+        - generic [ref=e213]:
+          - button "Siguiente" [disabled]:
+            - text: Siguiente
+            - img
+  - generic [ref=e216]:
+    - generic [ref=e217]:
+      - heading "Lo que dicen nuestros clientes" [level=2] [ref=e218]
+      - paragraph [ref=e219]: Miles de personas ya confiaron en nosotros para conseguir la moto de sus sueños. Conoce sus experiencias.
+    - generic [ref=e220]:
+      - region [ref=e222]:
+        - generic [ref=e224]:
+          - group [ref=e225]:
+            - img "Cliente retirando su moto gracias al crédito" [ref=e228]
+          - group [ref=e229]:
+            - img "Entrega de moto en concesionaria con financiamiento" [ref=e232]
+          - group [ref=e233]:
+            - img "Nuevo propietario feliz tras aprobar crédito de moto" [ref=e236]
+      - generic [ref=e237]:
+        - generic [ref=e240]:
+          - generic [ref=e241]:
+            - generic [ref=e243]: MG
+            - heading "María González" [level=3] [ref=e244]
+            - paragraph [ref=e245]: Formosa Capital
+            - paragraph [ref=e246]: Honda CB 190R
+          - generic [ref=e247]:
+            - generic [ref=e248]:
+              - img [ref=e249]
+              - img [ref=e251]
+              - img [ref=e253]
+              - img [ref=e255]
+              - img [ref=e257]
+            - blockquote [ref=e260]: "\"Excelente atención y muy rápido el proceso. Conseguí mi Honda CB 190R en solo una semana. El equipo de Formosa Moto Crédito me ayudó en todo momento y las cuotas son muy accesibles.\""
+        - generic [ref=e261]:
+          - button [ref=e262] [cursor=pointer]:
+            - img
+          - generic [ref=e263]:
+            - button [ref=e264] [cursor=pointer]
+            - button [ref=e265] [cursor=pointer]
+            - button [ref=e266] [cursor=pointer]
+            - button [ref=e267] [cursor=pointer]
+            - button [ref=e268] [cursor=pointer]
+            - button [ref=e269] [cursor=pointer]
+          - button [ref=e270] [cursor=pointer]:
+            - img
+      - generic [ref=e271]:
+        - generic [ref=e273]:
+          - img [ref=e275]
+          - heading "500+" [level=3] [ref=e278]
+          - paragraph [ref=e279]: Clientes Satisfechos
+        - generic [ref=e281]:
+          - img [ref=e283]
+          - heading "4.9" [level=3] [ref=e285]
+          - paragraph [ref=e286]: Calificación Promedio
+        - generic [ref=e288]:
+          - img [ref=e290]
+          - heading "98%" [level=3] [ref=e292]
+          - paragraph [ref=e293]: Recomendación
+  - generic [ref=e296]:
+    - generic [ref=e297]:
+      - heading "CONCESIONARIOS ASOCIADOS" [level=2] [ref=e298]
+      - paragraph [ref=e299]: Los mejores concesionarios de Formosa para vos puedas elegir.
+    - region [ref=e301]:
+      - generic [ref=e303]:
+        - group [ref=e304]:
+          - generic [ref=e306]:
+            - heading "GIULIANO MOTOS" [level=3] [ref=e307]
+            - generic [ref=e308]:
+              - img [ref=e309]
+              - paragraph [ref=e312]: Mitre esq, Av. Napoleón Uriburu S/N
+            - generic [ref=e313]:
+              - img [ref=e314]
+              - link "Contactar a GIULIANO MOTOS por WhatsApp" [ref=e316] [cursor=pointer]:
+                - /url: https://wa.me/5437049973443704628777?text=Hola%2C%20me%20interesa%20consultar%20por%20GIULIANO%20MOTOS
+                - text: "*3704997344 y *3704628777"
+            - paragraph [ref=e317]: CORVEN | MOTOMEL | SUZUKI | BAJAJ | MONDIAL
+            - link "Abrir WhatsApp para GIULIANO MOTOS" [ref=e319] [cursor=pointer]:
+              - /url: https://wa.me/5437049973443704628777?text=Hola%2C%20me%20interesa%20consultar%20por%20GIULIANO%20MOTOS
+              - img [ref=e320] [cursor=pointer]
+        - group [ref=e324]:
+          - generic [ref=e326]:
+            - heading "SAAVEDRA MOTORS" [level=3] [ref=e327]
+            - generic [ref=e328]:
+              - img [ref=e329]
+              - paragraph [ref=e332]: Saavedra 2125
+            - generic [ref=e333]:
+              - img [ref=e334]
+              - link "Contactar a SAAVEDRA MOTORS por WhatsApp" [ref=e336] [cursor=pointer]:
+                - /url: https://wa.me/543704858982?text=Hola%2C%20me%20interesa%20consultar%20por%20SAAVEDRA%20MOTORS
+                - text: 0370-485-8982
+            - paragraph [ref=e337]: HONDA | YAMAHA | MOTOMEL | SUZUKI | ZANELLA | OKINOI
+            - link "Abrir WhatsApp para SAAVEDRA MOTORS" [ref=e339] [cursor=pointer]:
+              - /url: https://wa.me/543704858982?text=Hola%2C%20me%20interesa%20consultar%20por%20SAAVEDRA%20MOTORS
+              - img [ref=e340] [cursor=pointer]
+        - group [ref=e344]:
+          - generic [ref=e346]:
+            - heading "CRÉDITO GESTIÓN" [level=3] [ref=e347]
+            - generic [ref=e348]:
+              - img [ref=e349]
+              - paragraph [ref=e352]: Padre Pacifico Scozzina 445
+            - generic [ref=e353]:
+              - img [ref=e354]
+              - link "Contactar a CRÉDITO GESTIÓN por WhatsApp" [ref=e356] [cursor=pointer]:
+                - /url: https://wa.me/543704983866?text=Hola%2C%20me%20interesa%20consultar%20por%20CR%C3%89DITO%20GESTI%C3%93N
+                - text: 0370-498-3866
+            - paragraph [ref=e357]: YAMAHA | ZANELLA | MOTOMEL | CORVEN | GILERA | KELLER | BRAVA | ROUSER | SIAM
+            - link "Abrir WhatsApp para CRÉDITO GESTIÓN" [ref=e359] [cursor=pointer]:
+              - /url: https://wa.me/543704983866?text=Hola%2C%20me%20interesa%20consultar%20por%20CR%C3%89DITO%20GESTI%C3%93N
+              - img [ref=e360] [cursor=pointer]
+        - group [ref=e364]:
+          - generic [ref=e366]:
+            - heading "MAQUIMOT" [level=3] [ref=e367]
+            - generic [ref=e368]:
+              - img [ref=e369]
+              - paragraph [ref=e372]: Julio A. Roca 610
+            - generic [ref=e373]:
+              - img [ref=e374]
+              - link "Contactar a MAQUIMOT por WhatsApp" [ref=e376] [cursor=pointer]:
+                - /url: https://wa.me/543704858840?text=Hola%2C%20me%20interesa%20consultar%20por%20MAQUIMOT
+                - text: 0370-485-8840
+            - paragraph [ref=e377]: KELLER | CORVEN | ZANELLA | BAJAJ | MOTOMEL
+            - link "Abrir WhatsApp para MAQUIMOT" [ref=e379] [cursor=pointer]:
+              - /url: https://wa.me/543704858840?text=Hola%2C%20me%20interesa%20consultar%20por%20MAQUIMOT
+              - img [ref=e380] [cursor=pointer]
+        - group [ref=e384]:
+          - generic [ref=e386]:
+            - heading "MINIPRECIOS SRL" [level=3] [ref=e387]
+            - generic [ref=e388]:
+              - img [ref=e389]
+              - paragraph [ref=e392]: Rivadavia 770
+            - generic [ref=e393]:
+              - img [ref=e394]
+              - link "Contactar a MINIPRECIOS SRL por WhatsApp" [ref=e396] [cursor=pointer]:
+                - /url: https://wa.me/543704211957?text=Hola%2C%20me%20interesa%20consultar%20por%20MINIPRECIOS%20SRL
+                - text: 0370-421-1957
+            - paragraph [ref=e397]: SIAM | KELLER
+            - link "Abrir WhatsApp para MINIPRECIOS SRL" [ref=e399] [cursor=pointer]:
+              - /url: https://wa.me/543704211957?text=Hola%2C%20me%20interesa%20consultar%20por%20MINIPRECIOS%20SRL
+              - img [ref=e400] [cursor=pointer]
+        - group [ref=e404]:
+          - generic [ref=e406]:
+            - heading "FORMOSA AUTOM. S&R" [level=3] [ref=e407]
+            - generic [ref=e408]:
+              - img [ref=e409]
+              - paragraph [ref=e412]: Masferrer 1415
+            - generic [ref=e413]:
+              - img [ref=e414]
+              - link "Contactar a FORMOSA AUTOM. S&R por WhatsApp" [ref=e416] [cursor=pointer]:
+                - /url: https://wa.me/543704577915?text=Hola%2C%20me%20interesa%20consultar%20por%20FORMOSA%20AUTOM.%20S%26R
+                - text: 0370-457-7915
+            - paragraph [ref=e417]: YAMAHA
+            - link "Abrir WhatsApp para FORMOSA AUTOM. S&R" [ref=e419] [cursor=pointer]:
+              - /url: https://wa.me/543704577915?text=Hola%2C%20me%20interesa%20consultar%20por%20FORMOSA%20AUTOM.%20S%26R
+              - img [ref=e420] [cursor=pointer]
+        - group [ref=e424]:
+          - generic [ref=e426]:
+            - heading "TZT AUTOS" [level=3] [ref=e427]
+            - generic [ref=e428]:
+              - img [ref=e429]
+              - paragraph [ref=e432]: Av. Dr. N. Kirchner 4086
+            - generic [ref=e433]:
+              - img [ref=e434]
+              - link "Contactar a TZT AUTOS por WhatsApp" [ref=e436] [cursor=pointer]:
+                - /url: https://wa.me/543704570305?text=Hola%2C%20me%20interesa%20consultar%20por%20TZT%20AUTOS
+                - text: 0370-457-0305
+            - paragraph [ref=e437]: HONDA | YAMAHA
+            - link "Abrir WhatsApp para TZT AUTOS" [ref=e439] [cursor=pointer]:
+              - /url: https://wa.me/543704570305?text=Hola%2C%20me%20interesa%20consultar%20por%20TZT%20AUTOS
+              - img [ref=e440] [cursor=pointer]
+        - group [ref=e444]:
+          - generic [ref=e446]:
+            - heading "MOTO SHOW" [level=3] [ref=e447]
+            - generic [ref=e448]:
+              - img [ref=e449]
+              - paragraph [ref=e452]: 9 de julio 1136
+            - generic [ref=e453]:
+              - img [ref=e454]
+              - link "Contactar a MOTO SHOW por WhatsApp" [ref=e456] [cursor=pointer]:
+                - /url: https://wa.me/543704003045?text=Hola%2C%20me%20interesa%20consultar%20por%20MOTO%20SHOW
+                - text: 0370-400-3045
+            - paragraph [ref=e457]: HONDA
+            - link "Abrir WhatsApp para MOTO SHOW" [ref=e459] [cursor=pointer]:
+              - /url: https://wa.me/543704003045?text=Hola%2C%20me%20interesa%20consultar%20por%20MOTO%20SHOW
+              - img [ref=e460] [cursor=pointer]
+        - group [ref=e464]:
+          - generic [ref=e466]:
+            - heading "RIO BERMEJO S.A" [level=3] [ref=e467]
+            - generic [ref=e468]:
+              - img [ref=e469]
+              - paragraph [ref=e472]: Av. 25 de Mayo 1264
+            - generic [ref=e473]:
+              - img [ref=e474]
+              - link "Contactar a RIO BERMEJO S.A por WhatsApp" [ref=e476] [cursor=pointer]:
+                - /url: https://wa.me/543704264934?text=Hola%2C%20me%20interesa%20consultar%20por%20RIO%20BERMEJO%20S.A
+                - text: 0370-426-4934
+            - paragraph [ref=e477]: HONDA | BAJAJ | TRIAX | KELLER
+            - link "Abrir WhatsApp para RIO BERMEJO S.A" [ref=e479] [cursor=pointer]:
+              - /url: https://wa.me/543704264934?text=Hola%2C%20me%20interesa%20consultar%20por%20RIO%20BERMEJO%20S.A
+              - img [ref=e480] [cursor=pointer]
+        - group [ref=e484]:
+          - generic [ref=e486]:
+            - heading "PEREZ AUTOMOTORES" [level=3] [ref=e487]
+            - generic [ref=e488]:
+              - img [ref=e489]
+              - paragraph [ref=e492]: Belgrano 97
+            - generic [ref=e493]:
+              - img [ref=e494]
+              - link "Contactar a PEREZ AUTOMOTORES por WhatsApp" [ref=e496] [cursor=pointer]:
+                - /url: https://wa.me/543704207298?text=Hola%2C%20me%20interesa%20consultar%20por%20PEREZ%20AUTOMOTORES
+                - text: 0370-420-7298
+            - paragraph [ref=e497]: KAWASAKI
+            - link "Abrir WhatsApp para PEREZ AUTOMOTORES" [ref=e499] [cursor=pointer]:
+              - /url: https://wa.me/543704207298?text=Hola%2C%20me%20interesa%20consultar%20por%20PEREZ%20AUTOMOTORES
+              - img [ref=e500] [cursor=pointer]
+        - group [ref=e504]:
+          - generic [ref=e506]:
+            - heading "VERA MOTOS Y TRUCKS" [level=3] [ref=e507]
+            - generic [ref=e508]:
+              - img [ref=e509]
+              - paragraph [ref=e512]: Saavedra 828
+            - generic [ref=e513]:
+              - img [ref=e514]
+              - link "Contactar a VERA MOTOS Y TRUCKS por WhatsApp" [ref=e516] [cursor=pointer]:
+                - /url: https://wa.me/543704319538?text=Hola%2C%20me%20interesa%20consultar%20por%20VERA%20MOTOS%20Y%20TRUCKS
+                - text: 0370-431-9538
+            - paragraph [ref=e517]: HONDA
+            - link "Abrir WhatsApp para VERA MOTOS Y TRUCKS" [ref=e519] [cursor=pointer]:
+              - /url: https://wa.me/543704319538?text=Hola%2C%20me%20interesa%20consultar%20por%20VERA%20MOTOS%20Y%20TRUCKS
+              - img [ref=e520] [cursor=pointer]
+        - group [ref=e524]:
+          - generic [ref=e526]:
+            - heading "NACER, YAMIL ANGEL" [level=3] [ref=e527]
+            - generic [ref=e528]:
+              - img [ref=e529]
+              - paragraph [ref=e532]: "*9 DE JULIO 444"
+            - generic [ref=e533]:
+              - img [ref=e534]
+              - link "Contactar a NACER, YAMIL ANGEL por WhatsApp" [ref=e536] [cursor=pointer]:
+                - /url: https://wa.me/543704264561?text=Hola%2C%20me%20interesa%20consultar%20por%20NACER%2C%20YAMIL%20ANGEL
+                - text: 0370-426-4561
+            - paragraph [ref=e537]: YAMAHA
+            - link "Abrir WhatsApp para NACER, YAMIL ANGEL" [ref=e539] [cursor=pointer]:
+              - /url: https://wa.me/543704264561?text=Hola%2C%20me%20interesa%20consultar%20por%20NACER%2C%20YAMIL%20ANGEL
+              - img [ref=e540] [cursor=pointer]
+        - group [ref=e544]:
+          - generic [ref=e546]:
+            - heading "MOTOLANDIA" [level=3] [ref=e547]
+            - generic [ref=e548]:
+              - img [ref=e549]
+              - paragraph [ref=e552]: Belgrano y Sarmiento
+            - generic [ref=e553]:
+              - img [ref=e554]
+              - link "Contactar a MOTOLANDIA por WhatsApp" [ref=e556] [cursor=pointer]:
+                - /url: https://wa.me/543718413868?text=Hola%2C%20me%20interesa%20consultar%20por%20MOTOLANDIA
+                - text: 0371-841-3868
+            - paragraph [ref=e557]: GUERRERO
+            - link "Abrir WhatsApp para MOTOLANDIA" [ref=e559] [cursor=pointer]:
+              - /url: https://wa.me/543718413868?text=Hola%2C%20me%20interesa%20consultar%20por%20MOTOLANDIA
+              - img [ref=e560] [cursor=pointer]
+        - group [ref=e564]:
+          - generic [ref=e566]:
+            - heading "MAYANS SRL" [level=3] [ref=e567]
+            - generic [ref=e568]:
+              - img [ref=e569]
+              - paragraph [ref=e572]: Av. 12 de Octubre 1145
+            - generic [ref=e573]:
+              - img [ref=e574]
+              - link "Contactar a MAYANS SRL por WhatsApp" [ref=e576] [cursor=pointer]:
+                - /url: https://wa.me/543718444917?text=Hola%2C%20me%20interesa%20consultar%20por%20MAYANS%20SRL
+                - text: 0371-844-4917
+            - paragraph [ref=e577]: HONDA
+            - link "Abrir WhatsApp para MAYANS SRL" [ref=e579] [cursor=pointer]:
+              - /url: https://wa.me/543718444917?text=Hola%2C%20me%20interesa%20consultar%20por%20MAYANS%20SRL
+              - img [ref=e580] [cursor=pointer]
+        - group [ref=e584]:
+          - generic [ref=e586]:
+            - heading "PUCARA MOTOS" [level=3] [ref=e587]
+            - generic [ref=e588]:
+              - img [ref=e589]
+              - paragraph [ref=e592]: Rivadavia 555
+            - generic [ref=e593]:
+              - img [ref=e594]
+              - link "Contactar a PUCARA MOTOS por WhatsApp" [ref=e596] [cursor=pointer]:
+                - /url: https://wa.me/543704276950?text=Hola%2C%20me%20interesa%20consultar%20por%20PUCARA%20MOTOS
+                - text: 0370-427-6950
+            - paragraph [ref=e597]: KELLER | BAJAJ | MOTOMEL | MONDIAL
+            - link "Abrir WhatsApp para PUCARA MOTOS" [ref=e599] [cursor=pointer]:
+              - /url: https://wa.me/543704276950?text=Hola%2C%20me%20interesa%20consultar%20por%20PUCARA%20MOTOS
+              - img [ref=e600] [cursor=pointer]
+      - button "Previous slide" [disabled]:
+        - img
+        - generic: Previous slide
+      - button "Next slide" [disabled]:
+        - img
+        - generic: Next slide
+  - generic [ref=e608]:
+    - img "FMC" [ref=e610]
+    - heading "¿Listo para tu moto?" [level=2] [ref=e611]
+    - paragraph [ref=e612]: Tasas competitivas y aprobación rápida. Empezá hoy y llevate tu 0km.
+    - generic [ref=e613]:
+      - link "Solicitar crédito" [ref=e614] [cursor=pointer]:
+        - /url: "#solicitud"
+      - link "Hablar por WhatsApp" [ref=e615] [cursor=pointer]:
+        - /url: https://wa.me/543704069592
+  - contentinfo [ref=e616]:
+    - generic [ref=e617]:
+      - generic [ref=e618]:
+        - img "FMC" [ref=e619]
+        - generic [ref=e620]: FORMOSA MOTO CRÉDITO
+      - generic [ref=e621]:
+        - paragraph [ref=e622]: Te brindamos la oportunidad de cumplir tu sueño de tener una moto propia a través de créditos rápidos y accesibles. Con un proceso simple y personalizado, te ayudamos a dar el primer paso hacia la libertad y la aventura. ¡No esperes más, tu moto te está esperando!
+        - generic [ref=e623]:
+          - generic [ref=e624]:
+            - img [ref=e625]
+            - generic [ref=e627]: 370 428-5453
+          - generic [ref=e628]:
+            - img [ref=e629]
+            - link "Abrir WhatsApp" [ref=e631] [cursor=pointer]:
+              - /url: https://wa.me/5493704285453?text=Hola%2C%20me%20interesa%20obtener%20m%C3%A1s%20informaci%C3%B3n%20sobre%20los%20cr%C3%A9ditos%20para%20motos.
+              - text: +54 937-04285453
+            - link "WhatsApp" [ref=e632] [cursor=pointer]:
+              - /url: https://wa.me/5493704285453?text=Hola%2C%20me%20interesa%20obtener%20m%C3%A1s%20informaci%C3%B3n%20sobre%20los%20cr%C3%A9ditos%20para%20motos.
+    - generic [ref=e633]:
+      - paragraph [ref=e634]: Los préstamos otorgados por Banco de Formosa S.A. a personas humanas con garantía prendaria en primer grado sobre moto vehículos 0 km están sujetos a disponibilidad de stock en las concesionarias y a la aprobación del riesgo crediticio. El monto y el plazo del financiamiento dependerán de la capacidad crediticia del solicitante, y las tasas de interés serán las vigentes al momento de la aprobación. El préstamo estará respaldado por la prenda del vehículo adquirido, que deberá estar asegurado durante el período del préstamo. Las promociones están sujetas a condiciones específicas y la disponibilidad de unidades en las concesionarias. Además, se aplicarán comisiones, cargos administrativos y otros costos adicionales según las políticas del banco, y los pagos deberán realizarse dentro de los plazos establecidos.
+      - generic [ref=e635]:
+        - paragraph [ref=e636]: Copyright © 2025 FORMOSA MOTO CRÉDITO.
+        - paragraph [ref=e637]: Todos los derechos reservados.
+        - generic [ref=e639]:
+          - img "XOR" [ref=e640]
+          - generic [ref=e641]: Built by XOR
+```

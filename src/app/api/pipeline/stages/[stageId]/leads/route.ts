@@ -73,6 +73,11 @@ function mapLeadToPipelineLead(
   const lastActivity = lastEvent?.createdAt 
     ? new Date(lastEvent.createdAt)
     : new Date(lead.createdAt || Date.now())
+  
+  // Asegurar que createdAt esté disponible como string ISO
+  const createdAtISO = lead.createdAt 
+    ? (typeof lead.createdAt === 'string' ? lead.createdAt : new Date(lead.createdAt).toISOString())
+    : new Date().toISOString()
 
   const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
   
@@ -89,8 +94,8 @@ function mapLeadToPipelineLead(
     origen: lead.origen || 'web',
     estado: lead.estado,
     stageId,
-    stageEntryDate,
-    lastActivity,
+    stageEntryDate: typeof stageEntryDate === 'string' ? stageEntryDate : stageEntryDate.toISOString(),
+    lastActivity: typeof lastActivity === 'string' ? lastActivity : lastActivity.toISOString(),
     score: timeScore.score,
     tags: Array.isArray(tags) ? tags : [],
     customFields: lead.customFields ? (typeof lead.customFields === 'string' ? JSON.parse(lead.customFields) : lead.customFields) : undefined,
@@ -106,8 +111,8 @@ function mapLeadToPipelineLead(
     scoreColor: timeScore.color,
     scoreLabel: timeScore.label,
     cuil: lead.cuil || undefined,
-    createdAt: lead.createdAt ? new Date(lead.createdAt) : new Date()
-  } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string; cuil?: string; createdAt?: Date }
+    createdAt: createdAtISO
+  } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string; cuil?: string; createdAt?: string }
 }
 
 /**
@@ -367,7 +372,7 @@ export async function GET(
       otherLeads.push(pipelineLead)
     }
 
-    // Ordenar los leads prioritarios con ventana de 24hs en orden descendente por createdAt (más recientes primero)
+    // Ordenar los leads prioritarios con ventana de 24hs en orden ASCENDENTE por createdAt (más antiguos primero)
     priorityLeadsWith24hWindow.sort((a, b) => {
       const leadA = leadOriginalMap.get(a.id!)
       const leadB = leadOriginalMap.get(b.id!)
@@ -378,7 +383,7 @@ export async function GET(
       const dateA = new Date(leadA.createdAt).getTime()
       const dateB = new Date(leadB.createdAt).getTime()
       
-      return dateB - dateA // Orden descendente (más recientes primero)
+      return dateA - dateB // Orden ascendente (más antiguos primero)
     })
 
     // Ordenar los otros leads también por createdAt descendente (más recientes primero)

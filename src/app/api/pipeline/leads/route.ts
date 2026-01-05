@@ -407,9 +407,10 @@ function mapLeadToPipelineLead(
     email: lead.email || undefined,
     origen: lead.origen || 'web',
     estado: lead.estado,
+    createdAt: lead.createdAt ? (typeof lead.createdAt === 'string' ? lead.createdAt : new Date(lead.createdAt).toISOString()) : new Date().toISOString(),
     stageId,
-    stageEntryDate,
-    lastActivity,
+    stageEntryDate: typeof stageEntryDate === 'string' ? stageEntryDate : stageEntryDate.toISOString(),
+    lastActivity: typeof lastActivity === 'string' ? lastActivity : lastActivity.toISOString(),
     score: timeScore.score, // Score basado en tiempo en etapa
     tags: Array.isArray(tags) ? tags : [],
     customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
@@ -425,8 +426,9 @@ function mapLeadToPipelineLead(
     urgency: timeScore.urgency,
     scoreColor: timeScore.color,
     scoreLabel: timeScore.label,
-    cuil: cuilValue // Agregar CUIL (puede venir del campo directo o de customFields)
-  } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string; cuil?: string }
+    cuil: cuilValue, // Agregar CUIL (puede venir del campo directo o de customFields)
+    createdAt: lead.createdAt ? (typeof lead.createdAt === 'string' ? lead.createdAt : new Date(lead.createdAt).toISOString()) : new Date().toISOString()
+  } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string; cuil?: string; createdAt?: string }
 }
 
 // Datos de ejemplo eliminados - Ahora se usan datos reales de la base de datos
@@ -605,64 +607,79 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Ordenar leads: prioritarios con ventana de 24hs primero, en orden ascendente
+    // Ordenar leads POR COLUMNA: prioritarios con ventana de 24hs primero, en orden ascendente
     const now = new Date()
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
-    const priorityLeadsWith24hWindow: PipelineLead[] = []
-    const otherLeads: PipelineLead[] = []
+    // Agrupar leads por stageId primero
+    const leadsByStageId = new Map<string, PipelineLead[]>()
+    pipelineLeads.forEach(lead => {
+      const stageId = lead.stageId || 'nuevo'
+      if (!leadsByStageId.has(stageId)) {
+        leadsByStageId.set(stageId, [])
+      }
+      leadsByStageId.get(stageId)!.push(lead)
+    })
 
-    for (const pipelineLead of pipelineLeads) {
-      // Verificar si es prioritario (high o urgent)
-      const isPriority = pipelineLead.priority === 'high' || pipelineLead.priority === 'urgent'
-      
-      if (isPriority && pipelineLead.id) {
-        // Obtener el lead original para acceder a createdAt
-        const originalLead = leadOriginalMap.get(pipelineLead.id)
-        if (originalLead && originalLead.createdAt) {
-          const leadCreatedAt = new Date(originalLead.createdAt)
-          // Verificar si tiene ventana de 24hs activa (24hs o menos desde que ingresó)
-          if (leadCreatedAt >= twentyFourHoursAgo) {
-            priorityLeadsWith24hWindow.push(pipelineLead)
-            continue
+    // Ordenar cada columna (stageId) por separado
+    const sortedLeadsByStage: PipelineLead[] = []
+    
+    leadsByStageId.forEach((stageLeads, stageId) => {
+      const priorityLeadsWith24hWindow: PipelineLead[] = []
+      const otherLeads: PipelineLead[] = []
+
+      // Separar prioritarios con 24hs de los demás
+      for (const pipelineLead of stageLeads) {
+        const isPriority = pipelineLead.priority === 'high' || pipelineLead.priority === 'urgent'
+        
+        if (isPriority && pipelineLead.id) {
+          const originalLead = leadOriginalMap.get(pipelineLead.id)
+          if (originalLead && originalLead.createdAt) {
+            const leadCreatedAt = new Date(originalLead.createdAt)
+            if (leadCreatedAt >= twentyFourHoursAgo) {
+              priorityLeadsWith24hWindow.push(pipelineLead)
+              continue
+            }
           }
         }
+        
+        otherLeads.push(pipelineLead)
       }
-      
-      // Si no cumple los criterios, agregar al grupo de otros leads
-      otherLeads.push(pipelineLead)
-    }
 
-    // Ordenar los leads prioritarios con ventana de 24hs en orden descendente por createdAt (más recientes primero)
-    priorityLeadsWith24hWindow.sort((a, b) => {
-      const leadA = leadOriginalMap.get(a.id!)
-      const leadB = leadOriginalMap.get(b.id!)
-      
-      if (!leadA || !leadA.createdAt) return 1
-      if (!leadB || !leadB.createdAt) return -1
-      
-      const dateA = new Date(leadA.createdAt).getTime()
-      const dateB = new Date(leadB.createdAt).getTime()
-      
-      return dateB - dateA // Orden descendente (más recientes primero)
+      // Ordenar prioritarios con 24hs en orden ASCENDENTE (más antiguos primero)
+      priorityLeadsWith24hWindow.sort((a, b) => {
+        const leadA = leadOriginalMap.get(a.id!)
+        const leadB = leadOriginalMap.get(b.id!)
+        
+        if (!leadA || !leadA.createdAt) return 1
+        if (!leadB || !leadB.createdAt) return -1
+        
+        const dateA = new Date(leadA.createdAt).getTime()
+        const dateB = new Date(leadB.createdAt).getTime()
+        
+        return dateA - dateB // Orden ascendente (más antiguos primero)
+      })
+
+      // Ordenar otros leads en orden DESCENDENTE (más recientes primero)
+      otherLeads.sort((a, b) => {
+        const leadA = leadOriginalMap.get(a.id!)
+        const leadB = leadOriginalMap.get(b.id!)
+        
+        if (!leadA || !leadA.createdAt) return 1
+        if (!leadB || !leadB.createdAt) return -1
+        
+        const dateA = new Date(leadA.createdAt).getTime()
+        const dateB = new Date(leadB.createdAt).getTime()
+        
+        return dateB - dateA // Orden descendente (más recientes primero)
+      })
+
+      // Combinar para esta columna: primero prioritarios, luego otros
+      sortedLeadsByStage.push(...priorityLeadsWith24hWindow, ...otherLeads)
     })
 
-    // Ordenar los otros leads también por createdAt descendente (más recientes primero)
-    otherLeads.sort((a, b) => {
-      const leadA = leadOriginalMap.get(a.id!)
-      const leadB = leadOriginalMap.get(b.id!)
-      
-      if (!leadA || !leadA.createdAt) return 1
-      if (!leadB || !leadB.createdAt) return -1
-      
-      const dateA = new Date(leadA.createdAt).getTime()
-      const dateB = new Date(leadB.createdAt).getTime()
-      
-      return dateB - dateA // Orden descendente (más recientes primero)
-    })
-
-    // Combinar: primero los prioritarios con ventana de 24hs (ya ordenados), luego el resto (ya ordenados)
-    pipelineLeads = [...priorityLeadsWith24hWindow, ...otherLeads]
+    // Reemplazar pipelineLeads con la versión ordenada por columna
+    pipelineLeads = sortedLeadsByStage
 
     // Agrupar leads por estado original y stageId para debugging
     const leadsByEstado = leads.reduce((acc, lead) => {

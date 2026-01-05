@@ -52,26 +52,173 @@ export function usePipelineDragDrop({
   )
 
   // Organizar leads por etapa
-  // Respetar el orden del backend (que ya ordena prioritarios con ventana de 24hs primero)
+  // Ordenar correctamente dentro de cada columna: prioritarios con 24hs primero (ascendente), luego otros (descendente)
   const leadsByStage = useCallback(() => {
     const organized: Record<string, PipelineLead[]> = {}
-    
-    // Crear un mapa de índices para mantener el orden del backend
-    const leadOrderMap = new Map<string, number>()
-    leads.forEach((lead, index) => {
-      if (lead.id) {
-        leadOrderMap.set(lead.id, index)
-      }
-    })
+    const now = new Date()
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     
     stages.forEach(stage => {
-      organized[stage.id] = leads.filter(lead => lead.stageId === stage.id)
-        .sort((a, b) => {
-          // Mantener el orden del backend usando el índice original
-          const aIndex = leadOrderMap.get(a.id || '') ?? 0
-          const bIndex = leadOrderMap.get(b.id || '') ?? 0
-          return aIndex - bIndex
+      const stageLeads = leads.filter(lead => lead.stageId === stage.id)
+      
+      // Separar prioritarios con 24hs de los demás
+      const priorityLeadsWith24h: PipelineLead[] = []
+      const otherLeads: PipelineLead[] = []
+      
+      stageLeads.forEach(lead => {
+        const isPriority = lead.priority === 'high' || lead.priority === 'urgent'
+        
+        // Intentar obtener createdAt de diferentes formas
+        let leadCreatedAt: Date | null = null
+        const createdAtStr = (lead as any).createdAt
+        if (createdAtStr) {
+          leadCreatedAt = new Date(createdAtStr)
+          if (isNaN(leadCreatedAt.getTime())) {
+            leadCreatedAt = null
+          }
+        }
+        
+        // Si no hay createdAt válido, usar stageEntryDate como fallback
+        if (!leadCreatedAt && lead.stageEntryDate) {
+          leadCreatedAt = new Date(lead.stageEntryDate)
+          if (isNaN(leadCreatedAt.getTime())) {
+            leadCreatedAt = null
+          }
+        }
+        
+        if (isPriority && leadCreatedAt && !isNaN(leadCreatedAt.getTime())) {
+          if (leadCreatedAt >= twentyFourHoursAgo) {
+            priorityLeadsWith24h.push(lead)
+            return
+          }
+        }
+        
+        otherLeads.push(lead)
+      })
+      
+      // Ordenar prioritarios con 24hs en orden ASCENDENTE (más antiguos primero)
+      priorityLeadsWith24h.sort((a, b) => {
+        let dateA = 0
+        let dateB = 0
+        
+        // Priorizar createdAt, fallback a stageEntryDate
+        const aCreatedAt = (a as any).createdAt
+        if (aCreatedAt) {
+          const date = new Date(aCreatedAt)
+          if (!isNaN(date.getTime())) dateA = date.getTime()
+        }
+        if (dateA === 0 && a.stageEntryDate) {
+          const date = new Date(a.stageEntryDate)
+          if (!isNaN(date.getTime())) dateA = date.getTime()
+        }
+        
+        const bCreatedAt = (b as any).createdAt
+        if (bCreatedAt) {
+          const date = new Date(bCreatedAt)
+          if (!isNaN(date.getTime())) dateB = date.getTime()
+        }
+        if (dateB === 0 && b.stageEntryDate) {
+          const date = new Date(b.stageEntryDate)
+          if (!isNaN(date.getTime())) dateB = date.getTime()
+        }
+        
+        // Si ambos tienen fecha válida, ordenar ascendente
+        if (dateA > 0 && dateB > 0) {
+          return dateA - dateB
+        }
+        // Si solo uno tiene fecha, ponerlo primero
+        if (dateA > 0) return -1
+        if (dateB > 0) return 1
+        // Si ninguno tiene fecha, mantener orden original
+        return 0
+      })
+      
+      // Ordenar otros leads en orden DESCENDENTE (más recientes primero)
+      // IMPORTANTE: Usar stageEntryDate si createdAt no está disponible
+      otherLeads.sort((a, b) => {
+        let dateA = 0
+        let dateB = 0
+        
+        // Priorizar createdAt, fallback a stageEntryDate
+        const aCreatedAt = (a as any).createdAt
+        if (aCreatedAt) {
+          const date = new Date(aCreatedAt)
+          if (!isNaN(date.getTime())) {
+            dateA = date.getTime()
+          }
+        }
+        
+        // Si no hay createdAt, usar stageEntryDate (que siempre debería estar disponible)
+        if (dateA === 0) {
+          const stageEntryA = a.stageEntryDate
+          if (stageEntryA) {
+            const date = typeof stageEntryA === 'string' ? new Date(stageEntryA) : new Date(stageEntryA)
+            if (!isNaN(date.getTime())) {
+              dateA = date.getTime()
+            }
+          }
+        }
+        
+        const bCreatedAt = (b as any).createdAt
+        if (bCreatedAt) {
+          const date = new Date(bCreatedAt)
+          if (!isNaN(date.getTime())) {
+            dateB = date.getTime()
+          }
+        }
+        
+        // Si no hay createdAt, usar stageEntryDate
+        if (dateB === 0) {
+          const stageEntryB = b.stageEntryDate
+          if (stageEntryB) {
+            const date = typeof stageEntryB === 'string' ? new Date(stageEntryB) : new Date(stageEntryB)
+            if (!isNaN(date.getTime())) {
+              dateB = date.getTime()
+            }
+          }
+        }
+        
+        // Si ambos tienen fecha válida, ordenar descendente (más recientes primero)
+        if (dateA > 0 && dateB > 0) {
+          return dateB - dateA
+        }
+        // Si solo uno tiene fecha, ponerlo primero
+        if (dateA > 0) return -1
+        if (dateB > 0) return 1
+        // Si ninguno tiene fecha, mantener orden original
+        return 0
+      })
+      
+      // Combinar: primero prioritarios, luego otros
+      organized[stage.id] = [...priorityLeadsWith24h, ...otherLeads]
+      
+      // Log para debugging (solo para las primeras 3 columnas para no saturar)
+      if (['cliente-nuevo', 'consultando-credito', 'solicitando-docs'].includes(stage.id) && organized[stage.id].length > 0) {
+        const sampleLeads = organized[stage.id].slice(0, 5).map((l, idx) => {
+          const createdAt = (l as any).createdAt
+          const stageEntry = l.stageEntryDate ? (typeof l.stageEntryDate === 'string' ? l.stageEntryDate : l.stageEntryDate.toISOString()) : null
+          
+          // Intentar obtener fecha para cálculo
+          let dateToUse: Date | null = null
+          if (createdAt) {
+            dateToUse = new Date(createdAt)
+            if (isNaN(dateToUse.getTime())) dateToUse = null
+          }
+          if (!dateToUse && stageEntry) {
+            dateToUse = new Date(stageEntry)
+            if (isNaN(dateToUse.getTime())) dateToUse = null
+          }
+          
+          const hoursAgo = dateToUse 
+            ? Math.floor((Date.now() - dateToUse.getTime()) / (1000 * 60 * 60)) 
+            : null
+          
+          return `${idx + 1}. ${l.nombre} (priority: ${l.priority}, createdAt: ${createdAt || 'MISSING'}, stageEntry: ${stageEntry ? 'YES' : 'NO'}, ${hoursAgo !== null ? hoursAgo + 'h ago' : 'N/A'})`
         })
+        
+        console.log(`[SORTING] Columna "${stage.id}": Total: ${organized[stage.id].length}, Priority24h: ${priorityLeadsWith24h.length}, Others: ${otherLeads.length}`)
+        sampleLeads.forEach(line => console.log(`  ${line}`))
+      }
     })
     
     return organized

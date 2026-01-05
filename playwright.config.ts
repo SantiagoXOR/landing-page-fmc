@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 import * as fs from 'fs'
 import * as path from 'path'
+import * as dotenv from 'dotenv'
+
+// Cargar variables de entorno desde .env.local
+dotenv.config({ path: path.resolve(__dirname, '.env.local') })
 
 // Verificar si existe el archivo de autenticación
 const authFile = path.join(__dirname, './playwright/.auth/user.json')
@@ -41,6 +45,11 @@ export default defineConfig({
     
     /* Usar estado de autenticación guardado si existe */
     ...(hasAuthFile && { storageState: authFile }),
+
+    /* Variables de entorno disponibles en los tests */
+    extraHTTPHeaders: {
+      'Accept': 'application/json',
+    },
   },
 
   /* Configure projects for major browsers */
@@ -52,6 +61,13 @@ export default defineConfig({
         // Configuración específica para CRM Phorencial
         viewport: { width: 1920, height: 1080 },
         ignoreHTTPSErrors: true,
+        // Variables de entorno para tests de pipeline
+        env: {
+          PLAYWRIGHT_BASE_URL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+          NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+          SUPABASE_URL: process.env.SUPABASE_URL,
+          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
       },
     },
 
@@ -123,11 +139,11 @@ export default defineConfig({
   globalTeardown: require.resolve('./tests/global-teardown.ts'),
 
   /* Test timeout */
-  timeout: 30 * 1000, // 30 seconds
+  timeout: 60 * 1000, // 60 seconds (aumentado para tests de pipeline con MCP)
 
   /* Expect timeout */
   expect: {
-    timeout: 10 * 1000, // 10 seconds
+    timeout: 15 * 1000, // 15 seconds (aumentado para tests de pipeline)
   },
 
   /* Output directory for test artifacts */

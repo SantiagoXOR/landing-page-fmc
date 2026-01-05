@@ -40,6 +40,7 @@
     "test:e2e:documents": "playwright test tests/documents.spec.ts",
     "test:e2e:settings": "playwright test tests/settings.spec.ts",
     "test:e2e:formosa": "playwright test tests/formosa-data.spec.ts",
+    "test:e2e:pipeline-sorting": "playwright test tests/pipeline-sorting-e2e.spec.ts",
     "test:e2e:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
     "test:e2e:regression": "playwright test --project=chromium --project=firefox --project=webkit",
     "test:e2e:report": "playwright show-report",

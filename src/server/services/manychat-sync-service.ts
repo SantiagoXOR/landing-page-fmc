@@ -284,6 +284,20 @@ export class ManychatSyncService {
       logger.info(`Subscriber ${subscriber.id} sincronizado exitosamente al CRM`, { 
         leadId: lead.id 
       })
+
+      // Verificar si el lead tiene CUIL y moverlo automáticamente a LISTO_ANALISIS
+      // si está en CLIENTE_NUEVO o CONSULTANDO_CREDITO
+      try {
+        const { PipelineAutoMoveService } = await import('./pipeline-auto-move-service')
+        await PipelineAutoMoveService.checkAndMoveLeadWithCUIL(lead.id)
+      } catch (autoMoveError: any) {
+        // No bloquear la sincronización si falla el auto-move
+        logger.warn('Error en auto-move después de sincronizar lead (no crítico)', {
+          leadId: lead.id,
+          error: autoMoveError.message
+        })
+      }
+
       return lead.id
     } catch (error: any) {
       logger.error(`Error sincronizando subscriber ${subscriber.id} al CRM`, { 

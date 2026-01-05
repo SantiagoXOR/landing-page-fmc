@@ -36,6 +36,8 @@ import { usePipelineMetrics, formatChange, getTrendColor, getTrendIcon } from '@
 // Constantes para el caché en sessionStorage
 const CACHE_KEY = 'pipeline_data_cache'
 const CACHE_TIMESTAMP_KEY = 'pipeline_data_cache_timestamp'
+const CACHE_VERSION_KEY = 'pipeline_data_cache_version'
+const CACHE_VERSION = '2.0.0' // Incrementar cuando cambie la lógica de ordenamiento
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutos en milisegundos
 
 // Funciones de caché
@@ -45,6 +47,16 @@ const getCachedData = (): { stages: PipelineStage[], leads: PipelineLead[], metr
   try {
     const cached = sessionStorage.getItem(CACHE_KEY)
     const timestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY)
+    const cachedVersion = sessionStorage.getItem(CACHE_VERSION_KEY)
+    
+    // Invalidar caché si la versión no coincide
+    if (cachedVersion !== CACHE_VERSION) {
+      console.log(`🔄 Versión de caché desactualizada (${cachedVersion} vs ${CACHE_VERSION}), invalidando...`)
+      sessionStorage.removeItem(CACHE_KEY)
+      sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
+      sessionStorage.removeItem(CACHE_VERSION_KEY)
+      return null
+    }
     
     if (!cached || !timestamp) {
       console.log('🔍 No hay caché disponible')
@@ -60,6 +72,7 @@ const getCachedData = (): { stages: PipelineStage[], leads: PipelineLead[], metr
       console.log(`⏰ Caché expirado (edad: ${Math.round(age / 1000)}s, TTL: ${CACHE_TTL / 1000}s)`)
       sessionStorage.removeItem(CACHE_KEY)
       sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
+      sessionStorage.removeItem(CACHE_VERSION_KEY)
       return null
     }
     
@@ -78,15 +91,18 @@ const saveToCache = (data: { stages: PipelineStage[], leads: PipelineLead[], met
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
     sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
-    console.log(`💾 Caché guardado (stages: ${data.stages?.length || 0}, leads: ${data.leads?.length || 0})`)
+    sessionStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION)
+    console.log(`💾 Caché guardado (stages: ${data.stages?.length || 0}, leads: ${data.leads?.length || 0}, versión: ${CACHE_VERSION})`)
   } catch (error) {
     console.error('❌ Error saving cache:', error)
     // Si hay error (por ejemplo, storage lleno), limpiar caché viejo
     try {
       sessionStorage.removeItem(CACHE_KEY)
       sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
+      sessionStorage.removeItem(CACHE_VERSION_KEY)
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
       sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+      sessionStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION)
       console.log('✅ Caché guardado después de limpiar espacio')
     } catch (retryError) {
       console.error('❌ Error retrying cache save:', retryError)

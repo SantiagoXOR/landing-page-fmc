@@ -1471,47 +1471,34 @@ const LeadCard = memo(function LeadCard({
 
   // Formatear tiempo en etapa con contador de horas para menos de 24hs (memoizado)
   const formatTimeInStage = useCallback((days?: number, entryDate?: Date | string) => {
-    if (days === undefined || days === null) {
-      // Si tenemos la fecha de entrada, calcular desde ahí
-      if (entryDate) {
-        const dateObj = typeof entryDate === 'string' ? new Date(entryDate) : entryDate
-        if (!isNaN(dateObj.getTime())) {
-          const now = new Date()
-          const diffInMs = now.getTime() - dateObj.getTime()
-          const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
-          const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
-          
-          // Si es menos de 24 horas, mostrar horas
-          if (diffInHours < 24) {
-            if (diffInHours === 0) {
-              const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
-              if (diffInMinutes === 0) return 'Menos de 1 min'
-              return `${diffInMinutes} min`
-            }
-            return `${diffInHours} hora${diffInHours > 1 ? 's' : ''}`
-          }
-          
-          if (diffInDays === 0) return 'Hoy'
-          if (diffInDays === 1) return '1 día'
-          if (diffInDays < 7) return `${diffInDays} días`
-          if (diffInDays < 30) {
-            const weeks = Math.floor(diffInDays / 7)
-            return weeks === 1 ? '1 semana' : `${weeks} semanas`
-          }
-          const months = Math.floor(diffInDays / 30)
-          return months === 1 ? '1 mes' : `${months} meses`
-        }
-      }
-      return null
-    }
-    
-    // Si tenemos días pero es menos de 1 día, calcular horas desde la fecha
-    if (days < 1 && entryDate) {
+    // SIEMPRE calcular desde entryDate si está disponible, ignorar days si parece incorrecto
+    if (entryDate) {
       const dateObj = typeof entryDate === 'string' ? new Date(entryDate) : entryDate
       if (!isNaN(dateObj.getTime())) {
         const now = new Date()
         const diffInMs = now.getTime() - dateObj.getTime()
+        
+        // Si la diferencia es negativa (fecha futura), usar días proporcionados o retornar error
+        if (diffInMs < 0) {
+          if (days !== undefined && days !== null && days >= 0) {
+            // Usar días proporcionados si la fecha parece incorrecta
+            if (days < 1) return 'Menos de 1 día'
+            if (days === 1) return '1 día'
+            if (days < 7) return `${days} días`
+            if (days < 30) {
+              const weeks = Math.floor(days / 7)
+              return weeks === 1 ? '1 semana' : `${weeks} semanas`
+            }
+            const months = Math.floor(days / 30)
+            return months === 1 ? '1 mes' : `${months} meses`
+          }
+          return 'Fecha inválida'
+        }
+        
         const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+        
+        // Si es menos de 24 horas, mostrar horas
         if (diffInHours < 24) {
           if (diffInHours === 0) {
             const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
@@ -1520,18 +1507,37 @@ const LeadCard = memo(function LeadCard({
           }
           return `${diffInHours} hora${diffInHours > 1 ? 's' : ''}`
         }
+        
+        // Si es exactamente 0 días (menos de 24 horas pero más de 0), mostrar horas
+        if (diffInDays === 0) {
+          return `${diffInHours} hora${diffInHours > 1 ? 's' : ''}`
+        }
+        
+        if (diffInDays === 1) return '1 día'
+        if (diffInDays < 7) return `${diffInDays} días`
+        if (diffInDays < 30) {
+          const weeks = Math.floor(diffInDays / 7)
+          return weeks === 1 ? '1 semana' : `${weeks} semanas`
+        }
+        const months = Math.floor(diffInDays / 30)
+        return months === 1 ? '1 mes' : `${months} meses`
       }
     }
     
-    if (days === 0) return 'Hoy'
-    if (days === 1) return '1 día'
-    if (days < 7) return `${days} días`
-    if (days < 30) {
-      const weeks = Math.floor(days / 7)
-      return weeks === 1 ? '1 semana' : `${weeks} semanas`
+    // Fallback: usar días si entryDate no está disponible
+    if (days !== undefined && days !== null) {
+      if (days < 1) return 'Menos de 1 día'
+      if (days === 1) return '1 día'
+      if (days < 7) return `${days} días`
+      if (days < 30) {
+        const weeks = Math.floor(days / 7)
+        return weeks === 1 ? '1 semana' : `${weeks} semanas`
+      }
+      const months = Math.floor(days / 30)
+      return months === 1 ? '1 mes' : `${months} meses`
     }
-    const months = Math.floor(days / 30)
-    return months === 1 ? '1 mes' : `${months} meses`
+    
+    return null
   }, [])
 
   return (

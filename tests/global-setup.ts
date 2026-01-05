@@ -34,7 +34,13 @@ async function globalSetup(config: FullConfig) {
     
   } catch (error) {
     console.error('❌ Error en setup global:', error);
-    throw new Error(`Setup falló: ${error}`);
+    console.error('\n💡 SOLUCIÓN:');
+    console.error('   1. Asegúrate de que la aplicación esté corriendo:');
+    console.error('      npm run dev');
+    console.error('   2. Verifica que la aplicación esté disponible en:', targetURL);
+    console.error('   3. Si usas un puerto diferente, configura PLAYWRIGHT_BASE_URL');
+    console.error('\n');
+    throw new Error(`Setup falló: La aplicación no está disponible en ${targetURL}. Inicia la aplicación con 'npm run dev'`);
   } finally {
     await browser.close();
   }

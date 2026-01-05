@@ -55,8 +55,8 @@ export interface PipelineLead {
   origen: string
   estado: string
   stageId: string
-  stageEntryDate: Date
-  lastActivity?: Date
+  stageEntryDate: Date | string
+  lastActivity?: Date | string
   score?: number // Score basado en tiempo en etapa (0-100)
   tags?: string[]
   customFields?: Record<string, any>

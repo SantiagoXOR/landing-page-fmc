@@ -61,13 +61,7 @@ export default defineConfig({
         // Configuración específica para CRM Phorencial
         viewport: { width: 1920, height: 1080 },
         ignoreHTTPSErrors: true,
-        // Variables de entorno para tests de pipeline
-        env: {
-          PLAYWRIGHT_BASE_URL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
-          NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-          SUPABASE_URL: process.env.SUPABASE_URL,
-          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        },
+        // Variables de entorno están disponibles a través de process.env en los tests
       },
     },
 

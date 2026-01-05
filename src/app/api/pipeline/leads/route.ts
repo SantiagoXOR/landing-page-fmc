@@ -426,8 +426,7 @@ function mapLeadToPipelineLead(
     urgency: timeScore.urgency,
     scoreColor: timeScore.color,
     scoreLabel: timeScore.label,
-    cuil: cuilValue, // Agregar CUIL (puede venir del campo directo o de customFields)
-    createdAt: lead.createdAt ? (typeof lead.createdAt === 'string' ? lead.createdAt : new Date(lead.createdAt).toISOString()) : new Date().toISOString()
+    cuil: cuilValue // Agregar CUIL (puede venir del campo directo o de customFields)
   } as PipelineLead & { timeInStage?: number; urgency?: string; scoreColor?: string; scoreLabel?: string; cuil?: string; createdAt?: string }
 }
 

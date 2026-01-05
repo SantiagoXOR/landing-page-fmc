@@ -374,7 +374,7 @@ export function PipelineBoardAdvanced({
     }).format(value)
   }, [])
 
-  // Formatear fecha relativa (memoizado)
+  // Formatear fecha relativa con contador de horas para menos de 24hs (memoizado)
   const formatRelativeDate = useCallback((date: Date | string) => {
     if (!date) return 'Sin fecha'
 
@@ -382,7 +382,19 @@ export function PipelineBoardAdvanced({
     if (isNaN(dateObj.getTime())) return 'Fecha inválida'
 
     const now = new Date()
-    const diffInDays = Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60 * 24))
+    const diffInMs = now.getTime() - dateObj.getTime()
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+
+    // Si es menos de 24 horas, mostrar horas
+    if (diffInHours < 24) {
+      if (diffInHours === 0) {
+        const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+        if (diffInMinutes === 0) return 'Hace menos de un minuto'
+        return `Hace ${diffInMinutes} minuto${diffInMinutes > 1 ? 's' : ''}`
+      }
+      return `Hace ${diffInHours} hora${diffInHours > 1 ? 's' : ''}`
+    }
 
     if (diffInDays === 0) return 'Hoy'
     if (diffInDays === 1) return 'Ayer'
@@ -1457,9 +1469,60 @@ const LeadCard = memo(function LeadCard({
     }
   }
 
-  // Formatear tiempo en etapa de manera más clara (memoizado)
-  const formatTimeInStage = useCallback((days?: number) => {
-    if (days === undefined || days === null) return null
+  // Formatear tiempo en etapa con contador de horas para menos de 24hs (memoizado)
+  const formatTimeInStage = useCallback((days?: number, entryDate?: Date | string) => {
+    if (days === undefined || days === null) {
+      // Si tenemos la fecha de entrada, calcular desde ahí
+      if (entryDate) {
+        const dateObj = typeof entryDate === 'string' ? new Date(entryDate) : entryDate
+        if (!isNaN(dateObj.getTime())) {
+          const now = new Date()
+          const diffInMs = now.getTime() - dateObj.getTime()
+          const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+          const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+          
+          // Si es menos de 24 horas, mostrar horas
+          if (diffInHours < 24) {
+            if (diffInHours === 0) {
+              const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+              if (diffInMinutes === 0) return 'Menos de 1 min'
+              return `${diffInMinutes} min`
+            }
+            return `${diffInHours} hora${diffInHours > 1 ? 's' : ''}`
+          }
+          
+          if (diffInDays === 0) return 'Hoy'
+          if (diffInDays === 1) return '1 día'
+          if (diffInDays < 7) return `${diffInDays} días`
+          if (diffInDays < 30) {
+            const weeks = Math.floor(diffInDays / 7)
+            return weeks === 1 ? '1 semana' : `${weeks} semanas`
+          }
+          const months = Math.floor(diffInDays / 30)
+          return months === 1 ? '1 mes' : `${months} meses`
+        }
+      }
+      return null
+    }
+    
+    // Si tenemos días pero es menos de 1 día, calcular horas desde la fecha
+    if (days < 1 && entryDate) {
+      const dateObj = typeof entryDate === 'string' ? new Date(entryDate) : entryDate
+      if (!isNaN(dateObj.getTime())) {
+        const now = new Date()
+        const diffInMs = now.getTime() - dateObj.getTime()
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+        if (diffInHours < 24) {
+          if (diffInHours === 0) {
+            const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+            if (diffInMinutes === 0) return 'Menos de 1 min'
+            return `${diffInMinutes} min`
+          }
+          return `${diffInHours} hora${diffInHours > 1 ? 's' : ''}`
+        }
+      }
+    }
+    
     if (days === 0) return 'Hoy'
     if (days === 1) return '1 día'
     if (days < 7) return `${days} días`
@@ -1732,16 +1795,16 @@ const LeadCard = memo(function LeadCard({
               <span className="text-muted-foreground">En esta etapa:</span>
             </div>
             <span className="font-medium text-gray-900">
-              {formatTimeInStage(lead.timeInStage)}
+              {formatTimeInStage(lead.timeInStage, lead.stageEntryDate)}
             </span>
           </div>
         )}
 
-        {/* Fecha de ingreso a la etapa */}
-        {lead.stageEntryDate && (
+        {/* Fecha de ingreso a la etapa - usar createdAt si está disponible para leads nuevos */}
+        {(lead.stageEntryDate || (lead as any).createdAt) && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Ingresó:</span>
-            <span>{formatRelativeDate(lead.stageEntryDate)}</span>
+            <span>{formatRelativeDate((lead as any).createdAt || lead.stageEntryDate)}</span>
           </div>
         )}
 

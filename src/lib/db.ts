@@ -5,7 +5,29 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+// URL correcta de Supabase (fallback si hay variables incorrectas)
+const CORRECT_SUPABASE_URL = 'https://hvmenkhmyovfmwsnitab.supabase.co'
+
+// Obtener URL de Supabase con validación
+function getSupabaseUrl(): string {
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
+  
+  // Validar que la URL no sea la incorrecta
+  if (url && url.includes('zmozfpxujgknqqgmsrpk')) {
+    console.warn('[db.ts] URL incorrecta detectada. Usando URL correcta como fallback.')
+    url = CORRECT_SUPABASE_URL
+  }
+  
+  // Si no hay URL, usar la correcta como fallback
+  if (!url) {
+    console.warn('[db.ts] No se encontró URL de Supabase. Usando URL correcta como fallback.')
+    url = CORRECT_SUPABASE_URL
+  }
+  
+  return url
+}
+
+const SUPABASE_URL = getSupabaseUrl()
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
 class SupabaseClient {

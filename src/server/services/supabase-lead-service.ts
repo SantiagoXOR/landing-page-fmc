@@ -24,23 +24,49 @@ interface Lead {
   updatedAt?: string
 }
 
+// URL correcta de Supabase (fallback si hay variables incorrectas)
+const CORRECT_SUPABASE_URL = 'https://hvmenkhmyovfmwsnitab.supabase.co'
+
 export class SupabaseLeadService {
   private supabaseUrl: string
   private serviceRoleKey: string
 
   constructor() {
-    this.supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    // Priorizar NEXT_PUBLIC_SUPABASE_URL, pero validar ambas
+    let supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
+    
+    // Validar que la URL no sea la incorrecta
+    if (supabaseUrl && supabaseUrl.includes('zmozfpxujgknqqgmsrpk')) {
+      logger.warn('URL incorrecta detectada en variables de entorno. Usando URL correcta como fallback.')
+      logger.warn('Para corregir: elimine la variable SUPABASE_URL del sistema o configure NEXT_PUBLIC_SUPABASE_URL en .env.local')
+      supabaseUrl = CORRECT_SUPABASE_URL
+    }
+    
+    // Si no hay URL, usar la correcta como fallback
+    if (!supabaseUrl) {
+      logger.warn('No se encontró URL de Supabase. Usando URL correcta como fallback.')
+      supabaseUrl = CORRECT_SUPABASE_URL
+    }
+    
+    this.supabaseUrl = supabaseUrl
     this.serviceRoleKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
     logger.info('SupabaseLeadService constructor', {
       hasUrl: !!this.supabaseUrl,
       hasKey: !!this.serviceRoleKey,
       urlPrefix: this.supabaseUrl ? this.supabaseUrl.substring(0, 30) + '...' : 'MISSING',
-      keyPrefix: this.serviceRoleKey ? this.serviceRoleKey.substring(0, 20) + '...' : 'MISSING'
+      keyPrefix: this.serviceRoleKey ? this.serviceRoleKey.substring(0, 20) + '...' : 'MISSING',
+      envVars: {
+        SUPABASE_URL: !!process.env.SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
+        SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      },
+      usingFallback: supabaseUrl === CORRECT_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL
     })
 
-    if (!this.supabaseUrl || !this.serviceRoleKey) {
-      throw new Error('Supabase credentials not configured')
+    if (!this.serviceRoleKey) {
+      throw new Error(`Supabase credentials not configured. Missing: SUPABASE_SERVICE_KEY o SUPABASE_SERVICE_ROLE_KEY`)
     }
   }
 
@@ -54,33 +80,48 @@ export class SupabaseLeadService {
       serviceKeyPrefix: this.serviceRoleKey ? this.serviceRoleKey.substring(0, 20) + '...' : 'MISSING'
     })
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'apikey': this.serviceRoleKey,
-        'Authorization': `Bearer ${this.serviceRoleKey}`,
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
-    })
-
-    logger.info('Supabase response received', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error('Supabase API error', {
-        endpoint,
-        status: response.status,
-        error: errorText
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'apikey': this.serviceRoleKey,
+          'Authorization': `Bearer ${this.serviceRoleKey}`,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
       })
-      throw new Error(`Supabase API error: ${response.status} - ${errorText}`)
-    }
 
-    return response
+      logger.info('Supabase response received', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('Supabase API error', {
+          endpoint,
+          status: response.status,
+          error: errorText
+        })
+        throw new Error(`Supabase API error: ${response.status} - ${errorText}`)
+      }
+
+      return response
+    } catch (error: any) {
+      // Capturar errores de red específicos
+      if (error.message === 'fetch failed' || error.name === 'TypeError' || error.cause?.code === 'ECONNREFUSED') {
+        logger.error('Supabase network error', {
+          endpoint,
+          url,
+          error: error.message,
+          errorName: error.name,
+          errorCause: error.cause
+        })
+        throw new Error(`Error de conexión a Supabase: ${error.message}. Verifique que SUPABASE_URL sea accesible y que las variables de entorno estén configuradas correctamente.`)
+      }
+      throw error
+    }
   }
 
   async createLead(leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {

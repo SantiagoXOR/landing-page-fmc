@@ -633,7 +633,7 @@ export async function GET(request: NextRequest) {
       otherLeads.push(pipelineLead)
     }
 
-    // Ordenar los leads prioritarios con ventana de 24hs en orden ascendente por createdAt
+    // Ordenar los leads prioritarios con ventana de 24hs en orden descendente por createdAt (más recientes primero)
     priorityLeadsWith24hWindow.sort((a, b) => {
       const leadA = leadOriginalMap.get(a.id!)
       const leadB = leadOriginalMap.get(b.id!)
@@ -644,10 +644,24 @@ export async function GET(request: NextRequest) {
       const dateA = new Date(leadA.createdAt).getTime()
       const dateB = new Date(leadB.createdAt).getTime()
       
-      return dateA - dateB // Orden ascendente (más antiguos primero)
+      return dateB - dateA // Orden descendente (más recientes primero)
     })
 
-    // Combinar: primero los prioritarios con ventana de 24hs, luego el resto
+    // Ordenar los otros leads también por createdAt descendente (más recientes primero)
+    otherLeads.sort((a, b) => {
+      const leadA = leadOriginalMap.get(a.id!)
+      const leadB = leadOriginalMap.get(b.id!)
+      
+      if (!leadA || !leadA.createdAt) return 1
+      if (!leadB || !leadB.createdAt) return -1
+      
+      const dateA = new Date(leadA.createdAt).getTime()
+      const dateB = new Date(leadB.createdAt).getTime()
+      
+      return dateB - dateA // Orden descendente (más recientes primero)
+    })
+
+    // Combinar: primero los prioritarios con ventana de 24hs (ya ordenados), luego el resto (ya ordenados)
     pipelineLeads = [...priorityLeadsWith24hWindow, ...otherLeads]
 
     // Agrupar leads por estado original y stageId para debugging

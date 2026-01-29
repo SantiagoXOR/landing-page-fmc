@@ -85,6 +85,11 @@
 - [Códigos de Error](./API-REFERENCE.md#-códigos-de-error)
 - [Ejemplos de Uso](./API-REFERENCE.md#-ejemplos-completos)
 
+### 🔗 Integraciones
+
+- [WhatsApp Business API Oficial](./WHATSAPP-BUSINESS-API-OFICIAL.md) - Guía completa de implementación de Meta WhatsApp Business API
+- [ManyChat Setup](./MANYCHAT-SETUP.md) - Configuración de integración con ManyChat
+
 ### 🔧 Solución de Problemas
 
 - [Problemas de Setup](./TROUBLESHOOTING.md#-problemas-de-setup)
@@ -126,7 +131,7 @@ Dashboard              █████████████████░░
 Migración Supabase     ████████████████░░░░  80%
 Pipeline               ██████████████░░░░░░  70%
 Testing                ███████████████░░░░░  75%
-WhatsApp               ██████░░░░░░░░░░░░░░  30%
+WhatsApp               ████████░░░░░░░░░░░░  40%
 Documentación          ████████████████░░░░  80%
 ```
 
@@ -198,6 +203,7 @@ Documentación          ████████████████░░�
 | Playwright | [playwright.dev/docs](https://playwright.dev/docs) |
 | React Query | [tanstack.com/query](https://tanstack.com/query/latest) |
 | TypeScript | [typescriptlang.org/docs](https://www.typescriptlang.org/docs) |
+| WhatsApp Business API | [developers.facebook.com/docs/whatsapp](https://developers.facebook.com/docs/whatsapp) |
 
 ---
 
@@ -234,6 +240,7 @@ Documentación          ████████████████░░�
 - ✅ Guías de migración a Supabase
 - ✅ API Reference completada
 - ✅ Troubleshooting expandido
+- ✅ **Documentación oficial WhatsApp Business API agregada**
 
 ### Próximas Actualizaciones
 - [ ] Ejemplos de código adicionales

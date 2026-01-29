@@ -335,72 +335,35 @@ export async function GET(
       }
     }
 
-    // Aplicar ordenamiento: prioritarios con ventana de 24hs primero, en orden ascendente
-    // Crear mapa para relacionar PipelineLead con lead original (para acceder a createdAt)
-    const leadOriginalMap = new Map<string, any>()
-    leads.forEach(lead => {
-      if (lead.id && leadIds.includes(lead.id)) {
-        leadOriginalMap.set(lead.id, lead)
-      }
-    })
-
-    // Ordenar leads: prioritarios con ventana de 24hs primero, en orden ascendente
-    const now = new Date()
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    // Ordenar por fecha de entrada A LA ETAPA (stage_entered_at): más antiguos en la etapa primero
+    // Prioritarios (urgent/high que llevan <24h en la etapa) arriba, ordenados por stageEntryDate ascendente
+    // Resto debajo, también por stageEntryDate ascendente (quien más tiempo lleva esperando, primero)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
     const priorityLeadsWith24hWindow: PipelineLead[] = []
     const otherLeads: PipelineLead[] = []
 
     for (const pipelineLead of pipelineLeads) {
-      // Verificar si es prioritario (high o urgent)
       const isPriority = pipelineLead.priority === 'high' || pipelineLead.priority === 'urgent'
-      
-      if (isPriority && pipelineLead.id) {
-        // Obtener el lead original para acceder a createdAt
-        const originalLead = leadOriginalMap.get(pipelineLead.id)
-        if (originalLead && originalLead.createdAt) {
-          const leadCreatedAt = new Date(originalLead.createdAt)
-          // Verificar si tiene ventana de 24hs activa (24hs o menos desde que ingresó)
-          if (leadCreatedAt >= twentyFourHoursAgo) {
-            priorityLeadsWith24hWindow.push(pipelineLead)
-            continue
-          }
-        }
+      const stageEntry = pipelineLead.stageEntryDate ? new Date(pipelineLead.stageEntryDate).getTime() : 0
+      const enteredThisStageRecently = stageEntry && stageEntry >= twentyFourHoursAgo.getTime()
+
+      if (isPriority && enteredThisStageRecently) {
+        priorityLeadsWith24hWindow.push(pipelineLead)
+      } else {
+        otherLeads.push(pipelineLead)
       }
-      
-      // Si no cumple los criterios, agregar al grupo de otros leads
-      otherLeads.push(pipelineLead)
     }
 
-    // Ordenar los leads prioritarios con ventana de 24hs en orden ASCENDENTE por createdAt (más antiguos primero)
-    priorityLeadsWith24hWindow.sort((a, b) => {
-      const leadA = leadOriginalMap.get(a.id!)
-      const leadB = leadOriginalMap.get(b.id!)
-      
-      if (!leadA || !leadA.createdAt) return 1
-      if (!leadB || !leadB.createdAt) return -1
-      
-      const dateA = new Date(leadA.createdAt).getTime()
-      const dateB = new Date(leadB.createdAt).getTime()
-      
-      return dateA - dateB // Orden ascendente (más antiguos primero)
-    })
+    const sortByStageEntryAsc = (a: PipelineLead, b: PipelineLead) => {
+      const dateA = a.stageEntryDate ? new Date(a.stageEntryDate).getTime() : 0
+      const dateB = b.stageEntryDate ? new Date(b.stageEntryDate).getTime() : 0
+      return dateA - dateB // Ascendente: más antiguos en la etapa primero
+    }
 
-    // Ordenar los otros leads también por createdAt descendente (más recientes primero)
-    otherLeads.sort((a, b) => {
-      const leadA = leadOriginalMap.get(a.id!)
-      const leadB = leadOriginalMap.get(b.id!)
-      
-      if (!leadA || !leadA.createdAt) return 1
-      if (!leadB || !leadB.createdAt) return -1
-      
-      const dateA = new Date(leadA.createdAt).getTime()
-      const dateB = new Date(leadB.createdAt).getTime()
-      
-      return dateB - dateA // Orden descendente (más recientes primero)
-    })
+    priorityLeadsWith24hWindow.sort(sortByStageEntryAsc)
+    otherLeads.sort(sortByStageEntryAsc)
 
-    // Combinar: primero los prioritarios con ventana de 24hs (ya ordenados), luego el resto (ya ordenados)
     const sortedPipelineLeads = [...priorityLeadsWith24hWindow, ...otherLeads]
 
     return NextResponse.json(sortedPipelineLeads, {

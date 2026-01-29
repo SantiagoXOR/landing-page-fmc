@@ -3,7 +3,8 @@
  * 
  * Procesa todos los leads que:
  * - Tienen CUIL válido (7+ caracteres)
- * - Están en CLIENTE_NUEVO o CONSULTANDO_CREDITO
+ * - Están en CLIENTE_NUEVO, CONSULTANDO_CREDITO, SOLICITANDO_DOCS o sin pipeline
+ * - CUIL puede estar en la columna cuil o dentro de customFields (formulario)
  * 
  * Uso:
  *   node scripts/move-leads-with-cuil-to-analisis.js
@@ -258,7 +259,7 @@ async function checkAndMoveLeadWithCUIL(leadId) {
     }
 
     // 4. Verificar que esté en una etapa válida para mover
-    const validStages = ['CLIENTE_NUEVO', 'CONSULTANDO_CREDITO', 'LEAD_NUEVO', 'CONTACTO_INICIAL']
+    const validStages = ['CLIENTE_NUEVO', 'CONSULTANDO_CREDITO', 'SOLICITANDO_DOCS', 'LEAD_NUEVO', 'CONTACTO_INICIAL', 'CALIFICACION', 'PRESENTACION']
     const currentStage = pipeline?.current_stage
 
     if (!currentStage) {
@@ -267,7 +268,7 @@ async function checkAndMoveLeadWithCUIL(leadId) {
       return true
     }
 
-    // Verificar si está en una etapa válida
+    // Verificar si está en una etapa válida (cualquiera excepto LISTO_ANALISIS, PREAPROBADO, RECHAZADO, etc.)
     if (!validStages.includes(currentStage)) {
       return false
     }
@@ -294,26 +295,40 @@ async function main() {
   }
 
   try {
-    // 1. Obtener todos los leads con CUIL
-    console.log('📋 Buscando leads con CUIL...')
+    // 1. Obtener leads que pueden tener CUIL: columna cuil O customFields (formulario)
+    console.log('📋 Buscando leads con CUIL (columna o customFields)...')
     
-    const { data: leadsWithCuil, error: leadsError } = await supabase
+    const maxLimit = limit || 10000
+    const { data: withCuilCol } = await supabase
       .from('Lead')
       .select('id, nombre, cuil, customFields')
       .not('cuil', 'is', null)
       .neq('cuil', '')
-      .limit(limit || 10000)
+      .limit(maxLimit)
+    const { data: withCustomFields } = await supabase
+      .from('Lead')
+      .select('id, nombre, cuil, customFields')
+      .not('customFields', 'is', null)
+      .limit(maxLimit)
 
-    if (leadsError) {
-      throw leadsError
+    const byId = new Map()
+    for (const lead of [...(withCuilCol || []), ...(withCustomFields || [])]) {
+      if (lead?.id && !byId.has(lead.id)) byId.set(lead.id, lead)
     }
+    const leadsRaw = Array.from(byId.values())
 
-    if (!leadsWithCuil || leadsWithCuil.length === 0) {
-      console.log('✅ No se encontraron leads con CUIL')
+    if (leadsRaw.length === 0) {
+      console.log('✅ No se encontraron leads con cuil/customFields')
       return
     }
 
-    console.log(`   Encontrados ${leadsWithCuil.length} leads con CUIL\n`)
+    // Filtrar solo los que tienen CUIL válido (columna o extraído de customFields)
+    const leadsWithCuil = leadsRaw.filter((lead) => {
+      const cuil = extractCUILFromLead(lead)
+      return isValidCUIL(cuil)
+    })
+
+    console.log(`   Encontrados ${leadsWithCuil.length} leads con CUIL válido (de ${leadsRaw.length} con cuil/customFields)\n`)
 
     // 2. Obtener pipelines de estos leads
     console.log('📊 Obteniendo información de pipelines...')
@@ -336,16 +351,20 @@ async function main() {
       })
     }
 
-    // 3. Filtrar leads que están en etapas válidas y tienen CUIL válido
-    const validStages = ['CLIENTE_NUEVO', 'CONSULTANDO_CREDITO', 'LEAD_NUEVO', 'CONTACTO_INICIAL']
+    // 3. Filtrar leads que están en etapas válidas (no ya en LISTO_ANALISIS/PREAPROBADO/RECHAZADO)
+    const validStages = ['CLIENTE_NUEVO', 'CONSULTANDO_CREDITO', 'SOLICITANDO_DOCS', 'LEAD_NUEVO', 'CONTACTO_INICIAL', 'CALIFICACION', 'PRESENTACION']
+    const excludedStages = ['LISTO_ANALISIS', 'PREAPROBADO', 'RECHAZADO', 'APROBADO', 'CERRADO_GANADO', 'EN_SEGUIMIENTO', 'SOLICITAR_REFERIDO']
     const leadsToProcess = []
 
     for (const lead of leadsWithCuil) {
       const currentStage = pipelineMap.get(lead.id)
       
-      // Si no tiene pipeline, asumimos que está en CLIENTE_NUEVO (se creará)
+      // Excluir si ya está en Listo para Análisis o etapas finales
+      if (currentStage && excludedStages.includes(currentStage)) {
+        continue
+      }
+      // Incluir si no tiene pipeline o está en una etapa válida para mover
       if (!currentStage || validStages.includes(currentStage)) {
-        // Verificar que el CUIL sea válido
         const cuil = extractCUILFromLead(lead)
         if (isValidCUIL(cuil)) {
           leadsToProcess.push({
@@ -358,8 +377,9 @@ async function main() {
     }
 
     console.log(`   ${leadsToProcess.length} leads cumplen las condiciones:\n`)
-    console.log(`   - Tienen CUIL válido (7+ caracteres)`)
-    console.log(`   - Están en: CLIENTE_NUEVO, CONSULTANDO_CREDITO, o sin pipeline\n`)
+    console.log(`   - Tienen CUIL válido (columna o customFields)`)
+    console.log(`   - No están ya en Listo para Análisis / Preaprobado / Rechazado`)
+    console.log(`   - Están en: ${validStages.join(', ')}, o sin pipeline\n`)
 
     if (leadsToProcess.length === 0) {
       console.log('✅ No hay leads para procesar')
@@ -458,6 +478,10 @@ main().catch(error => {
   console.error('Error no manejado:', error)
   process.exit(1)
 })
+
+
+
+
 
 
 

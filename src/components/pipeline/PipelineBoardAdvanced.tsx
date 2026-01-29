@@ -1483,14 +1483,14 @@ const LeadCard = memo(function LeadCard({
           if (days !== undefined && days !== null && days >= 0) {
             // Usar días proporcionados si la fecha parece incorrecta
             if (days < 1) return 'Menos de 1 día'
-            if (days === 1) return '1 día'
-            if (days < 7) return `${days} días`
-            if (days < 30) {
-              const weeks = Math.floor(days / 7)
-              return weeks === 1 ? '1 semana' : `${weeks} semanas`
-            }
-            const months = Math.floor(days / 30)
-            return months === 1 ? '1 mes' : `${months} meses`
+    if (days === 1) return '1 día'
+    if (days < 7) return `${days} días`
+    if (days < 30) {
+      const weeks = Math.floor(days / 7)
+      return weeks === 1 ? '1 semana' : `${weeks} semanas`
+    }
+    const months = Math.floor(days / 30)
+    return months === 1 ? '1 mes' : `${months} meses`
           }
           return 'Fecha inválida'
         }
@@ -1806,11 +1806,11 @@ const LeadCard = memo(function LeadCard({
           </div>
         )}
 
-        {/* Fecha de ingreso a la etapa - usar createdAt si está disponible para leads nuevos */}
+        {/* Fecha de ingreso a ESTA etapa (stage_entered_at); fallback a creación del lead si no hay pipeline */}
         {(lead.stageEntryDate || (lead as any).createdAt) && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Ingresó:</span>
-            <span>{formatRelativeDate((lead as any).createdAt || lead.stageEntryDate)}</span>
+            <span>{formatRelativeDate(lead.stageEntryDate || (lead as any).createdAt)}</span>
           </div>
         )}
 

@@ -81,33 +81,33 @@ export class SupabaseLeadService {
     })
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'apikey': this.serviceRoleKey,
-          'Authorization': `Bearer ${this.serviceRoleKey}`,
-          'Content-Type': 'application/json',
-          ...options.headers
-        }
-      })
-
-      logger.info('Supabase response received', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        logger.error('Supabase API error', {
-          endpoint,
-          status: response.status,
-          error: errorText
-        })
-        throw new Error(`Supabase API error: ${response.status} - ${errorText}`)
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'apikey': this.serviceRoleKey,
+        'Authorization': `Bearer ${this.serviceRoleKey}`,
+        'Content-Type': 'application/json',
+        ...options.headers
       }
+    })
 
-      return response
+    logger.info('Supabase response received', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      logger.error('Supabase API error', {
+        endpoint,
+        status: response.status,
+        error: errorText
+      })
+      throw new Error(`Supabase API error: ${response.status} - ${errorText}`)
+    }
+
+    return response
     } catch (error: any) {
       // Capturar errores de red específicos
       if (error.message === 'fetch failed' || error.name === 'TypeError' || error.cause?.code === 'ECONNREFUSED') {

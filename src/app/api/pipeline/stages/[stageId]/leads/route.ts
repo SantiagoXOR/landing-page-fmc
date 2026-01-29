@@ -335,9 +335,7 @@ export async function GET(
       }
     }
 
-    // Ordenar por fecha de entrada A LA ETAPA (stage_entered_at): más antiguos en la etapa primero
-    // Prioritarios (urgent/high que llevan <24h en la etapa) arriba, ordenados por stageEntryDate ascendente
-    // Resto debajo, también por stageEntryDate ascendente (quien más tiempo lleva esperando, primero)
+    // Ordenar por fecha de entrada a la etapa: más recientes primero (newest first)
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
     const priorityLeadsWith24hWindow: PipelineLead[] = []
@@ -355,14 +353,14 @@ export async function GET(
       }
     }
 
-    const sortByStageEntryAsc = (a: PipelineLead, b: PipelineLead) => {
+    const sortByStageEntryDesc = (a: PipelineLead, b: PipelineLead) => {
       const dateA = a.stageEntryDate ? new Date(a.stageEntryDate).getTime() : 0
       const dateB = b.stageEntryDate ? new Date(b.stageEntryDate).getTime() : 0
-      return dateA - dateB // Ascendente: más antiguos en la etapa primero
+      return dateB - dateA // Descendente: más recientes en la etapa primero
     }
 
-    priorityLeadsWith24hWindow.sort(sortByStageEntryAsc)
-    otherLeads.sort(sortByStageEntryAsc)
+    priorityLeadsWith24hWindow.sort(sortByStageEntryDesc)
+    otherLeads.sort(sortByStageEntryDesc)
 
     const sortedPipelineLeads = [...priorityLeadsWith24hWindow, ...otherLeads]
 

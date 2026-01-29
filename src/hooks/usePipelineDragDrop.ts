@@ -80,17 +80,17 @@ export function usePipelineDragDrop({
         }
       })
 
-      // Ordenar por fecha de entrada A LA ETAPA (stage_entered_at): más antiguos primero
-      const sortByStageEntryAsc = (a: PipelineLead, b: PipelineLead) => {
+      // Ordenar por fecha de entrada a la etapa: más recientes primero (newest first)
+      const sortByStageEntryDesc = (a: PipelineLead, b: PipelineLead) => {
         const dateA = a.stageEntryDate ? new Date(a.stageEntryDate).getTime() : 0
         const dateB = b.stageEntryDate ? new Date(b.stageEntryDate).getTime() : 0
-        if (dateA > 0 && dateB > 0) return dateA - dateB
+        if (dateA > 0 && dateB > 0) return dateB - dateA
         if (dateA > 0) return -1
         if (dateB > 0) return 1
         return 0
       }
-      priorityLeadsWith24h.sort(sortByStageEntryAsc)
-      otherLeads.sort(sortByStageEntryAsc)
+      priorityLeadsWith24h.sort(sortByStageEntryDesc)
+      otherLeads.sort(sortByStageEntryDesc)
       
       // Combinar: primero prioritarios, luego otros
       organized[stage.id] = [...priorityLeadsWith24h, ...otherLeads]

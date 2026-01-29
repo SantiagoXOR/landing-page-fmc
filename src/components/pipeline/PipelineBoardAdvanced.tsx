@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useLongPress } from '@/hooks/useLongPress'
 import { REJECTION_MESSAGES, REJECTION_MESSAGE_OPTIONS } from '@/lib/rejection-messages'
+import { formatDate } from '@/lib/utils'
 
 interface PipelineBoardAdvancedProps {
   stages: PipelineStage[]
@@ -1806,11 +1807,11 @@ const LeadCard = memo(function LeadCard({
           </div>
         )}
 
-        {/* Fecha de ingreso a ESTA etapa (stage_entered_at); fallback a creación del lead si no hay pipeline */}
+        {/* Fecha/hora real de creación del lead en el sistema (createdAt) */}
         {(lead.stageEntryDate || (lead as any).createdAt) && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Ingresó:</span>
-            <span>{formatRelativeDate(lead.stageEntryDate || (lead as any).createdAt)}</span>
+            <span>{formatDate((lead as any).createdAt || lead.stageEntryDate)}</span>
           </div>
         )}
 

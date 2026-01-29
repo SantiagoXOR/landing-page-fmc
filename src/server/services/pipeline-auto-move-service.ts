@@ -1,15 +1,21 @@
 /**
  * Servicio para mover automáticamente leads a "Listo para Análisis"
- * cuando tienen CUIL y están en etapas iniciales
+ * cuando tienen CUIL o customFields completos, y no están en Preaprobado ni Rechazado
  */
 
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { getTagForStage } from '@/lib/manychat-sync'
 import { PipelineService, PipelineStage } from './pipeline-service'
+import { ManychatSyncService } from './manychat-sync-service'
+
+/** Etapas en las que NO se mueve automáticamente a Listo para Análisis */
+const STAGES_EXCLUDED_FROM_AUTO_MOVE: PipelineStage[] = ['PREAPROBADO', 'RECHAZADO', 'LISTO_ANALISIS']
 
 export class PipelineAutoMoveService {
   /**
-   * Verificar si un lead tiene CUIL y moverlo a LISTO_ANALISIS si está en etapas iniciales
+   * Verificar si un lead tiene CUIL o customFields completos y moverlo a LISTO_ANALISIS
+   * si no está en Preaprobado, Rechazado ni ya en Listo para Análisis.
    * @param leadId - ID del lead a verificar
    * @returns true si se movió el lead, false en caso contrario
    */
@@ -40,14 +46,16 @@ export class PipelineAutoMoveService {
         return false
       }
 
-      // 2. Extraer CUIL del lead
+      // 2. Criterio: tiene CUIL válido O customFields completos
       const cuil = this.extractCUILFromLead(lead)
+      const hasCuil = this.isValidCUIL(cuil)
+      const hasCompleteCustomFields = this.hasCompleteCustomFields(lead)
 
-      if (!this.isValidCUIL(cuil)) {
-        logger.debug('Lead no tiene CUIL válido, no se mueve automáticamente', {
+      if (!hasCuil && !hasCompleteCustomFields) {
+        logger.debug('Lead sin CUIL ni customFields completos, no se mueve automáticamente', {
           leadId,
-          hasCuil: !!lead.cuil,
-          hasCustomFields: !!lead.customFields
+          hasCuil,
+          hasCompleteCustomFields
         })
         return false
       }
@@ -60,7 +68,6 @@ export class PipelineAutoMoveService {
         .single()
 
       if (pipelineError && pipelineError.code !== 'PGRST116') {
-        // Error diferente a "no encontrado"
         logger.warn('Error obteniendo pipeline para auto-move', {
           leadId,
           error: pipelineError.message
@@ -68,78 +75,96 @@ export class PipelineAutoMoveService {
         return false
       }
 
-      // 4. Verificar que esté en una etapa válida para mover
-      const validStages: PipelineStage[] = ['CLIENTE_NUEVO', 'CONSULTANDO_CREDITO']
       const currentStage = pipeline?.current_stage as PipelineStage | undefined
 
+      // 4. No mover si ya está en Listo para Análisis, Preaprobado o Rechazado
+      if (currentStage && STAGES_EXCLUDED_FROM_AUTO_MOVE.includes(currentStage)) {
+        logger.debug('Lead en etapa excluida para auto-move', { leadId, currentStage })
+        return false
+      }
+
+      const reason = hasCuil ? `Lead tiene CUIL (${cuil?.substring(0, 5)}***)` : 'Lead con customFields completos'
+
       if (!currentStage) {
-        // No hay pipeline, crear uno primero
-        logger.info('No hay pipeline para el lead, creando uno en CLIENTE_NUEVO', {
-          leadId,
-          cuil: cuil?.substring(0, 5) + '***' // Ocultar CUIL completo en logs
-        })
+        logger.info('No hay pipeline para el lead, creando uno en CLIENTE_NUEVO', { leadId })
 
         const pipelineService = new PipelineService()
         await pipelineService.createLeadPipeline(leadId, 'system')
 
-        // Ahora mover a LISTO_ANALISIS
         await pipelineService.moveLeadToStage(
           leadId,
           'LISTO_ANALISIS',
           'system',
-          `Movido automáticamente: Lead tiene CUIL (${cuil?.substring(0, 5)}***)`
+          `Movido automáticamente: ${reason}`
         )
 
-        logger.info('✅ Lead movido automáticamente a LISTO_ANALISIS (pipeline creado)', {
-          leadId,
-          cuilPrefix: cuil?.substring(0, 5) + '***'
-        })
-
+        logger.info('✅ Lead movido automáticamente a LISTO_ANALISIS (pipeline creado)', { leadId })
+        await this.normalizeTagsListoAnalisis(leadId)
         return true
       }
 
-      // Verificar si está en una etapa válida
-      if (!validStages.includes(currentStage)) {
-        logger.debug('Lead no está en etapa válida para auto-move', {
-          leadId,
-          currentStage,
-          validStages,
-          cuilPrefix: cuil?.substring(0, 5) + '***'
-        })
-        return false
-      }
-
-      // 5. Verificar que no esté ya en LISTO_ANALISIS
-      if (currentStage === 'LISTO_ANALISIS') {
-        logger.debug('Lead ya está en LISTO_ANALISIS', { leadId })
-        return false
-      }
-
-      // 6. Mover el lead a LISTO_ANALISIS
+      // 5. Mover el lead a LISTO_ANALISIS
       const pipelineService = new PipelineService()
       await pipelineService.moveLeadToStage(
         leadId,
         'LISTO_ANALISIS',
         'system',
-        `Movido automáticamente: Lead tiene CUIL (${cuil?.substring(0, 5)}***)`
+        `Movido automáticamente: ${reason}`
       )
 
       logger.info('✅ Lead movido automáticamente a LISTO_ANALISIS', {
         leadId,
         fromStage: currentStage,
-        toStage: 'LISTO_ANALISIS',
-        cuilPrefix: cuil?.substring(0, 5) + '***'
+        toStage: 'LISTO_ANALISIS'
       })
 
+      await this.normalizeTagsListoAnalisis(leadId)
       return true
     } catch (error: any) {
-      // No bloquear el flujo principal si falla
       logger.error('Error en checkAndMoveLeadWithCUIL (no crítico)', {
         leadId,
         error: error.message,
         stack: error.stack
       })
       return false
+    }
+  }
+
+  /**
+   * Considera customFields "completos" si tiene identificación (CUIL/DNI) + zona + producto o marca
+   */
+  static hasCompleteCustomFields(lead: any): boolean {
+    try {
+      const cf = lead?.customFields
+      if (!cf) return false
+
+      const parsed = typeof cf === 'string' ? (() => { try { return JSON.parse(cf) } catch { return {} } })() : cf
+      if (!parsed || typeof parsed !== 'object') return false
+
+      const hasId = !!(parsed.cuil || parsed.cuit || parsed.dni) && String(parsed.cuil ?? parsed.cuit ?? parsed.dni).trim().length >= 7
+      const hasZona = !!(parsed.zona && String(parsed.zona).trim())
+      const hasProductoOrMarca = !!(parsed.producto && String(parsed.producto).trim()) || !!(parsed.marca && String(parsed.marca).trim())
+
+      return hasId && hasZona && hasProductoOrMarca
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * En "Listo para Análisis" el lead debe tener solo el tag solicitud-en-proceso.
+   * Actualiza Lead.tags y sincroniza con ManyChat.
+   */
+  private static async normalizeTagsListoAnalisis(leadId: string): Promise<void> {
+    try {
+      const tag = await getTagForStage('LISTO_ANALISIS')
+      if (!tag) return
+      await ManychatSyncService.syncTagsToManychat(leadId, [tag])
+    } catch (error: any) {
+      logger.warn('Error normalizando tags para Listo para Análisis (no crítico)', {
+        leadId,
+        error: error.message
+      })
     }
   }
 
@@ -262,6 +287,10 @@ export class PipelineAutoMoveService {
     return null
   }
 }
+
+
+
+
 
 
 

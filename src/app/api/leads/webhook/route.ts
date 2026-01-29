@@ -62,7 +62,10 @@ export async function POST(request: NextRequest) {
     const tokenFromHeader = authHeader?.replace('Bearer ', '')
     const { searchParams } = new URL(request.url)
     const tokenFromQuery = searchParams.get('token')
-    const expectedToken = process.env.WEBHOOK_TOKEN || process.env.ALLOWED_WEBHOOK_TOKEN
+    const expectedToken =
+      process.env.WEBHOOK_TOKEN ||
+      process.env.ALLOWED_WEBHOOK_TOKEN ||
+      process.env.NEXT_PUBLIC_WEBHOOK_TOKEN
 
     const providedToken = tokenFromHeader || tokenFromQuery
 

@@ -693,12 +693,16 @@ async function assignStageTag(leadId: string, stageId: string, alreadySyncedToMa
       }
     }
 
-    // Remover todos los tags de pipeline (excepto el nuevo que vamos a agregar)
-    const filteredTags = currentTags.filter(tag => !pipelineTagNames.includes(tag))
-
-    // Agregar el nuevo tag si no existe
-    if (!filteredTags.includes(tagToAdd)) {
-      filteredTags.push(tagToAdd)
+    // En "Listo para Análisis" el lead debe tener SOLO el tag solicitud-en-proceso
+    let filteredTags: string[]
+    if (stageEnum === 'LISTO_ANALISIS') {
+      filteredTags = [tagToAdd]
+    } else {
+      // Remover todos los tags de pipeline (excepto el nuevo que vamos a agregar)
+      filteredTags = currentTags.filter(tag => !pipelineTagNames.includes(tag))
+      if (!filteredTags.includes(tagToAdd)) {
+        filteredTags.push(tagToAdd)
+      }
     }
 
     // Actualizar lead con nuevos tags

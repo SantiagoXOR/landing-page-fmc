@@ -1,9 +1,11 @@
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { parseFormMessage, updateLeadFromParsedForm } from '@/lib/form-message-parser'
 import { ManychatWebhookEvent, ManychatSubscriber, ManychatWebhookMessage } from '@/types/manychat'
 import { ConversationService } from './conversation-service'
 import { ManychatSyncService } from './manychat-sync-service'
 import { ManychatService } from './manychat-service'
+import { PipelineAutoMoveService } from './pipeline-auto-move-service'
 
 /**
  * Servicio para procesar webhooks de Manychat
@@ -706,6 +708,38 @@ export class ManychatWebhookService {
 
       // Actualizar actividad del lead
       await this.updateLeadActivity(leadId)
+
+      // Si el mensaje es una "Solicitud de Crédito", extraer datos y actualizar lead + customFields
+      const content = message.text || message.caption || ''
+      if (content.includes('Solicitud de Crédito') && supabase.client) {
+        try {
+          const parsed = parseFormMessage(content)
+          if (parsed) {
+            await updateLeadFromParsedForm(leadId, parsed, supabase.client)
+            try {
+              await ManychatSyncService.syncCustomFieldsToManychat(leadId)
+            } catch (syncErr: any) {
+              logger.warn('Error sincronizando custom fields a ManyChat (no crítico)', {
+                leadId,
+                error: syncErr?.message
+              })
+            }
+            try {
+              await PipelineAutoMoveService.checkAndMoveLeadWithCUIL(leadId)
+            } catch (moveErr: any) {
+              logger.warn('Error en auto-move pipeline (no crítico)', {
+                leadId,
+                error: moveErr?.message
+              })
+            }
+          }
+        } catch (formErr: any) {
+          logger.warn('Error parseando/actualizando lead desde mensaje de formulario (no crítico)', {
+            leadId,
+            error: formErr?.message
+          })
+        }
+      }
 
       return {
         success: true,

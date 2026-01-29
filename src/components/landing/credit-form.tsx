@@ -202,6 +202,44 @@ export function CreditForm() {
 
       const safeMessage = sanitizeForWhatsApp(message)
 
+      // Enviar datos al backend para capturar en la DB (además de abrir WhatsApp)
+      const webhookToken =
+        typeof process.env.NEXT_PUBLIC_WEBHOOK_TOKEN === 'string'
+          ? process.env.NEXT_PUBLIC_WEBHOOK_TOKEN
+          : ''
+      if (webhookToken) {
+        const ingresosNum = parseInt(
+          String(data.ingresos).replace(/\./g, '').replace(',', ''),
+          10
+        )
+        const payload = {
+          nombre: `${data.nombre} ${data.apellido}`.trim(),
+          telefono: data.telefono.replace(/\s/g, ''),
+          email: data.email || '',
+          dni: data.dni || '',
+          ingresos: isNaN(ingresosNum) ? undefined : ingresosNum,
+          zona: zonaTexto || '',
+          producto: `${data.tipoVehiculo === 'moto' ? 'Moto' : 'Auto'} - ${marcaTexto} ${data.modelo}`.trim(),
+          origen: 'web',
+          notas: data.comentarios || '',
+        }
+        try {
+          const res = await fetch('/api/leads/webhook', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${webhookToken}`,
+            },
+            body: JSON.stringify(payload),
+          })
+          if (!res.ok) {
+            console.warn('Webhook lead falló:', res.status, await res.text())
+          }
+        } catch (err) {
+          console.warn('Error enviando datos al backend:', err)
+        }
+      }
+
       // Número de WhatsApp corregido: +54 9 3704 06-9592 -> 5493704069592
       // Usar API clásica mejora compatibilidad de emojis en Web y móviles
       const whatsappUrl = getWhatsAppUrl(safeMessage)

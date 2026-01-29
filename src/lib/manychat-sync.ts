@@ -288,45 +288,30 @@ export async function syncPipelineToManychat(
     })
 
     // 6. Determinar tags a mantener (solo tags de negocio y tags no relacionados con pipeline)
-    // IMPORTANTE: NO mantener el nuevo tag de pipeline si ya existe, lo eliminaremos y re-agregaremos
-    // para asegurar que ManyChat dispare las automatizaciones correctamente
+    // En "Listo para Análisis" el lead debe tener SOLO solicitud-en-proceso: no mantener otros tags
     const normalizedNewTag = newTag.trim().toLowerCase()
-    const tagsToKeep = currentTags.filter(tag => {
-      const normalizedTag = tag.trim().toLowerCase()
-      
-      // Mantener tags de negocio
-      if (normalizedBusinessTags.includes(normalizedTag)) {
-        return true
-      }
-      // Mantener tags que no son de pipeline
-      if (!normalizedPipelineTags.includes(normalizedTag)) {
-        return true
-      }
-      // NO mantener tags de pipeline (incluyendo el nuevo si ya existe)
-      // Los eliminaremos todos y luego agregaremos el nuevo para disparar automatizaciones
-      return false
-    })
+    const isListoAnalisis = newStage === 'LISTO_ANALISIS'
+    const tagsToKeep = isListoAnalisis
+      ? []
+      : currentTags.filter(tag => {
+          const normalizedTag = tag.trim().toLowerCase()
+          if (normalizedBusinessTags.includes(normalizedTag)) return true
+          if (!normalizedPipelineTags.includes(normalizedTag)) return true
+          return false
+        })
 
     // 7. Determinar tags a agregar y remover
     const tagsToRemove: string[] = []
-    
-    // Remover TODOS los tags de pipeline (incluyendo el nuevo si ya existe)
-    // Esto asegura un estado limpio antes de agregar el nuevo tag
-    // El orden correcto es: eliminar todos → esperar → agregar nuevo → ManyChat dispara automatización
-    for (const tag of currentTags) {
-      const normalizedTag = tag.trim().toLowerCase()
-      // Si es un tag de pipeline, agregarlo a la lista de eliminación
-      const isPipelineTag = normalizedPipelineTags.includes(normalizedTag)
-      
-      if (isPipelineTag) {
-        tagsToRemove.push(tag) // Usar el tag original (no normalizado) para la eliminación
-        logger.debug('Tag de pipeline marcado para eliminación', {
-          leadId,
-          tag,
-          normalizedTag,
-          isPipelineTag,
-          isNewTag: normalizedTag === normalizedNewTag
-        })
+    if (isListoAnalisis) {
+      // En Listo para Análisis: remover TODOS los tags para dejar solo solicitud-en-proceso
+      tagsToRemove.push(...currentTags)
+    } else {
+      // Remover TODOS los tags de pipeline (incluyendo el nuevo si ya existe)
+      for (const tag of currentTags) {
+        const normalizedTag = tag.trim().toLowerCase()
+        if (normalizedPipelineTags.includes(normalizedTag)) {
+          tagsToRemove.push(tag)
+        }
       }
     }
 

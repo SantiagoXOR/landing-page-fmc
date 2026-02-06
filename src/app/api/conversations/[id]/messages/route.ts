@@ -188,83 +188,93 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Obtener teléfono del lead o usar platformId
-    const phoneNumber = conversation.lead?.telefono || conversation.platformId
+    // Construir identificadores para MessagingService (soporta WhatsApp, Instagram, Facebook)
+    const manychatId = (conversation.lead as { manychatId?: string })?.manychatId
+    const platformId = conversation.platformId || (conversation as { platform_id?: string }).platform_id
+    const phoneNumber = conversation.lead?.telefono
     const email = conversation.lead?.email
 
-    if (!phoneNumber && !email) {
+    // subscriberId: prioridad manychatId del lead, luego platformId (para IG/FB es el subscriber_id)
+    let subscriberId: number | undefined
+    if (manychatId) {
+      const parsed = parseInt(String(manychatId), 10)
+      if (!isNaN(parsed) && parsed > 0) subscriberId = parsed
+    }
+    if (subscriberId === undefined && platformId) {
+      const parsed = parseInt(String(platformId), 10)
+      if (!isNaN(parsed) && parsed > 0) subscriberId = parsed
+    }
+
+    const to = {
+      subscriberId,
+      phone: phoneNumber || undefined,
+      email: email || undefined
+    }
+
+    if (!to.subscriberId && !to.phone && !to.email) {
       logger.error('No se pudo determinar destinatario del mensaje', {
         conversationId: params.id,
         leadId: conversation.lead?.id,
-        platformId: conversation.platformId,
+        platformId,
         userId: session.user.id
       })
       return NextResponse.json(
-        { error: 'No se pudo determinar el número de teléfono o email del destinatario' },
+        { error: 'No se pudo determinar el destinatario (subscriber_id, teléfono o email). Para Instagram y Facebook, sincroniza el contacto primero desde la página del lead.' },
         { status: 400 }
       )
     }
 
-    // Detectar canal desde la conversación si es posible
-    // El campo platform puede ser 'whatsapp', 'instagram', 'facebook', etc.
+    // Detectar canal desde la conversación
     const platform = (conversation.platform || 'whatsapp').toLowerCase()
-    const channel = platform === 'whatsapp' ? 'whatsapp' : 
-                    platform === 'instagram' ? 'instagram' :
-                    platform === 'facebook' || platform === 'messenger' ? 'facebook' : 'auto'
+    const channel = platform === 'whatsapp' ? 'whatsapp' as const :
+                    platform === 'instagram' ? 'instagram' as const :
+                    platform === 'facebook' || platform === 'messenger' ? 'facebook' as const : 'auto' as const
+
+    // Mapear document -> file (MessagingService usa 'file')
+    const effectiveMessageType = messageType === 'document' ? 'file' : messageType
 
     logger.info('Enviando mensaje desde conversación', {
       conversationId: params.id,
       leadId: conversation.lead?.id,
+      hasSubscriberId: !!to.subscriberId,
       phone: phoneNumber ? phoneNumber.substring(0, 5) + '***' : undefined,
       email: email ? email.substring(0, 3) + '***' : undefined,
-      messageType,
+      messageType: effectiveMessageType,
       messageLength: message.length,
       channel,
       userId: session.user.id
     })
 
-    // Enviar mensaje usando WhatsAppService (que internamente usa MessagingService)
-    // WhatsAppService maneja la lógica de ManyChat o Meta API
-    let whatsappResult
-    try {
-      whatsappResult = await WhatsAppService.sendMessage({
-        to: phoneNumber || email || '',
-        message: message.trim(),
-        messageType,
-        mediaUrl
-      })
-    } catch (sendError: any) {
-      logger.error('Error al enviar mensaje - excepción', {
-        error: sendError.message,
-        stack: sendError.stack,
+    // Usar MessagingService (soporta subscriberId para Instagram/Facebook)
+    const sendResult = await MessagingService.sendMessage({
+      to,
+      message: message.trim(),
+      messageType: effectiveMessageType,
+      mediaUrl,
+      channel
+    })
+
+    if (!sendResult.success) {
+      logger.error('Error al enviar mensaje vía MessagingService', {
+        error: sendResult.error,
+        errorCode: sendResult.errorCode,
         conversationId: params.id,
         leadId: conversation.lead?.id,
-        userId: session.user.id,
-        phone: phoneNumber ? phoneNumber.substring(0, 5) + '***' : undefined
+        userId: session.user.id
       })
-      
-      // Proporcionar mensaje de error más específico
-      let errorMessage = 'No se pudo enviar el mensaje. Intenta nuevamente.'
-      if (sendError.message?.includes('not found') || sendError.message?.includes('no encontrado')) {
-        errorMessage = 'El contacto no está sincronizado con ManyChat. Por favor, sincroniza el contacto primero.'
-      } else if (sendError.message?.includes('not configured') || sendError.message?.includes('no configurado')) {
-        errorMessage = 'WhatsApp no está configurado correctamente. Contacta al administrador.'
-      } else if (sendError.message) {
-        errorMessage = sendError.message
-      }
-      
+      const errorMessage = sendResult.error || 'No se pudo enviar el mensaje. Intenta nuevamente.'
       return NextResponse.json(
         { error: errorMessage },
         { status: 500 }
       )
     }
 
-    if (!whatsappResult || !whatsappResult.messageId) {
+    if (!sendResult.messageId) {
       logger.error('Error al enviar mensaje - resultado inválido', {
         conversationId: params.id,
         leadId: conversation.lead?.id,
         userId: session.user.id,
-        result: whatsappResult
+        result: sendResult
       })
       return NextResponse.json(
         { error: 'No se pudo enviar el mensaje. El contacto puede no estar sincronizado con ManyChat.' },
@@ -281,24 +291,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         content: message.trim(),
         messageType,
         mediaUrl,
-        platformMsgId: whatsappResult.messageId
+        platformMsgId: sendResult.messageId
       })
     } catch (createError: any) {
       logger.error('Error creando mensaje en base de datos', {
         error: createError.message,
         stack: createError.stack,
         conversationId: params.id,
-        messageId: whatsappResult.messageId,
+        messageId: sendResult.messageId,
         userId: session.user.id
       })
       
-      // El mensaje ya se envió por WhatsApp, pero no se pudo guardar en la BD
-      // Retornar éxito pero con advertencia
+      // El mensaje ya se envió, pero no se pudo guardar en la BD
       return NextResponse.json({
         success: true,
         warning: 'El mensaje se envió pero no se pudo guardar en la base de datos',
-        messageId: whatsappResult.messageId,
-        channel: ('channel' in whatsappResult ? whatsappResult.channel : undefined) || channel
+        messageId: sendResult.messageId,
+        channel: sendResult.channel || channel
       }, { status: 201 })
     }
 
@@ -307,9 +316,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     logger.info('Mensaje enviado exitosamente', {
       conversationId: params.id,
-      messageId: whatsappResult.messageId,
+      messageId: sendResult.messageId,
       messageRecordId: messageRecord.id,
-      channel: ('channel' in whatsappResult ? whatsappResult.channel : undefined) || channel,
+      channel: sendResult.channel || channel,
       userId: session.user.id
     })
 
@@ -328,9 +337,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       success: true,
       message: formattedMessage,
       whatsappResult: {
-        messageId: whatsappResult.messageId,
-        channel: ('channel' in whatsappResult ? whatsappResult.channel : undefined) || channel,
-        provider: whatsappResult.provider || 'manychat'
+        messageId: sendResult.messageId,
+        channel: sendResult.channel || channel,
+        provider: 'manychat'
       }
     }, { status: 201 })
 

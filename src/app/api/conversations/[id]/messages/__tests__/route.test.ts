@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next'
 import { checkPermission } from '@/lib/rbac'
 import { ConversationService } from '@/server/services/conversation-service'
 import { WhatsAppService } from '@/server/services/whatsapp-service'
+import { MessagingService } from '@/server/services/messaging-service'
 import { createMockSession } from '@/__tests__/helpers/messaging-test-helpers'
 
 // Mock dependencies
@@ -30,10 +31,17 @@ vi.mock('@/server/services/whatsapp-service', () => ({
   },
 }))
 
+vi.mock('@/server/services/messaging-service', () => ({
+  MessagingService: {
+    sendMessage: vi.fn(),
+  },
+}))
+
 const mockGetServerSession = vi.mocked(getServerSession)
 const mockCheckPermission = vi.mocked(checkPermission)
 const mockConversationService = vi.mocked(ConversationService)
 const mockWhatsAppService = vi.mocked(WhatsAppService)
+const mockMessagingService = vi.mocked(MessagingService)
 
 describe('/api/conversations/[id]/messages', () => {
   const conversationId = 'conv-123'
@@ -217,10 +225,9 @@ describe('/api/conversations/[id]/messages', () => {
         mockConversation as any
       )
 
-      mockWhatsAppService.sendMessage.mockResolvedValueOnce({
+      mockMessagingService.sendMessage.mockResolvedValueOnce({
         success: true,
         messageId: 'wamid.test123',
-        provider: 'manychat',
         channel: 'whatsapp',
       } as any)
 
@@ -257,9 +264,12 @@ describe('/api/conversations/[id]/messages', () => {
       expect(response.status).toBe(201)
       expect(data.success).toBe(true)
       expect(data.message.id).toBe('msg-123')
-      expect(mockWhatsAppService.sendMessage).toHaveBeenCalledWith(
+      expect(mockMessagingService.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: '+5491155556789',
+          to: expect.objectContaining({
+            phone: '+5491155556789',
+            email: 'test@example.com',
+          }),
           message: 'Test message',
         })
       )
@@ -363,7 +373,7 @@ describe('/api/conversations/[id]/messages', () => {
       expect(data.error).toContain('destinatario')
     })
 
-    it('debe detectar canal desde platform de conversación', async () => {
+    it('debe detectar canal desde platform de conversación y usar subscriberId para Instagram', async () => {
       const mockSession = createMockSession()
       mockGetServerSession.mockResolvedValue(mockSession as any)
       mockCheckPermission.mockImplementation(() => {})
@@ -371,10 +381,12 @@ describe('/api/conversations/[id]/messages', () => {
       const mockConversation = {
         id: conversationId,
         platform: 'instagram',
+        platformId: '123456789012345',
         lead: {
           id: 'lead-123',
           telefono: '+5491155556789',
           email: 'test@example.com',
+          manychatId: '123456789012345',
         },
       }
 
@@ -382,10 +394,9 @@ describe('/api/conversations/[id]/messages', () => {
         mockConversation as any
       )
 
-      mockWhatsAppService.sendMessage.mockResolvedValueOnce({
+      mockMessagingService.sendMessage.mockResolvedValueOnce({
         success: true,
         messageId: 'wamid.test123',
-        provider: 'manychat',
         channel: 'instagram',
       } as any)
 
@@ -420,6 +431,16 @@ describe('/api/conversations/[id]/messages', () => {
 
       expect(response.status).toBe(201)
       expect(data.whatsappResult.channel).toBe('instagram')
+      expect(mockMessagingService.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: expect.objectContaining({
+            subscriberId: 123456789012345,
+            phone: '+5491155556789',
+            email: 'test@example.com',
+          }),
+          channel: 'instagram',
+        })
+      )
     })
   })
 })

@@ -84,7 +84,7 @@ export class ConversationService {
         .from('conversations')
         .select(`
           *,
-          lead:Lead(id, nombre, telefono, email)
+          lead:Lead(id, nombre, telefono, email, manychatId)
         `)
         .eq('id', id)
         .single()

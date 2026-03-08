@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { format } from 'date-fns'
+import { format, isToday, isYesterday } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { MessageTypeIndicator } from '@/components/manychat/MessageTypeIndicator'
 import type { Message } from '@/types/chat'
@@ -16,22 +16,21 @@ export function MessageBubble({ message, className }: MessageBubbleProps) {
   const isRead = !!message.readAt
   const isFromBot = message.isFromBot || false
 
-  const formatTime = (dateString: string | null | undefined) => {
-    // Validar que dateString exista
-    if (!dateString) {
-      return '--:--'
-    }
-    
+  const formatMessageDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '--:--'
     try {
       const date = new Date(dateString)
-      
-      // Validar que la fecha sea válida
       if (isNaN(date.getTime())) {
-        console.warn('Fecha inválida en MessageBubble formatTime:', dateString)
+        console.warn('Fecha inválida en MessageBubble formatMessageDate:', dateString)
         return '--:--'
       }
-      
-      return format(date, 'HH:mm', { locale: es })
+      if (isToday(date)) {
+        return format(date, 'HH:mm', { locale: es })
+      }
+      if (isYesterday(date)) {
+        return `Ayer ${format(date, 'HH:mm', { locale: es })}`
+      }
+      return format(date, "d MMM yyyy, HH:mm", { locale: es })
     } catch (error) {
       console.error('Error formateando fecha en MessageBubble:', error, dateString)
       return '--:--'
@@ -102,7 +101,7 @@ export function MessageBubble({ message, className }: MessageBubbleProps) {
               isOutbound ? 'text-purple-100' : isFromBot ? 'text-blue-600' : 'text-gray-500'
             )}
           >
-            <span>{formatTime(message.sentAt)}</span>
+            <span>{formatMessageDate(message.sentAt)}</span>
             {isOutbound && (
               <span className={cn(
                 'text-xs',

@@ -397,6 +397,35 @@ export class ConversationService {
   }
 
   /**
+   * Buscar conversación por lead y plataforma (útil cuando platform_id cambió, ej. de message.id a teléfono)
+   */
+  static async findConversationByLeadAndPlatform(leadId: string, platform: string) {
+    try {
+      if (!supabase.client) {
+        throw new Error('Database connection error')
+      }
+
+      const { data: conversation, error } = await supabase.client
+        .from('conversations')
+        .select(`
+          *,
+          lead:Lead(id, nombre, telefono, email)
+        `)
+        .eq('lead_id', leadId)
+        .eq('platform', platform)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error) throw error
+      return conversation
+    } catch (error) {
+      console.error('Error finding conversation by lead and platform:', error)
+      return null
+    }
+  }
+
+  /**
    * Actualizar última actividad de conversación
    */
   static async updateLastActivity(conversationId: string) {

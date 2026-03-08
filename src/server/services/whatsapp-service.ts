@@ -118,19 +118,31 @@ export class WhatsAppService {
       }
 
       const from = message.from
-      const platformId = message.id
       const content = this.extractMessageContent(message)
       const messageType = this.extractMessageType(message)
       const mediaUrl = this.extractMediaUrl(message)
 
-      // Buscar o crear conversación
-      let conversation = await ConversationService.findConversationByPlatform('whatsapp', platformId)
-      
-      if (!conversation) {
-        // Buscar lead existente por teléfono
-        const lead = await supabase.findLeadByPhoneOrDni(from)
+      // Usar teléfono como platformId para que la misma conversación se reutilice (no message.id)
+      const platformId = webhookData.platformIdByPhone ?? formatWhatsAppNumber(from)
+      const preferredLeadId = webhookData.leadId
 
-        // Crear nueva conversación
+      // Buscar o crear conversación (por teléfono como platformId para reutilizar la misma)
+      let conversation = await ConversationService.findConversationByPlatform('whatsapp', platformId)
+      if (!conversation && preferredLeadId) {
+        conversation = await ConversationService.findConversationByLeadAndPlatform(preferredLeadId, 'whatsapp')
+        if (conversation && supabase.client) {
+          await supabase.client.from('conversations').update({ platform_id: platformId }).eq('id', conversation.id)
+        }
+      }
+      if (!conversation) {
+        // Buscar lead por teléfono (varios formatos) o usar el que vino del webhook
+        let lead = preferredLeadId ? await supabase.findLeadById(preferredLeadId) : null
+        if (!lead) {
+          const formattedFrom = formatWhatsAppNumber(from)
+          lead = await supabase.findLeadByPhoneOrDni(formattedFrom) || await supabase.findLeadByPhoneOrDni(from)
+        }
+
+        // Crear nueva conversación vinculada al lead
         conversation = await ConversationService.createConversation({
           platform: 'whatsapp',
           platformId,
@@ -870,33 +882,79 @@ export class WhatsAppService {
   }
 
   /**
-   * Marcar mensaje como leído
+   * Actualizar estado de un mensaje por platform_msg_id (sent → delivered → read).
+   * Persiste en DB para reflejar los estados que envía Meta en el webhook.
    */
-  static async markAsRead(messageId: string) {
+  static async updateMessageStatus(
+    platformMsgId: string,
+    status: 'sent' | 'delivered' | 'read',
+    timestamp?: string
+  ) {
     try {
       if (!supabase.client) {
         throw new Error('Database connection error')
       }
 
-      // Actualizar en la base de datos
+      const ts = timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
+      const updates: Record<string, string> = {}
+
+      if (status === 'sent') {
+        updates.sent_at = ts
+      } else if (status === 'delivered') {
+        updates.delivered_at = ts
+      } else if (status === 'read') {
+        updates.read_at = ts
+      }
+
+      if (Object.keys(updates).length === 0) return
+
       const { error } = await supabase.client
         .from('messages')
-        .update({ read_at: new Date().toISOString() })
-        .eq('platform_msg_id', messageId)
+        .update(updates)
+        .eq('platform_msg_id', platformMsgId)
 
       if (error) {
-        console.warn('[WhatsApp] Could not mark message as read in database:', error)
+        console.warn('[WhatsApp] Could not update message status in database:', error)
+        return
       }
 
-      console.log('[WhatsApp] Message marked as read:', messageId)
-      
-      // Si usamos WhatsApp Business API, marcar en la plataforma también
-      if (this.whatsappClient) {
-        await this.whatsappClient.markAsRead(messageId)
+      console.log('[WhatsApp] Message status updated:', { platformMsgId, status })
+
+      if (status === 'read' && this.whatsappClient) {
+        await this.whatsappClient.markAsRead(platformMsgId)
       }
     } catch (error) {
-      console.error('[WhatsApp] Error marking message as read:', error)
-      // No lanzar error, es una operación secundaria
+      console.error('[WhatsApp] Error updating message status:', error)
+    }
+  }
+
+  /**
+   * Marcar mensaje como leído (conveniencia que delega en updateMessageStatus)
+   */
+  static async markAsRead(messageId: string) {
+    await this.updateMessageStatus(messageId, 'read')
+  }
+
+  /**
+   * Registrar fallo de entrega de un mensaje (webhook value.errors).
+   * Persiste en messages.delivery_error para poder mostrarlo en el CRM.
+   */
+  static async markMessageDeliveryFailed(platformMsgId: string, errorMessage: string) {
+    try {
+      if (!supabase.client) return
+
+      const { error } = await supabase.client
+        .from('messages')
+        .update({ delivery_error: errorMessage })
+        .eq('platform_msg_id', platformMsgId)
+
+      if (error) {
+        console.warn('[WhatsApp] Could not save delivery_error in database:', error)
+        return
+      }
+      console.log('[WhatsApp] Message marked as delivery failed:', platformMsgId)
+    } catch (e) {
+      console.warn('[WhatsApp] Could not record delivery failure:', e)
     }
   }
 

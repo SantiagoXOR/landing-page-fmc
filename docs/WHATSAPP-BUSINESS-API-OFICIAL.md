@@ -139,13 +139,18 @@ Copia la URL HTTPS generada (ej: `https://abc123.ngrok.io`)
    - **Token de verificación**: El valor de `WHATSAPP_VERIFY_TOKEN` de tu `.env.local`
 5. Haz clic en **"Verificar y guardar"**
 
-### 3. Suscribirse a Eventos
+### 3. Suscribirse a Eventos (campos del webhook)
 
-Selecciona los eventos a los que quieres suscribirte:
+En **Campos del webhook** activa **Suscribirse** para estos campos según lo que necesite el CRM:
 
-- ✅ **messages**: Mensajes entrantes y salientes
-- ✅ **message_status**: Estados de entrega (enviado, entregado, leído, fallido)
-- ✅ **message_template_status_update**: Actualizaciones de estado de templates
+| Campo | Obligatorio | Uso en el CRM |
+|-------|-------------|----------------|
+| **messages** | ✅ Sí | Mensajes entrantes, creación de leads/conversaciones, estados (enviado/entregado/leído). |
+| **message_echoes** | Recomendado | Mensajes enviados por el negocio (eco) para mostrarlos en el historial del chat. |
+| **message_template_status_update** | Opcional | Aprobación o rechazo de plantillas. |
+| **message_template_quality_update** | Opcional | Cambios de calidad/tier de plantillas. |
+
+Mínimo para que el CRM funcione: **messages**. Para que también se vean en el historial los mensajes que envía el agente desde el CRM, suscribirse además a **message_echoes**.
 
 ### 4. Implementar Verificación de Webhook
 

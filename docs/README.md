@@ -92,6 +92,7 @@
 - [Uchat Setup](./UCHAT-SETUP.md) - Configuración de Uchat, webhooks, variables de entorno y checklist
 - [Migración Manychat → Uchat](./UCHAT-MIGRACION-MANYCHAT.md) - Guía técnica de migración de código
 - [Arquitectura Uchat + CRM](./ARQUITECTURA-UCHAT-CRM.md) - Diagramas y flujos de la integración
+- [Webhook WhatsApp – Casos de uso CRM](./WEBHOOK-WHATSAPP-CASOS-DE-USO-CRM.md) - Eventos del webhook y cómo cubren los casos de uso del CRM
 - [ManyChat Setup](./MANYCHAT-SETUP.md) - Configuración de integración con ManyChat (legacy, en migración a Uchat)
 
 ### 🔧 Solución de Problemas

@@ -573,19 +573,19 @@ function PipelinePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aprobados</CardTitle>
+            <CardTitle className="text-sm font-medium">Preaprobados</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {realMetrics ? realMetrics.approvedLeads.current : 0}
+              {realMetrics ? realMetrics.preapprovedLeads.current : 0}
             </div>
             {realMetrics && (
-              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.approvedLeads.trend)}`}>
-                {realMetrics.approvedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
-                {realMetrics.approvedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
-                {realMetrics.approvedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChange(realMetrics.approvedLeads.change)} desde el mes pasado</span>
+              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.preapprovedLeads.trend)}`}>
+                {realMetrics.preapprovedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {realMetrics.preapprovedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {realMetrics.preapprovedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                <span>{formatChange(realMetrics.preapprovedLeads.change)} desde el mes pasado</span>
               </div>
             )}
             {!realMetrics && (

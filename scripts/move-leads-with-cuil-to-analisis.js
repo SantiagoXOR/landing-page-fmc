@@ -265,6 +265,7 @@ async function checkAndMoveLeadWithCUIL(leadId) {
     if (!currentStage) {
       // No hay pipeline, crear uno y moverlo
       await moveLeadToStage(leadId, 'LISTO_ANALISIS', 'system', `Movido automáticamente: Lead tiene CUIL`)
+      await supabase.from('Lead').update({ tags: JSON.stringify(['solicitud-en-proceso']) }).eq('id', leadId)
       return true
     }
 
@@ -280,6 +281,11 @@ async function checkAndMoveLeadWithCUIL(leadId) {
 
     // Mover el lead a LISTO_ANALISIS
     await moveLeadToStage(leadId, 'LISTO_ANALISIS', 'system', `Movido automáticamente: Lead tiene CUIL`)
+    // En esta etapa solo debe tener el tag solicitud-en-proceso
+    await supabase
+      .from('Lead')
+      .update({ tags: JSON.stringify(['solicitud-en-proceso']) })
+      .eq('id', leadId)
     return true
   } catch (error) {
     console.error(`Error procesando lead ${leadId}:`, error.message)

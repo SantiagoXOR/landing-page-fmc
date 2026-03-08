@@ -16,6 +16,8 @@ interface MetricsComparison {
 
 interface PipelineMetricsResponse {
   totalLeads: MetricsComparison
+  /** Leads en etapa PREAPROBADO (métrica principal para el negocio) */
+  preapprovedLeads: MetricsComparison
   approvedLeads: MetricsComparison
   rejectedLeads: MetricsComparison
   highPriorityLeads: MetricsComparison
@@ -48,6 +50,7 @@ async function calculatePeriodMetrics(
   dateTo: Date
 ): Promise<{
   totalLeads: number
+  preapprovedLeads: number
   approvedLeads: number
   rejectedLeads: number
   highPriorityLeads: number
@@ -103,6 +106,7 @@ async function calculatePeriodMetrics(
     // Tags que indican rechazo
     const rejectedTags = ['rechazado', 'credito-rechazado', 'rechazado-credito', 'perdido', 'cerrado-perdido']
 
+    let preapprovedCount = 0
     let approvedCount = 0
     let rejectedCount = 0
     let highPriorityCount = 0
@@ -130,6 +134,10 @@ async function calculatePeriodMetrics(
       // Primero verificar por etapa del pipeline
       if (pipelineInfo) {
         const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || ''
+        // Preaprobados: solo etapa PREAPROBADO (métrica principal)
+        if (pipelineInfo.current_stage === 'PREAPROBADO') {
+          preapprovedCount++
+        }
         if (stageId === 'cerrado-ganado' || pipelineInfo.current_stage === 'APROBADO' || pipelineInfo.current_stage === 'PREAPROBADO' || pipelineInfo.current_stage === 'CERRADO_GANADO') {
           isApproved = true
         } else if (stageId === 'cerrado-perdido' || pipelineInfo.current_stage === 'RECHAZADO' || pipelineInfo.current_stage === 'CIERRE_PERDIDO') {
@@ -191,6 +199,7 @@ async function calculatePeriodMetrics(
 
     return {
       totalLeads: allLeads.length, // Total de TODOS los leads
+      preapprovedLeads: preapprovedCount,
       approvedLeads: approvedCount,
       rejectedLeads: rejectedCount,
       highPriorityLeads: highPriorityCount,
@@ -203,6 +212,7 @@ async function calculatePeriodMetrics(
     logger.error('Error calculating period metrics:', error)
     return {
       totalLeads: 0,
+      preapprovedLeads: 0,
       approvedLeads: 0,
       rejectedLeads: 0,
       highPriorityLeads: 0,
@@ -317,7 +327,7 @@ export async function GET(request: NextRequest) {
     ])
 
     // Construir respuesta con comparaciones
-    // Nota: totalLeads, approvedLeads y rejectedLeads son totales absolutos, no del período
+    // Nota: totalLeads, preapprovedLeads, approvedLeads y rejectedLeads son totales absolutos, no del período
     const response: PipelineMetricsResponse = {
       totalLeads: {
         current: currentMetrics.totalLeads,
@@ -327,6 +337,16 @@ export async function GET(request: NextRequest) {
           : currentMetrics.totalLeads > 0 ? 100 : 0,
         trend: currentMetrics.totalLeads > previousMetrics.totalLeads ? 'up' 
           : currentMetrics.totalLeads < previousMetrics.totalLeads ? 'down' 
+          : 'stable'
+      },
+      preapprovedLeads: {
+        current: currentMetrics.preapprovedLeads,
+        previous: previousMetrics.preapprovedLeads,
+        change: previousMetrics.preapprovedLeads > 0 
+          ? ((currentMetrics.preapprovedLeads - previousMetrics.preapprovedLeads) / previousMetrics.preapprovedLeads) * 100 
+          : currentMetrics.preapprovedLeads > 0 ? 100 : 0,
+        trend: currentMetrics.preapprovedLeads > previousMetrics.preapprovedLeads ? 'up' 
+          : currentMetrics.preapprovedLeads < previousMetrics.preapprovedLeads ? 'down' 
           : 'stable'
       },
       approvedLeads: {

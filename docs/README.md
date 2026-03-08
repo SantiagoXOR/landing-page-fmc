@@ -88,7 +88,11 @@
 ### 🔗 Integraciones
 
 - [WhatsApp Business API Oficial](./WHATSAPP-BUSINESS-API-OFICIAL.md) - Guía completa de implementación de Meta WhatsApp Business API
-- [ManyChat Setup](./MANYCHAT-SETUP.md) - Configuración de integración con ManyChat
+- [Uchat vs CRM – Casos de uso](./UCHAT-VS-CRM-CASOS-DE-USO.md) - Reparto de responsabilidades entre Uchat (flujos, bots) y el CRM
+- [Uchat Setup](./UCHAT-SETUP.md) - Configuración de Uchat, webhooks, variables de entorno y checklist
+- [Migración Manychat → Uchat](./UCHAT-MIGRACION-MANYCHAT.md) - Guía técnica de migración de código
+- [Arquitectura Uchat + CRM](./ARQUITECTURA-UCHAT-CRM.md) - Diagramas y flujos de la integración
+- [ManyChat Setup](./MANYCHAT-SETUP.md) - Configuración de integración con ManyChat (legacy, en migración a Uchat)
 
 ### 🔧 Solución de Problemas
 
@@ -153,12 +157,15 @@ Documentación          ████████████████░░�
 | Tarea | Documento | Sección |
 |-------|-----------|---------|
 | Configurar el entorno | [Setup](./SETUP-DESARROLLO.md) | Instalación |
+| Configurar Uchat + WhatsApp | [Uchat Setup](./UCHAT-SETUP.md) | Variables y checklist |
+| Migrar de Manychat a Uchat | [Migración Uchat](./UCHAT-MIGRACION-MANYCHAT.md) | Orden de implementación |
 | Crear un lead | [API Reference](./API-REFERENCE.md) | Leads → Crear |
 | Ejecutar tests | [Setup](./SETUP-DESARROLLO.md) | Comandos Útiles |
 | Solucionar error de pipeline | [Troubleshooting](./TROUBLESHOOTING.md) | Pipeline |
 | Contribuir código | [Contributing](./CONTRIBUTING.md) | Proceso |
 | Migrar datos | [Migración](./MIGRACION-SUPABASE.md) | Pasos |
 | Ver arquitectura | [Arquitectura](./ARQUITECTURA.md) | Visión General |
+| Ver arquitectura Uchat + CRM | [Arquitectura Uchat](./ARQUITECTURA-UCHAT-CRM.md) | Diagramas |
 | Próximas tareas | [Próximos Pasos](./PROXIMOS-PASOS.md) | Crítico |
 
 ---
@@ -241,6 +248,7 @@ Documentación          ████████████████░░�
 - ✅ API Reference completada
 - ✅ Troubleshooting expandido
 - ✅ **Documentación oficial WhatsApp Business API agregada**
+- ✅ **Documentación Uchat:** casos de uso, setup, migración Manychat→Uchat, arquitectura
 
 ### Próximas Actualizaciones
 - [ ] Ejemplos de código adicionales

@@ -9,6 +9,7 @@ export interface MetricsComparison {
 
 export interface PipelineMetricsData {
   totalLeads: MetricsComparison
+  preapprovedLeads: MetricsComparison
   approvedLeads: MetricsComparison
   rejectedLeads: MetricsComparison
   highPriorityLeads: MetricsComparison

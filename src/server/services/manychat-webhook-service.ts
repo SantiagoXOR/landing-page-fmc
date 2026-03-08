@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { parseFormMessage, updateLeadFromParsedForm } from '@/lib/form-message-parser'
+import { parseFormMessage, updateLeadFromParsedForm, ParsedForm } from '@/lib/form-message-parser'
 import { ManychatWebhookEvent, ManychatSubscriber, ManychatWebhookMessage } from '@/types/manychat'
 import { ConversationService } from './conversation-service'
 import { ManychatSyncService } from './manychat-sync-service'
@@ -52,6 +52,19 @@ export class ManychatWebhookService {
 
           // Si es nuevo subscriber pero tiene mensaje, procesar ambos
           if (event.message) {
+            // Si el mensaje es un formulario "Solicitud de Crédito", extraer datos y enriquecer
+            // el subscriber ANTES de crear el lead para que custom_fields queden poblados desde el inicio
+            const formContent = event.message.text || event.message.caption || ''
+            if (formContent.includes('Solicitud de Crédito')) {
+              const parsed = parseFormMessage(formContent)
+              if (parsed) {
+                this.enrichSubscriberFromParsedForm(subscriber, parsed)
+                logger.info('Subscriber enriquecido con datos del formulario (Solicitud de Crédito)', {
+                  subscriberId: subscriber.id,
+                  fields: Object.keys(parsed).filter((k) => (parsed as Record<string, unknown>)[k] != null)
+                })
+              }
+            }
             // Primero crear/actualizar el lead (forzar creación si es nuevo)
             const leadResult = await this.handleSubscriberEvent(subscriber, true)
             if (!leadResult.success || !leadResult.leadId) {
@@ -502,6 +515,31 @@ export class ManychatWebhookService {
         .eq('id', leadId)
     } catch (error: any) {
       logger.error('Error actualizando actividad del lead', { error: error.message, leadId })
+    }
+  }
+
+  /**
+   * Enriquecer subscriber con datos parseados de un mensaje tipo "Solicitud de Crédito".
+   * Modifica subscriber.custom_fields y opcionalmente nombre para que el lead se cree con los datos.
+   */
+  private static enrichSubscriberFromParsedForm(subscriber: ManychatSubscriber, parsed: ParsedForm): void {
+    if (!subscriber.custom_fields) subscriber.custom_fields = {}
+    const cf = subscriber.custom_fields
+    if (parsed.cuil) cf.cuil = parsed.cuil
+    if (parsed.dni) cf.dni = parsed.dni
+    if (parsed.ingresos != null) cf.ingresos = parsed.ingresos
+    if (parsed.zona) cf.zona = parsed.zona
+    if (parsed.producto) cf.producto = parsed.producto
+    if (parsed.marca) cf.marca = parsed.marca
+    if (parsed.modelo) cf.modelo = parsed.modelo
+    if (parsed.cuotas) cf.cuotas = parsed.cuotas
+    if (parsed.email) cf.email = parsed.email
+    if (parsed.comentarios) cf.comentarios = parsed.comentarios
+    if (parsed.nombre) {
+      const parts = parsed.nombre.trim().split(/\s+/)
+      subscriber.first_name = parts[0] || parsed.nombre
+      subscriber.last_name = parts.length > 1 ? parts.slice(1).join(' ') : undefined
+      subscriber.name = parsed.nombre
     }
   }
 

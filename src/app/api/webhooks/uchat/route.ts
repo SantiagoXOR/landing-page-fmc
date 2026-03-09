@@ -34,9 +34,13 @@ function normalizeBody(body: Record<string, unknown>): UchatWebhookEvent {
   const tag = body.tag as UchatWebhookEvent['tag']
   const customField = body.custom_field as UchatWebhookEvent['custom_field']
 
+  const subscriberId = body.subscriber_id ?? subscriber?.id
+  const subscriberIdTyped =
+    typeof subscriberId === 'number' || typeof subscriberId === 'string' ? subscriberId : undefined
+
   return {
     event_type: eventType,
-    subscriber_id: body.subscriber_id ?? subscriber?.id,
+    subscriber_id: subscriberIdTyped,
     subscriber,
     message,
     tag,

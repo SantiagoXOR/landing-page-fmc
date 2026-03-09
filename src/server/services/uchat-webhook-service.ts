@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { parseFormMessage, updateLeadFromParsedForm } from '@/lib/form-message-parser'
+import { parseFormMessage, updateLeadFromParsedForm, type ParsedForm } from '@/lib/form-message-parser'
 import type { UchatWebhookEvent, UchatSubscriber, UchatWebhookMessage, UchatTag, UchatWebhookCustomField } from '@/types/uchat'
 import { ConversationService } from './conversation-service'
 import { PipelineAutoMoveService } from './pipeline-auto-move-service'
@@ -9,7 +9,7 @@ const UCHAT_PREFIX = 'uchat_'
 
 /**
  * Servicio para procesar webhooks de Uchat.
- * Misma lógica que Manychat: new_subscriber, message_received, tag_added, custom_field_changed.
+ * Misma lÃ³gica que Manychat: new_subscriber, message_received, tag_added, custom_field_changed.
  * Los leads de Uchat se identifican con manychatId = "uchat_" + id del usuario Uchat.
  */
 export class UchatWebhookService {
@@ -35,7 +35,7 @@ export class UchatWebhookService {
         case 'new_subscriber':
           if (event.message) {
             const formContent = event.message.text || event.message.caption || ''
-            if (formContent.includes('Solicitud de Crédito')) {
+            if (formContent.includes('Solicitud de CrÃ©dito')) {
               const parsed = parseFormMessage(formContent)
               if (parsed) {
                 enrichSubscriberFromParsedForm(subscriber, parsed)
@@ -63,7 +63,7 @@ export class UchatWebhookService {
 
         case 'tag_added':
         case 'tag_removed':
-          return await this.handleTagEvent(subscriber, event.tag!)
+          return await this.handleTagEvent(subscriber, event.tag!, event.event_type)
 
         case 'custom_field_changed':
           return await this.handleCustomFieldEvent(subscriber, event.custom_field!)
@@ -183,7 +183,7 @@ export class UchatWebhookService {
         mediaUrl = message.url || null
         break
       case 'location':
-        content = `Ubicación: ${message.latitude}, ${message.longitude}`
+        content = `UbicaciÃ³n: ${message.latitude}, ${message.longitude}`
         break
       default:
         content = `[${message.type}]`
@@ -252,7 +252,7 @@ export class UchatWebhookService {
     await this.updateLeadActivity(leadId)
 
     const content = message.text || message.caption || ''
-    if (content.includes('Solicitud de Crédito') && supabase.client) {
+    if (content.includes('Solicitud de CrÃ©dito') && supabase.client) {
       try {
         const parsed = parseFormMessage(content)
         if (parsed) {
@@ -260,7 +260,7 @@ export class UchatWebhookService {
           await PipelineAutoMoveService.checkAndMoveLeadWithCUIL(leadId).catch(() => {})
         }
       } catch {
-        // no crítico
+        // no crÃ­tico
       }
     }
 
@@ -350,7 +350,7 @@ export class UchatWebhookService {
   }
 }
 
-function enrichSubscriberFromParsedForm(subscriber: UchatSubscriber, parsed: Record<string, unknown>): void {
+function enrichSubscriberFromParsedForm(subscriber: UchatSubscriber, parsed: ParsedForm): void {
   if (!subscriber.custom_fields) subscriber.custom_fields = {}
   const cf = subscriber.custom_fields as Record<string, unknown>
   if (parsed.cuil) cf.cuil = parsed.cuil
@@ -358,6 +358,9 @@ function enrichSubscriberFromParsedForm(subscriber: UchatSubscriber, parsed: Rec
   if (parsed.ingresos != null) cf.ingresos = parsed.ingresos
   if (parsed.zona) cf.zona = parsed.zona
   if (parsed.producto) cf.producto = parsed.producto
+  if (parsed.marca) cf.marca = parsed.marca
+  if (parsed.modelo) cf.modelo = parsed.modelo
+  if (parsed.cuotas) cf.cuotas = parsed.cuotas
   if (parsed.email) cf.email = parsed.email
   if (parsed.nombre) {
     const parts = String(parsed.nombre).trim().split(/\s+/)
@@ -366,7 +369,3 @@ function enrichSubscriberFromParsedForm(subscriber: UchatSubscriber, parsed: Rec
     subscriber.name = String(parsed.nombre)
   }
 }
-</think>
-Corrigiendo el handler de tags: necesita saber si es `tag_added` o `tag_removed`.
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-StrReplace

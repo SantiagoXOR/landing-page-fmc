@@ -94,6 +94,13 @@ export class WhatsAppService {
   }
 
   /**
+   * Indica si se puede enviar por Meta API (para priorizar Meta en el chat con USE_META_WHATSAPP_FOR_CHAT)
+   */
+  static canSendViaMeta(): boolean {
+    return !!this.whatsappClient
+  }
+
+  /**
    * Procesar mensaje entrante de WhatsApp
    */
   static async processIncomingMessage(webhookData: any) {

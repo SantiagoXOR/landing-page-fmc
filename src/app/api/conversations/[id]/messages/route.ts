@@ -233,34 +233,92 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Mapear document -> file (MessagingService usa 'file')
     const effectiveMessageType = messageType === 'document' ? 'file' : messageType
 
-    logger.info('Enviando mensaje desde conversación', {
-      conversationId: params.id,
-      leadId: conversation.lead?.id,
-      hasSubscriberId: !!to.subscriberId,
-      phone: phoneNumber ? phoneNumber.substring(0, 5) + '***' : undefined,
-      email: email ? email.substring(0, 3) + '***' : undefined,
-      messageType: effectiveMessageType,
-      messageLength: message.length,
-      channel,
-      userId: session.user.id
-    })
+    // Decidir si enviar por Meta API para conversaciones WhatsApp (cuando Meta está configurado o USE_META_WHATSAPP_FOR_CHAT)
+    const useMetaForWhatsApp =
+      platform === 'whatsapp' &&
+      !!phoneNumber &&
+      (WhatsAppService.getActiveProvider() === 'whatsapp' ||
+        (process.env.USE_META_WHATSAPP_FOR_CHAT === 'true' && WhatsAppService.canSendViaMeta()))
 
-    // Usar MessagingService (soporta subscriberId para Instagram/Facebook)
-    const sendResult = await MessagingService.sendMessage({
-      to,
-      message: message.trim(),
-      messageType: effectiveMessageType,
-      mediaUrl,
-      channel
-    })
+    let sendResult: { success: boolean; messageId?: string; channel?: string; error?: string; errorCode?: string }
+    let sentViaMeta = false
+
+    if (useMetaForWhatsApp) {
+      // Enviar por Meta (WhatsApp Business API)
+      try {
+        const metaResult = await WhatsAppService.sendMessage({
+          to: phoneNumber,
+          message: message.trim(),
+          messageType: effectiveMessageType,
+          mediaUrl,
+          leadId: conversation.lead?.id,
+        })
+        sendResult = {
+          success: !!metaResult?.success,
+          messageId: metaResult?.messageId,
+          channel: 'whatsapp',
+        }
+        if (sendResult.success) sentViaMeta = true
+      } catch (metaError: any) {
+        logger.error('Error al enviar mensaje vía Meta API', {
+          error: metaError?.message,
+          conversationId: params.id,
+          leadId: conversation.lead?.id,
+          userId: session.user.id,
+        })
+        sendResult = {
+          success: false,
+          error: metaError?.message || 'Error al enviar por WhatsApp.',
+          errorCode: 'META_SEND_ERROR',
+        }
+      }
+    } else {
+      // Usar MessagingService (Manychat; soporta Instagram/Facebook)
+      sendResult = await MessagingService.sendMessage({
+        to,
+        message: message.trim(),
+        messageType: effectiveMessageType,
+        mediaUrl,
+        channel,
+      })
+    }
+
+    // Fallback: si es WhatsApp y Manychat falló (ej. SUBSCRIBER_NOT_FOUND), intentar Meta
+    if (
+      !sendResult.success &&
+      platform === 'whatsapp' &&
+      !!phoneNumber &&
+      WhatsAppService.canSendViaMeta() &&
+      (sendResult.errorCode === 'SUBSCRIBER_NOT_FOUND' || sendResult.errorCode === 'INVALID_SUBSCRIBER_ID')
+    ) {
+      logger.info('Fallback: intentando envío por Meta tras fallo Manychat', {
+        conversationId: params.id,
+        leadId: conversation.lead?.id,
+      })
+      try {
+        const metaResult = await WhatsAppService.sendMessage({
+          to: phoneNumber,
+          message: message.trim(),
+          messageType: effectiveMessageType,
+          mediaUrl,
+          leadId: conversation.lead?.id,
+        })
+        if (metaResult?.success && metaResult?.messageId) {
+          sendResult = { success: true, messageId: metaResult.messageId, channel: 'whatsapp' }
+          sentViaMeta = true
+        }
+      } catch {
+        // Mantener sendResult original (fallido)
+      }
+    }
 
     if (!sendResult.success) {
-      logger.error('Error al enviar mensaje vía MessagingService', {
+      logger.error('Error al enviar mensaje', {
         error: sendResult.error,
         errorCode: sendResult.errorCode,
         conversationId: params.id,
         leadId: conversation.lead?.id,
-        userId: session.user.id
+        userId: session.user.id,
       })
       const errorMessage = sendResult.error || 'No se pudo enviar el mensaje. Intenta nuevamente.'
       return NextResponse.json(
@@ -274,10 +332,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         conversationId: params.id,
         leadId: conversation.lead?.id,
         userId: session.user.id,
-        result: sendResult
+        result: sendResult,
       })
       return NextResponse.json(
-        { error: 'No se pudo enviar el mensaje. El contacto puede no estar sincronizado con ManyChat.' },
+        {
+          error:
+            'No se pudo enviar el mensaje. El contacto puede no estar sincronizado con ManyChat o verifica la configuración de WhatsApp.',
+        },
         { status: 500 }
       )
     }
@@ -291,7 +352,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         content: message.trim(),
         messageType,
         mediaUrl,
-        platformMsgId: sendResult.messageId
+        platformMsgId: sendResult.messageId,
       })
     } catch (createError: any) {
       logger.error('Error creando mensaje en base de datos', {
@@ -299,19 +360,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         stack: createError.stack,
         conversationId: params.id,
         messageId: sendResult.messageId,
-        userId: session.user.id
+        userId: session.user.id,
       })
-      
-      // El mensaje ya se envió, pero no se pudo guardar en la BD
-      return NextResponse.json({
-        success: true,
-        warning: 'El mensaje se envió pero no se pudo guardar en la base de datos',
-        messageId: sendResult.messageId,
-        channel: sendResult.channel || channel
-      }, { status: 201 })
+
+      return NextResponse.json(
+        {
+          success: true,
+          warning: 'El mensaje se envió pero no se pudo guardar en la base de datos',
+          messageId: sendResult.messageId,
+          channel: sendResult.channel || channel,
+        },
+        { status: 201 }
+      )
     }
 
-    // Actualizar última actividad
     await ConversationService.updateLastActivity(params.id)
 
     logger.info('Mensaje enviado exitosamente', {
@@ -319,10 +381,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       messageId: sendResult.messageId,
       messageRecordId: messageRecord.id,
       channel: sendResult.channel || channel,
-      userId: session.user.id
+      userId: session.user.id,
     })
 
-    // Formatear mensaje para respuesta
     const formattedMessage = {
       id: messageRecord.id,
       direction: 'outbound' as const,
@@ -330,18 +391,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       messageType: messageRecord.message_type || messageType,
       sentAt: toSafeISOString(messageRecord.sent_at || new Date()),
       readAt: undefined,
-      isFromBot: false
+      isFromBot: false,
     }
 
-    return NextResponse.json({ 
-      success: true,
-      message: formattedMessage,
-      whatsappResult: {
-        messageId: sendResult.messageId,
-        channel: sendResult.channel || channel,
-        provider: 'manychat'
-      }
-    }, { status: 201 })
+    const provider = sentViaMeta ? 'meta' : 'manychat'
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: formattedMessage,
+        whatsappResult: {
+          messageId: sendResult.messageId,
+          channel: sendResult.channel || channel,
+          provider,
+        },
+      },
+      { status: 201 }
+    )
 
   } catch (error: any) {
     logger.error('Error enviando mensaje', {

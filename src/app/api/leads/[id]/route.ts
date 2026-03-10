@@ -5,9 +5,6 @@ import { LeadService } from '@/server/services/lead-service'
 import { LeadUpdateSchema } from '@/lib/validators'
 import { checkPermission, checkUserPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
-import { ManychatSyncService } from '@/server/services/manychat-sync-service'
-import { ManychatService } from '@/server/services/manychat-service'
-
 const leadService = new LeadService()
 
 export async function GET(
@@ -91,31 +88,6 @@ export async function PATCH(
         logger.warn('Error en auto-move después de actualizar lead (no crítico)', {
           leadId: params.id,
           error: autoMoveError.message
-        })
-      }
-    }
-
-    // Sincronizar automáticamente con ManyChat si está configurado
-    if (ManychatService.isConfigured()) {
-      try {
-        // Sincronizar de forma asíncrona para no bloquear la respuesta
-        ManychatSyncService.fullSyncLeadToManychat(params.id)
-          .then((success) => {
-            if (success) {
-              logger.info(`Lead ${params.id} sincronizado automáticamente con ManyChat después de actualización`)
-            } else {
-              logger.warn(`No se pudo sincronizar lead ${params.id} con ManyChat después de actualización`)
-            }
-          })
-          .catch((error: any) => {
-            logger.error(`Error sincronizando lead ${params.id} con ManyChat`, {
-              error: error?.message || String(error)
-            })
-          })
-      } catch (error: any) {
-        // Error silencioso, no afecta la actualización del lead
-        logger.error(`Error iniciando sincronización automática para lead ${params.id}`, {
-          error: error?.message || String(error)
         })
       }
     }

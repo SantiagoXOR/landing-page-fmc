@@ -5,9 +5,8 @@
 
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { getTagForStage } from '@/lib/manychat-sync'
+import { getTagForStage } from '@/lib/pipeline-stage-tags'
 import { PipelineService, PipelineStage } from './pipeline-service'
-import { ManychatSyncService } from './manychat-sync-service'
 
 /** Etapas en las que NO se mueve automáticamente a Listo para Análisis */
 const STAGES_EXCLUDED_FROM_AUTO_MOVE: PipelineStage[] = ['PREAPROBADO', 'RECHAZADO', 'LISTO_ANALISIS']
@@ -153,13 +152,19 @@ export class PipelineAutoMoveService {
 
   /**
    * En "Listo para Análisis" el lead debe tener solo el tag solicitud-en-proceso.
-   * Actualiza Lead.tags y sincroniza con ManyChat.
+   * Actualiza Lead.tags en CRM (sin sincronización externa).
    */
   private static async normalizeTagsListoAnalisis(leadId: string): Promise<void> {
     try {
       const tag = await getTagForStage('LISTO_ANALISIS')
-      if (!tag) return
-      await ManychatSyncService.syncTagsToManychat(leadId, [tag])
+      if (!tag || !supabase.client) return
+      const { error } = await supabase.client
+        .from('Lead')
+        .update({ tags: JSON.stringify([tag]) })
+        .eq('id', leadId)
+      if (error) {
+        logger.warn('Error actualizando tags del lead (no crítico)', { leadId, error: error.message })
+      }
     } catch (error: any) {
       logger.warn('Error normalizando tags para Listo para Análisis (no crítico)', {
         leadId,

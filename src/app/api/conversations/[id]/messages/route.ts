@@ -233,84 +233,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Mapear document -> file (MessagingService usa 'file')
     const effectiveMessageType = messageType === 'document' ? 'file' : messageType
 
-    // Decidir si enviar por Meta API para conversaciones WhatsApp (cuando Meta está configurado o USE_META_WHATSAPP_FOR_CHAT)
-    const useMetaForWhatsApp =
-      platform === 'whatsapp' &&
-      !!phoneNumber &&
-      (WhatsAppService.getActiveProvider() === 'whatsapp' ||
-        (process.env.USE_META_WHATSAPP_FOR_CHAT === 'true' && WhatsAppService.canSendViaMeta()))
-
-    let sendResult: { success: boolean; messageId?: string; channel?: string; error?: string; errorCode?: string }
-    let sentViaMeta = false
-
-    if (useMetaForWhatsApp) {
-      // Enviar por Meta (WhatsApp Business API)
-      try {
-        const metaResult = await WhatsAppService.sendMessage({
-          to: phoneNumber,
-          message: message.trim(),
-          messageType: effectiveMessageType,
-          mediaUrl,
-          leadId: conversation.lead?.id,
-        })
-        sendResult = {
-          success: !!metaResult?.success,
-          messageId: metaResult?.messageId,
-          channel: 'whatsapp',
-        }
-        if (sendResult.success) sentViaMeta = true
-      } catch (metaError: any) {
-        logger.error('Error al enviar mensaje vía Meta API', {
-          error: metaError?.message,
-          conversationId: params.id,
-          leadId: conversation.lead?.id,
-          userId: session.user.id,
-        })
-        sendResult = {
-          success: false,
-          error: metaError?.message || 'Error al enviar por WhatsApp.',
-          errorCode: 'META_SEND_ERROR',
-        }
-      }
-    } else {
-      // Usar MessagingService (Manychat; soporta Instagram/Facebook)
-      sendResult = await MessagingService.sendMessage({
-        to,
-        message: message.trim(),
-        messageType: effectiveMessageType,
-        mediaUrl,
-        channel,
-      })
-    }
-
-    // Fallback: si es WhatsApp y Manychat falló (ej. SUBSCRIBER_NOT_FOUND), intentar Meta
-    if (
-      !sendResult.success &&
-      platform === 'whatsapp' &&
-      !!phoneNumber &&
-      WhatsAppService.canSendViaMeta() &&
-      (sendResult.errorCode === 'SUBSCRIBER_NOT_FOUND' || sendResult.errorCode === 'INVALID_SUBSCRIBER_ID')
-    ) {
-      logger.info('Fallback: intentando envío por Meta tras fallo Manychat', {
-        conversationId: params.id,
-        leadId: conversation.lead?.id,
-      })
-      try {
-        const metaResult = await WhatsAppService.sendMessage({
-          to: phoneNumber,
-          message: message.trim(),
-          messageType: effectiveMessageType,
-          mediaUrl,
-          leadId: conversation.lead?.id,
-        })
-        if (metaResult?.success && metaResult?.messageId) {
-          sendResult = { success: true, messageId: metaResult.messageId, channel: 'whatsapp' }
-          sentViaMeta = true
-        }
-      } catch {
-        // Mantener sendResult original (fallido)
-      }
-    }
+    // Envío solo vía MessagingService (internamente usa Meta/WhatsApp)
+    const sendResult = await MessagingService.sendMessage({
+      to,
+      message: message.trim(),
+      messageType: effectiveMessageType,
+      mediaUrl,
+      channel,
+    })
 
     if (!sendResult.success) {
       logger.error('Error al enviar mensaje', {
@@ -337,7 +267,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(
         {
           error:
-            'No se pudo enviar el mensaje. El contacto puede no estar sincronizado con ManyChat o verifica la configuración de WhatsApp.',
+            'No se pudo enviar el mensaje. Verifica la configuración de WhatsApp (Meta API).',
         },
         { status: 500 }
       )
@@ -394,7 +324,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       isFromBot: false,
     }
 
-    const provider = sentViaMeta ? 'meta' : 'manychat'
+    const provider = 'meta'
 
     return NextResponse.json(
       {

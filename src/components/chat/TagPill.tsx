@@ -2,7 +2,6 @@
 
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { TagPillProps } from '@/types/manychat-ui'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -11,7 +10,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
-// Función para generar color basado en el nombre del tag
+export interface TagPillProps {
+  tag: string
+  onRemove?: () => void
+  readonly?: boolean
+  color?: string
+  className?: string
+}
+
 function getTagColor(tag: string): string {
   const colors = [
     'bg-purple-100 text-purple-800 border-purple-200',
@@ -23,13 +29,10 @@ function getTagColor(tag: string): string {
     'bg-red-100 text-red-800 border-red-200',
     'bg-orange-100 text-orange-800 border-orange-200',
   ]
-
-  // Simple hash function para consistencia
   let hash = 0
   for (let i = 0; i < tag.length; i++) {
     hash = tag.charCodeAt(i) + ((hash << 5) - hash)
   }
-  
   return colors[Math.abs(hash) % colors.length]
 }
 
@@ -41,7 +44,6 @@ export function TagPill({
   className,
 }: TagPillProps) {
   const colorClass = color || getTagColor(tag)
-
   const pill = (
     <div
       className={cn(
@@ -65,7 +67,6 @@ export function TagPill({
       )}
     </div>
   )
-
   if (readonly) {
     return (
       <TooltipProvider>
@@ -74,13 +75,11 @@ export function TagPill({
             {pill}
           </TooltipTrigger>
           <TooltipContent>
-            <p className="text-xs">Tag del chatbot: {tag}</p>
+            <p className="text-xs">Tag: {tag}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     )
   }
-
   return pill
 }
-

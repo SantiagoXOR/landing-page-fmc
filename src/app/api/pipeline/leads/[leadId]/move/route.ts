@@ -7,8 +7,7 @@ import { z } from 'zod'
 import { automationService } from '@/services/automation-service'
 import { pipelineService } from '@/server/services/pipeline-service'
 import { supabase } from '@/lib/db'
-import { syncPipelineToManychat, getTagForStage, getPipelineTags, getBusinessTags } from '@/lib/manychat-sync'
-import { ManychatService } from '@/server/services/manychat-service'
+import { getTagForStage, getPipelineTags } from '@/lib/pipeline-stage-tags'
 
 // Schema de validación para mover lead
 const MoveLeadSchema = z.object({
@@ -397,50 +396,9 @@ export async function POST(
       }, { status: 500 })
     }
 
-    // Sincronizar cambio de etapa con ManyChat (no crítico si falla)
-    let manychatSynced = false
+    // Asignar tags según la nueva etapa (solo en CRM, sin sincronización externa)
     try {
-      // Usar el lead que ya verificamos anteriormente
-      
-      if (lead && lead.manychatId) {
-        logger.info('Syncing pipeline change to ManyChat', {
-          leadId,
-          manychatId: lead.manychatId,
-          fromStage: fromStageEnum,
-          toStage: toStageEnum
-        })
-
-        await syncPipelineToManychat({
-          leadId,
-          manychatId: lead.manychatId,
-          previousStage: fromStageEnum,
-          newStage: toStageEnum,
-          userId: session.user.id,
-          notes,
-          rejectionMessage: toStageEnum === 'RECHAZADO' ? rejectionMessage : undefined
-        })
-
-        manychatSynced = true
-        logger.info('Successfully synced to ManyChat', {
-          leadId,
-          manychatId: lead.manychatId
-        })
-      } else {
-        logger.info('Lead does not have ManyChat ID, skipping sync', { leadId })
-      }
-    } catch (manychatError: any) {
-      logger.warn('Failed to sync to ManyChat (non-critical)', {
-        error: manychatError.message,
-        leadId
-      })
-      // Continuar aunque falle la sincronización con ManyChat
-      // No bloqueamos el movimiento del lead si ManyChat falla
-    }
-
-    // Asignar tags según la nueva etapa (no crítico si falla)
-    // Si ya se sincronizó con ManyChat, solo actualizar tags locales y manejar caso especial de credito-preaprobado
-    try {
-      await assignStageTag(leadId, normalizedToStageId, manychatSynced)
+      await assignStageTag(leadId, normalizedToStageId)
     } catch (tagError: any) {
       logger.warn('Failed to assign stage tag', {
         error: tagError.message,
@@ -481,17 +439,13 @@ export async function POST(
       fromStageId: normalizedFromStageId,
       toStageId: normalizedToStageId,
       toStageEnum,
-      manychatSynced,
       warnings: validationResult.warnings.length
     })
 
     return NextResponse.json({
       success: true,
-      message: manychatSynced 
-        ? 'Lead movido y sincronizado con ManyChat' 
-        : 'Lead movido exitosamente',
+      message: 'Lead movido exitosamente',
       transition,
-      manychatSynced,
       warnings: validationResult.warnings
     })
 
@@ -617,7 +571,7 @@ async function validateStageTransition(
 }
 
 // Función para asignar tags según la etapa
-async function assignStageTag(leadId: string, stageId: string, alreadySyncedToManyChat: boolean = false): Promise<void> {
+async function assignStageTag(leadId: string, stageId: string): Promise<void> {
   try {
     // Obtener lead actual
     const lead = await supabase.findLeadById(leadId)
@@ -655,7 +609,7 @@ async function assignStageTag(leadId: string, stageId: string, alreadySyncedToMa
 
     const stageEnum = stageMapping[stageId] || stageId
 
-    // Obtener el tag de ManyChat para esta etapa desde la base de datos
+    // Obtener el tag para esta etapa desde la base de datos (pipeline_stage_tags)
     const tagToAdd = await getTagForStage(stageEnum)
     if (!tagToAdd) {
       logger.warn('No tag mapping found for stage', { 
@@ -719,29 +673,6 @@ async function assignStageTag(leadId: string, stageId: string, alreadySyncedToMa
       newTags: filteredTags
     })
 
-    // Si el lead tiene manychatId y ya se sincronizó con ManyChat,
-    // NO hacer operaciones adicionales en ManyChat aquí.
-    // syncPipelineToManychat ya se encargó de:
-    // 1. Eliminar todos los tags de pipeline antiguos
-    // 2. Agregar el nuevo tag
-    // 3. Manejar el caso especial de credito-preaprobado si es necesario
-    // 
-    // Esta función solo actualiza los tags locales en la base de datos.
-    if (lead.manychatId && alreadySyncedToManyChat) {
-      logger.info('ManyChat ya fue sincronizado por syncPipelineToManychat, solo actualizando tags locales', {
-        leadId,
-        manychatId: lead.manychatId,
-        tag: tagToAdd
-      })
-    } else if (lead.manychatId && !alreadySyncedToManyChat) {
-      // Si no se sincronizó, syncPipelineToManychat debería haber sido llamado antes
-      // pero por si acaso, loguear un warning
-      logger.warn('Lead tiene manychatId pero no se sincronizó con ManyChat antes de assignStageTag', {
-        leadId,
-        manychatId: lead.manychatId,
-        tag: tagToAdd
-      })
-    }
   } catch (error) {
     logger.error('Error assigning stage tag', {
       leadId,

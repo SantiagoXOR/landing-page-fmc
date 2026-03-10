@@ -7,10 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TagPill } from '@/components/manychat/TagPill'
-import { ManychatBadge } from '@/components/manychat/ManychatBadge'
-import { SyncStatusIndicator } from '@/components/manychat/SyncStatusIndicator'
-import { useManychatSync } from '@/hooks/useManychatSync'
+import { TagPill } from './TagPill'
 import { 
   User, 
   Phone, 
@@ -60,14 +57,6 @@ export function ChatSidebar({
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; nombre: string; email: string }>>([])
   const [loadingAgents, setLoadingAgents] = useState(true)
   
-  // Hook de sincronización del chatbot
-  const {
-    isSynced,
-    syncNow,
-    syncStatus,
-    lastSyncAt,
-  } = useManychatSync(conversation?.lead?.id || '')
-
   // Obtener agentes desde la API
   useEffect(() => {
     const fetchAgents = async () => {
@@ -299,48 +288,16 @@ export function ChatSidebar({
       {conversation.lead?.id && (
         <Card className="border-blue-200 bg-blue-50/30">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-blue-900 uppercase tracking-wider flex items-center gap-2">
-                <Bot className="w-4 h-4" />
-                Chatbot
-              </CardTitle>
-              {conversation.lead?.manychatId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  asChild
-                >
-                  <a 
-                    href={`https://manychat.com/fb${conversation.lead.manychatId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </Button>
-              )}
-            </div>
+            <CardTitle className="text-sm font-semibold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+              <Bot className="w-4 h-4" />
+              Chatbot
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {/* Estado de sincronización */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Estado</span>
-              {conversation.lead?.manychatId ? (
-                <ManychatBadge variant="success" size="sm">
-                  Sincronizado
-                </ManychatBadge>
-              ) : (
-                <ManychatBadge variant="warning" size="sm">
-                  No sincronizado
-                </ManychatBadge>
-              )}
-            </div>
-
-            {/* Chatbot ID */}
+            {/* ID externo (UChat/Meta) */}
             {conversation.lead?.manychatId && (
               <div>
-                <span className="text-xs text-gray-500">Chatbot ID</span>
+                <span className="text-xs text-gray-500">ID externo</span>
                 <p className="text-xs font-mono bg-white px-2 py-1 rounded mt-1">
                   {conversation.lead.manychatId}
                 </p>
@@ -375,18 +332,6 @@ export function ChatSidebar({
               </div>
             )}
 
-            {/* Botón de sincronización */}
-            {conversation.lead?.id && (
-              <Button
-                onClick={syncNow}
-                disabled={syncStatus === 'syncing'}
-                size="sm"
-                variant="outline"
-                className="w-full text-xs"
-              >
-                {syncStatus === 'syncing' ? 'Sincronizando...' : 'Sincronizar ahora'}
-              </Button>
-            )}
           </CardContent>
         </Card>
       )}

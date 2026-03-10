@@ -18,12 +18,7 @@ import {
   Sparkles, AlertCircle, Info, ExternalLink
 } from 'lucide-react'
 import WhatsAppHistory from '@/components/whatsapp/WhatsAppHistory'
-import ManychatMessageSender from '@/components/manychat/ManychatMessageSender'
-import { ManychatTagManager } from '@/components/manychat/ManychatTagManager'
-import { ManychatSyncPanel } from '@/components/manychat/ManychatSyncPanel'
-import { ManychatBadge } from '@/components/manychat/ManychatBadge'
-import { TagPill } from '@/components/manychat/TagPill'
-import { useManychatSync } from '@/hooks/useManychatSync'
+import { TagPill } from '@/components/chat/TagPill'
 
 interface Lead {
   id: string
@@ -64,6 +59,54 @@ interface ScoringResult {
   motivos: string[]
 }
 
+function LeadMessageForm({ telefono, onSent }: { telefono: string; onSent: () => void }) {
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!message.trim()) return
+    setSending(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/messaging/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: { phone: telefono },
+          message: message.trim(),
+          channel: 'whatsapp',
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Error al enviar')
+      }
+      setMessage('')
+      onSent()
+    } catch (err: any) {
+      setError(err.message || 'Error al enviar')
+    } finally {
+      setSending(false)
+    }
+  }
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Escribe un mensaje de WhatsApp..."
+        className="w-full min-h-[80px] px-3 py-2 border rounded-md text-sm"
+        disabled={sending}
+      />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <Button type="submit" size="sm" disabled={sending || !message.trim()}>
+        {sending ? 'Enviando...' : 'Enviar por WhatsApp'}
+      </Button>
+    </form>
+  )
+}
+
 export default function LeadDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -72,9 +115,6 @@ export default function LeadDetailPage() {
   const [scoring, setScoring] = useState(false)
   const [scoringResult, setScoringResult] = useState<ScoringResult | null>(null)
   
-  // Hook debe estar al principio, antes de cualquier return condicional
-  const { isSynced, syncNow, syncStatus } = useManychatSync(params.id as string)
-
   const fetchLead = useCallback(async () => {
     try {
       const response = await fetch(`/api/leads/${params.id}`)
@@ -342,33 +382,14 @@ export default function LeadDetailPage() {
                   )}
                 </div>
                 {lead.manychatId && (
-                  <ManychatBadge variant="success" size="sm">
+                  <Badge variant="secondary" className="text-xs">
                     <Bot className="w-3 h-3 mr-1" />
-                    Sincronizado
-                  </ManychatBadge>
+                    ID externo
+                  </Badge>
                 )}
               </div>
             </div>
           </div>
-          
-          {!lead.manychatId && isSynced === false && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={syncNow}
-                  disabled={syncStatus === 'syncing'}
-                  variant="outline"
-                  size="sm"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                  Sincronizar
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Sincronizar este contacto con el chatbot</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
         </div>
       
         {/* Tags */}
@@ -722,14 +743,6 @@ export default function LeadDetailPage() {
               </Card>
             )}
 
-            {/* Panel de sincronización - Simplificado */}
-            <ManychatSyncPanel
-              leadId={lead.id}
-              onSyncComplete={() => {
-                fetchLead()
-              }}
-            />
-
             {/* Comunicación con Tabs */}
             {lead.telefono && (
               <Card>
@@ -753,24 +766,22 @@ export default function LeadDetailPage() {
                   
                   <CardContent>
                     <TabsContent value="send" className="mt-0">
-                      <ManychatMessageSender
-                        leadId={lead.id}
+                      <LeadMessageForm
                         telefono={lead.telefono}
-                        manychatId={lead.manychatId}
-                        onMessageSent={() => {
-                          fetchLead()
-                        }}
+                        onSent={fetchLead}
                       />
                     </TabsContent>
                     
                     <TabsContent value="tags" className="mt-0">
-                      <ManychatTagManager
-                        leadId={lead.id}
-                        initialTags={leadTags}
-                        onTagsChange={() => {
-                          fetchLead()
-                        }}
-                      />
+                      <div className="flex flex-wrap gap-2">
+                        {leadTags.length === 0 ? (
+                          <p className="text-sm text-gray-500">Sin tags</p>
+                        ) : (
+                          leadTags.map((tag) => (
+                            <TagPill key={tag} tag={tag} readonly />
+                          ))
+                        )}
+                      </div>
                     </TabsContent>
                     
                     <TabsContent value="history" className="mt-0">

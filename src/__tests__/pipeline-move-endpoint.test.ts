@@ -50,15 +50,9 @@ vi.mock('@/lib/db', () => ({
   }
 }))
 
-// Mock de manychat-sync
-vi.mock('@/lib/manychat-sync', () => ({
-  syncPipelineToManychat: vi.fn()
-}))
-
 import { getServerSession } from 'next-auth/next'
 import { pipelineService } from '@/server/services/pipeline-service'
 import { supabase } from '@/lib/db'
-import { syncPipelineToManychat } from '@/lib/manychat-sync'
 
 describe('POST /api/pipeline/leads/[leadId]/move', () => {
   beforeEach(() => {
@@ -75,18 +69,11 @@ describe('POST /api/pipeline/leads/[leadId]/move', () => {
   })
 
   it('debería mover un lead exitosamente', async () => {
-    // Mock de moveLeadToStage exitoso
     vi.mocked(pipelineService.moveLeadToStage).mockResolvedValue(undefined)
-    
-    // Mock de lead con manychatId
     vi.mocked(supabase.findLeadById).mockResolvedValue({
       id: 'test-lead-id',
-      manychatId: 'test-manychat-id',
       nombre: 'Test Lead'
     } as any)
-    
-    // Mock de sincronización exitosa
-    vi.mocked(syncPipelineToManychat).mockResolvedValue(true)
 
     const request = new NextRequest('http://localhost:3000/api/pipeline/leads/test-lead-id/move', {
       method: 'POST',
@@ -102,8 +89,8 @@ describe('POST /api/pipeline/leads/[leadId]/move', () => {
 
     expect(response.status).toBe(200)
     expect(data.success).toBe(true)
-    expect(data.manychatSynced).toBe(true)
-    expect(data.message).toContain('ManyChat')
+    expect(data.message).toBe('Lead movido exitosamente')
+    expect(data.transition).toBeDefined()
   })
 
   it('debería rechazar si no hay sesión', async () => {
@@ -154,16 +141,12 @@ describe('POST /api/pipeline/leads/[leadId]/move', () => {
     expect(data.error).toBe('Same stage')
   })
 
-  it('debería mover lead incluso si falla la sincronización con ManyChat', async () => {
+  it('debería mover lead y devolver transición y warnings', async () => {
     vi.mocked(pipelineService.moveLeadToStage).mockResolvedValue(undefined)
     vi.mocked(supabase.findLeadById).mockResolvedValue({
       id: 'test-lead-id',
-      manychatId: 'test-manychat-id',
       nombre: 'Test Lead'
     } as any)
-    
-    // Mock de sincronización fallida
-    vi.mocked(syncPipelineToManychat).mockRejectedValue(new Error('ManyChat API error'))
 
     const request = new NextRequest('http://localhost:3000/api/pipeline/leads/test-lead-id/move', {
       method: 'POST',
@@ -176,17 +159,16 @@ describe('POST /api/pipeline/leads/[leadId]/move', () => {
     const response = await POST(request, { params: { leadId: 'test-lead-id' } })
     const data = await response.json()
 
-    // El movimiento debería ser exitoso aunque falle ManyChat
     expect(response.status).toBe(200)
     expect(data.success).toBe(true)
-    expect(data.manychatSynced).toBe(false)
+    expect(data.warnings).toBeDefined()
+    expect(Array.isArray(data.warnings)).toBe(true)
   })
 
   it('debería mapear correctamente las etapas nuevas', async () => {
     vi.mocked(pipelineService.moveLeadToStage).mockResolvedValue(undefined)
     vi.mocked(supabase.findLeadById).mockResolvedValue({
       id: 'test-lead-id',
-      manychatId: null,
       nombre: 'Test Lead'
     } as any)
 
@@ -214,14 +196,12 @@ describe('POST /api/pipeline/leads/[leadId]/move', () => {
     )
   })
 
-  it('debería sincronizar con ManyChat si el lead tiene manychatId', async () => {
+  it('debería mover lead con notes y devolver transition', async () => {
     vi.mocked(pipelineService.moveLeadToStage).mockResolvedValue(undefined)
     vi.mocked(supabase.findLeadById).mockResolvedValue({
       id: 'test-lead-id',
-      manychatId: 'test-manychat-id',
       nombre: 'Test Lead'
     } as any)
-    vi.mocked(syncPipelineToManychat).mockResolvedValue(true)
 
     const request = new NextRequest('http://localhost:3000/api/pipeline/leads/test-lead-id/move', {
       method: 'POST',
@@ -232,42 +212,13 @@ describe('POST /api/pipeline/leads/[leadId]/move', () => {
       })
     })
 
-    await POST(request, { params: { leadId: 'test-lead-id' } })
-
-    // Verificar que se llamó a syncPipelineToManychat
-    expect(syncPipelineToManychat).toHaveBeenCalledWith({
-      leadId: 'test-lead-id',
-      manychatId: 'test-manychat-id',
-      previousStage: expect.any(String),
-      newStage: expect.any(String),
-      userId: 'test-user-id',
-      notes: 'Test note'
-    })
-  })
-
-  it('debería omitir sincronización si el lead no tiene manychatId', async () => {
-    vi.mocked(pipelineService.moveLeadToStage).mockResolvedValue(undefined)
-    vi.mocked(supabase.findLeadById).mockResolvedValue({
-      id: 'test-lead-id',
-      manychatId: null,
-      nombre: 'Test Lead'
-    } as any)
-
-    const request = new NextRequest('http://localhost:3000/api/pipeline/leads/test-lead-id/move', {
-      method: 'POST',
-      body: JSON.stringify({
-        fromStageId: 'nuevo',
-        toStageId: 'contactado'
-      })
-    })
-
     const response = await POST(request, { params: { leadId: 'test-lead-id' } })
     const data = await response.json()
 
     expect(response.status).toBe(200)
     expect(data.success).toBe(true)
-    expect(data.manychatSynced).toBe(false)
-    expect(syncPipelineToManychat).not.toHaveBeenCalled()
+    expect(data.transition.notes).toBe('Test note')
+    expect(data.transition.leadId).toBe('test-lead-id')
   })
 })
 

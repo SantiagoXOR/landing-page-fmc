@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { formatDate, formatCurrency, cn } from '@/lib/utils'
 import { Search, Plus, Filter, Download, Users, TrendingUp, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Tag, RefreshCw, CheckCircle2 } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
-import { TagPill } from '@/components/manychat/TagPill'
+import { TagPill } from '@/components/chat/TagPill'
 import DeleteConfirmationModal from '@/components/ui/delete-confirmation-modal'
 import { useToast } from '@/components/ui/toast'
 import { PermissionGuard, usePermissions, ConditionalRender } from '@/components/auth/PermissionGuard'
@@ -109,10 +109,9 @@ function LeadsPage() {
     }
   }
 
-  // Función para obtener tags disponibles de Manychat
   const fetchAvailableTags = async () => {
     try {
-      const response = await fetch('/api/manychat/tags')
+      const response = await fetch('/api/tags/list')
       if (response.ok) {
         const data = await response.json()
         setAvailableTags(data.tags || [])

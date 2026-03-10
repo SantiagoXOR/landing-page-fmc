@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { format, isToday, isYesterday } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { MessageTypeIndicator } from '@/components/manychat/MessageTypeIndicator'
+import { MessageTypeIndicator } from './MessageTypeIndicator'
 import type { Message } from '@/types/chat'
 
 interface MessageBubbleProps {

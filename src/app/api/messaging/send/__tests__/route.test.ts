@@ -158,7 +158,7 @@ describe('/api/messaging/send', () => {
         mockConversationService.updateLastActivity.mockResolvedValueOnce(undefined)
 
         const requestBody = {
-          conversationId: 'conv-123',
+          conversationId: 'clq1abc2def3ghi4jkl5mno6p7',
           to: {
             phone: '+5491155556789',
           },
@@ -177,7 +177,7 @@ describe('/api/messaging/send', () => {
 
         expect(response.status).toBe(201)
         expect(mockWhatsAppService.createMessage).toHaveBeenCalled()
-        expect(mockConversationService.updateLastActivity).toHaveBeenCalledWith('conv-123')
+        expect(mockConversationService.updateLastActivity).toHaveBeenCalledWith('clq1abc2def3ghi4jkl5mno6p7')
       })
     })
 
@@ -288,7 +288,8 @@ describe('/api/messaging/send', () => {
         mockGetServerSession.mockResolvedValue(mockSession as any)
         mockCheckPermission.mockImplementation(() => {})
 
-        mockMessagingService.sendMessage.mockResolvedValueOnce({
+        mockMessagingService.sendMessage.mockReset()
+        mockMessagingService.sendMessage.mockResolvedValue({
           success: false,
           error: 'Error enviando mensaje',
           errorCode: 'SUBSCRIBER_NOT_FOUND',

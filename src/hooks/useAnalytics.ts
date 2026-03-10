@@ -121,14 +121,14 @@ export function useAnalytics() {
   }, [])
 
   /**
-   * Rastrear sincronización con ManyChat
+   * Rastrear acción de chatbot (sync, mensaje, tag)
    */
-  const trackManyChatSync = useCallback((data: {
+  const trackChatbotAction = useCallback((data: {
     action: 'sync' | 'message_sent' | 'tag_added'
     leadId?: string
     success: boolean
   }) => {
-    trackEvent('manychat_action', {
+    trackEvent('chatbot_action', {
       action: data.action,
       lead_id: data.leadId,
       success: data.success,
@@ -216,8 +216,8 @@ export function useAnalytics() {
     // Búsqueda
     trackSearch,
     
-    // ManyChat
-    trackManyChatSync,
+    // Chatbot
+    trackChatbotAction,
     
     // Formularios
     trackFormSubmit,

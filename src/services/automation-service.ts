@@ -15,7 +15,7 @@ import {
 } from '@/types/automation'
 import { PipelineLead } from '@/types/pipeline'
 import { logger } from '@/lib/logger'
-import { ManychatService } from '@/server/services/manychat-service'
+import { MessagingService } from '@/server/services/messaging-service'
 import { ConversationService } from '@/server/services/conversation-service'
 import { supabase } from '@/lib/db'
 
@@ -911,38 +911,31 @@ export class AutomationService {
         })
       }
       
-      // Enviar mensaje usando ManyChat
-      const result = await ManychatService.sendMessage(
-        manychatId,
-        [{
-          type: 'text',
-          text: message
-        }],
-        `automation-${execution.ruleId}`
-      )
-      
-      if (result.status === 'error') {
-        logger.error('Error enviando mensaje de automatización por ManyChat', {
+      const result = await MessagingService.sendMessage({
+        to: { phone: lead.telefono },
+        message,
+        channel: 'whatsapp',
+      })
+
+      if (!result.success) {
+        logger.error('Error enviando mensaje de automatización', {
           leadId: lead.id,
-          manychatId,
           error: result.error,
-          errorCode: result.error_code
+          errorCode: result.errorCode,
         })
-        throw new Error(result.error || 'Error enviando mensaje por ManyChat')
+        throw new Error(result.error || 'Error enviando mensaje por WhatsApp')
       }
-      
+
       logger.info('Mensaje de automatización enviado exitosamente', {
         leadId: lead.id,
-        manychatId,
-        messageId: result.data?.message_id,
-        ruleId: execution.ruleId
+        messageId: result.messageId,
+        ruleId: execution.ruleId,
       })
-      
-      return { 
-        sent: true, 
-        messageId: result.data?.message_id || `whatsapp-${Date.now()}`,
-        manychatId,
-        channel: 'whatsapp' // Manychat siempre usa WhatsApp para estos mensajes
+
+      return {
+        sent: true,
+        messageId: result.messageId || `whatsapp-${Date.now()}`,
+        channel: 'whatsapp',
       }
     } catch (error) {
       logger.error('Error ejecutando acción WhatsApp en automatización', {

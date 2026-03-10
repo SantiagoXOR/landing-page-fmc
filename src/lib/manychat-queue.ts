@@ -1,8 +1,7 @@
 /**
- * Sistema de Cola para Sincronización con ManyChat
- * 
- * Este módulo maneja el procesamiento de sincronizaciones pendientes
- * y el retry automático cuando fallan.
+ * Sistema de cola para sincronización (legacy).
+ * Usaba ManyChat; la sincronización con pipeline es ahora no-op (solo CRM).
+ * Se mantiene por compatibilidad con jobs/cron que lo invoquen.
  */
 
 import { createClient } from '@supabase/supabase-js'

@@ -93,7 +93,9 @@
 - [Migración Manychat → Uchat](./UCHAT-MIGRACION-MANYCHAT.md) - Guía técnica de migración de código
 - [Arquitectura Uchat + CRM](./ARQUITECTURA-UCHAT-CRM.md) - Diagramas y flujos de la integración
 - [Webhook WhatsApp – Casos de uso CRM](./WEBHOOK-WHATSAPP-CASOS-DE-USO-CRM.md) - Eventos del webhook y cómo cubren los casos de uso del CRM
-- [ManyChat Setup](./MANYCHAT-SETUP.md) - Configuración de integración con ManyChat (legacy, en migración a Uchat)
+
+**Documentación legacy (ManyChat eliminado):** MANYCHAT-SETUP.md, GUIA-WEBHOOKS-MANYCHAT.md, PIPELINE-MANYCHAT-SYNC.md y otros en docs/ hacen referencia a la integración ManyChat, ya no utilizada. Solo referencia histórica; usar UChat y Meta.
+- **[Legacy]** [ManyChat Setup](./MANYCHAT-SETUP.md) - Referencia histórica; la integración ManyChat fue eliminada. Usar [Uchat Setup](./UCHAT-SETUP.md) y Meta/WhatsApp.
 
 ### 🔧 Solución de Problemas
 

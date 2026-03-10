@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { cacheService, CacheStrategies } from '@/lib/cache-service'
-import { ManychatService } from './manychat-service'
+import { getPipelineTags, getBusinessTags } from '@/lib/pipeline-stage-tags'
 
 export interface TagLead {
   id: string
@@ -161,20 +161,19 @@ export class TagsService {
       }
     }
 
-    // Obtener todos los tags de Manychat
-    let manychatTags: string[] = []
+    // Obtener todos los tags de pipeline/negocio (desde BD)
+    let pipelineTags: string[] = []
     try {
-      const manychatTagsData = await ManychatService.getTags()
-      manychatTags = manychatTagsData.map(tag => tag.name)
-      logger.info('Tags obtenidos de Manychat', { count: manychatTags.length })
+      const [pipeline, business] = await Promise.all([getPipelineTags(), getBusinessTags()])
+      pipelineTags = Array.from(new Set([...pipeline, ...business]))
+      logger.info('Tags obtenidos de pipeline_stage_tags', { count: pipelineTags.length })
     } catch (error: any) {
-      logger.warn('Error obteniendo tags de Manychat, usando solo tags de leads', { error: error.message })
-      // Si falla, continuar solo con los tags de los leads
+      logger.warn('Error obteniendo tags, usando solo tags de leads', { error: error.message })
     }
 
-    // Combinar tags de Manychat con tags de leads (sin duplicados)
+    // Combinar tags de pipeline con tags de leads (sin duplicados)
     const allTagNames = new Set<string>()
-    manychatTags.forEach(tag => allTagNames.add(tag))
+    pipelineTags.forEach(tag => allTagNames.add(tag))
     Array.from(tagMap.keys()).forEach(tag => allTagNames.add(tag))
 
     // Convertir map a array de TagGroup, incluyendo todos los tags de Manychat
@@ -258,14 +257,12 @@ export class TagsService {
       throw new Error('Base de datos no disponible')
     }
 
-    // Obtener todos los tags de Manychat
-    let manychatTags: string[] = []
+    let pipelineTags: string[] = []
     try {
-      const manychatTagsData = await ManychatService.getTags()
-      manychatTags = manychatTagsData.map(tag => tag.name)
-      logger.info('Tags obtenidos de Manychat para estadísticas', { count: manychatTags.length })
+      const [pipeline, business] = await Promise.all([getPipelineTags(), getBusinessTags()])
+      pipelineTags = Array.from(new Set([...pipeline, ...business]))
     } catch (error: any) {
-      logger.warn('Error obteniendo tags de Manychat para estadísticas', { error: error.message })
+      logger.warn('Error obteniendo tags para estadísticas', { error: error.message })
     }
 
     const { data: leads, error } = await supabase.client
@@ -276,11 +273,8 @@ export class TagsService {
       throw error
     }
 
-    // Contar tags en leads
     const tagCounts = new Map<string, number>()
-
-    // Inicializar todos los tags de Manychat con count 0
-    manychatTags.forEach(tag => {
+    pipelineTags.forEach(tag => {
       tagCounts.set(tag, 0)
     })
 

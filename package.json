@@ -14,6 +14,7 @@
     "test:auth": "node scripts/test-auth-routes.js",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "delete-lead": "tsx scripts/delete-lead-by-phone.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

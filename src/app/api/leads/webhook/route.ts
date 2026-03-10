@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
-import { ManychatService } from '@/server/services/manychat-service'
-import { ManychatSyncService } from '@/server/services/manychat-sync-service'
 import { z } from 'zod'
 
 /**
@@ -104,87 +102,6 @@ export async function POST(request: NextRequest) {
       origen: validatedData.origen
     })
 
-    // Verificar si Manychat está configurado
-    let manychatId: string | undefined
-    let subscriber: any = null
-
-    // 1. PRIMERO: Crear subscriber en Manychat (si está configurado)
-    if (ManychatService.isConfigured()) {
-      try {
-        // Preparar datos para Manychat
-        const [firstName, ...lastNameParts] = (validatedData.nombre || '').split(' ')
-        const lastName = lastNameParts.join(' ') || undefined
-
-        // Si el origen es WhatsApp, usar el método optimizado
-        if (validatedData.origen === 'whatsapp') {
-          subscriber = await ManychatService.createWhatsAppSubscriber({
-            phone: validatedData.telefono,
-            first_name: firstName,
-            last_name: lastName,
-            email: validatedData.email || undefined,
-            custom_fields: {
-              dni: validatedData.dni || undefined,
-              ingresos: validatedData.ingresos ?? undefined,
-              zona: validatedData.zona || undefined,
-              producto: validatedData.producto || undefined,
-              monto: validatedData.monto ?? undefined,
-              origen: validatedData.origen || 'whatsapp',
-              estado: validatedData.estado || 'NUEVO',
-              agencia: validatedData.agencia || undefined,
-            },
-            tags: validatedData.tags || []
-          })
-        } else {
-          // Para otros orígenes, usar el método estándar
-          const manychatData = {
-            phone: validatedData.telefono,
-            first_name: firstName,
-            last_name: lastName,
-            email: validatedData.email || undefined,
-            whatsapp_phone: validatedData.telefono,
-            custom_fields: {
-              dni: validatedData.dni || undefined,
-              ingresos: validatedData.ingresos ?? undefined,
-              zona: validatedData.zona || undefined,
-              producto: validatedData.producto || undefined,
-              monto: validatedData.monto ?? undefined,
-              origen: validatedData.origen || 'web',
-              estado: validatedData.estado || 'NUEVO',
-              agencia: validatedData.agencia || undefined,
-            },
-            tags: validatedData.tags || []
-          }
-
-          subscriber = await ManychatService.createOrUpdateSubscriber(manychatData)
-        }
-        
-        if (subscriber && subscriber.id) {
-          manychatId = String(subscriber.id)
-          logger.info('Subscriber created in Manychat from webhook', {
-            manychatId,
-            phone: validatedData.telefono
-          })
-        } else {
-          logger.warn('Failed to create subscriber in Manychat, continuing without manychatId')
-        }
-      } catch (manychatError: any) {
-        // Si falla Manychat, no crear el lead (según requerimiento)
-        logger.error('Error creating subscriber in Manychat from webhook', {
-          error: manychatError.message,
-          stack: manychatError.stack
-        })
-        
-        return NextResponse.json({
-          error: 'Manychat Error',
-          message: 'No se pudo crear el contacto en Manychat. El lead no fue creado.',
-          details: manychatError.message
-        }, { status: 500 })
-      }
-    } else {
-      logger.warn('Manychat not configured, creating lead without manychatId')
-    }
-
-    // 2. SEGUNDO: Crear lead en el CRM con el manychatId ya asignado
     const leadData = {
       nombre: validatedData.nombre,
       telefono: validatedData.telefono,
@@ -199,36 +116,17 @@ export async function POST(request: NextRequest) {
       estado: validatedData.estado || 'NUEVO',
       agencia: validatedData.agencia || null,
       notas: validatedData.notas || null,
-      manychatId: manychatId || undefined
+      manychatId: undefined as string | undefined,
     }
 
     const lead = await supabaseLeadService.createLead(leadData)
 
-    // Verificar que el lead fue creado correctamente
     if (!lead.id) {
       throw new Error('Lead created but no ID returned')
     }
 
-    // 3. Sincronizar custom fields y tags con Manychat si fue creado
-    if (manychatId && ManychatService.isConfigured()) {
-      try {
-        await ManychatSyncService.syncCustomFieldsToManychat(lead.id)
-        if (validatedData.tags && Array.isArray(validatedData.tags) && validatedData.tags.length > 0) {
-          await ManychatSyncService.syncTagsToManychat(lead.id, validatedData.tags)
-        }
-        logger.info('Custom fields and tags synced to Manychat from webhook', { leadId: lead.id })
-      } catch (syncError: any) {
-        // Log error pero no fallar la creación del lead
-        logger.error('Error syncing custom fields/tags to Manychat from webhook', {
-          leadId: lead.id,
-          error: syncError.message
-        })
-      }
-    }
-
     logger.info('Webhook lead created successfully', {
       leadId: lead.id,
-      manychatId: manychatId || 'none',
       origen: validatedData.origen
     })
 
@@ -236,7 +134,6 @@ export async function POST(request: NextRequest) {
       success: true,
       id: lead.id,
       estado: lead.estado,
-      manychatId: manychatId || null,
       message: 'Lead creado exitosamente desde formulario web'
     }, { status: 201 })
 

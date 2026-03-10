@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from './MessageBubble'
 import { EmptyState } from './EmptyState'
-import { ManychatFlowIndicator } from '@/components/manychat/ManychatFlowIndicator'
-import { TagPill } from '@/components/manychat/TagPill'
+import { FlowIndicator } from './FlowIndicator'
+import { TagPill } from './TagPill'
 import { Send, Paperclip, Smile, MoreVertical, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Conversation, Message } from '@/types/chat'
@@ -101,7 +101,7 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
         {/* Indicador de flujo del chatbot - Oculto en mobile muy pequeño */}
         {conversation.manychatData?.flowName && (
           <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-            <ManychatFlowIndicator
+            <FlowIndicator
               flowName={conversation.manychatData.flowName}
               flowNs={conversation.manychatData.flowNs}
               botActive={conversation.manychatData.botActive}

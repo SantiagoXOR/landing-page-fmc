@@ -8,9 +8,6 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.te
 process.env.JWT_SECRET = 'test-jwt-secret-key'
 process.env.ALLOWED_WEBHOOK_TOKEN = 'test-webhook-token'
 process.env.TESTING_MODE = 'true'
-// ManyChat API variables for tests
-process.env.MANYCHAT_API_KEY = 'test-api-key'
-process.env.MANYCHAT_BASE_URL = 'https://api.manychat.com'
 // NODE_ENV is read-only, so we don't set it directly
 
 // Mock fetch globally
@@ -48,7 +45,8 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-// Mock Supabase Lead Service
+// Mock Supabase Lead Service (tests de integración del servicio real en supabase-lead-service.test.ts
+// usan vi.unmock o su propio mock de fetch; los tests de API mockean el servicio en su archivo)
 vi.mock('@/server/services/supabase-lead-service', () => ({
   SupabaseLeadService: vi.fn().mockImplementation(() => ({
     createLead: vi.fn(),

@@ -102,24 +102,6 @@ const createNavigation = (leadsCount: number, chatsCount: number): NavigationIte
     icon: BarChart3
   },
   
-  // Separador - Chatbot
-  {
-    name: "Chatbot",
-    href: "#",
-    icon: null,
-    isHeader: true
-  },
-  {
-    name: "Dashboard",
-    href: "/manychat/dashboard",
-    icon: Bot
-  },
-  {
-    name: "Configuración",
-    href: "/settings/manychat",
-    icon: Settings
-  },
-  
   // Separador - Sistema
   {
     name: "Sistema",

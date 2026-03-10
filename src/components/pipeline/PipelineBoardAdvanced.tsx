@@ -1060,11 +1060,10 @@ const LeadCard = memo(function LeadCard({
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined
 
-  // Cargar tags disponibles cuando se abre el dropdown
   const loadAvailableTags = async () => {
     try {
       setLoadingTags(true)
-      const response = await fetch('/api/manychat/tags')
+      const response = await fetch('/api/tags/list')
       if (response.ok) {
         const data = await response.json()
         setAvailableTags(data.tags || [])
@@ -1388,41 +1387,27 @@ const LeadCard = memo(function LeadCard({
   // Funciones para gestionar tags
   const handleAddTag = async (tagName: string) => {
     try {
-      // Obtener el lead para encontrar el manychatId
       const leadResponse = await fetch(`/api/leads/${lead.id}`)
-      if (!leadResponse.ok) {
-        throw new Error('No se pudo obtener el lead')
-      }
-
+      if (!leadResponse.ok) throw new Error('No se pudo obtener el lead')
       const leadData = await leadResponse.json()
-      
-      if (!leadData.manychatId) {
-        toast.error('Lead no está sincronizado con Manychat')
+      const currentTags = Array.isArray(leadData.tags) ? leadData.tags : (typeof leadData.tags === 'string' ? (() => { try { return JSON.parse(leadData.tags) } catch { return [] } })() : [])
+      if (currentTags.includes(tagName)) {
+        toast.success(`El lead ya tiene el tag "${tagName}"`)
+        setShowDropdown(false)
         return
       }
-
-      // Agregar tag vía API de Manychat
-      const response = await fetch('/api/manychat/tags', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subscriberId: parseInt(leadData.manychatId),
-          tagName,
-          action: 'add',
-        }),
+      const newTags = [...currentTags, tagName]
+      const response = await fetch(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags }),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Error al agregar tag')
       }
-
       toast.success(`Tag "${tagName}" agregado`)
       setShowDropdown(false)
-      // Notificar al padre para refrescar datos si es necesario
-      // Por ahora solo cerramos el dropdown, los tags se actualizarán en la próxima carga
     } catch (error: any) {
       console.error('Error adding tag:', error)
       toast.error(error.message || 'Error al agregar tag')
@@ -1432,38 +1417,21 @@ const LeadCard = memo(function LeadCard({
   const handleRemoveTag = async (tagName: string) => {
     try {
       const leadResponse = await fetch(`/api/leads/${lead.id}`)
-      if (!leadResponse.ok) {
-        throw new Error('No se pudo obtener el lead')
-      }
-
+      if (!leadResponse.ok) throw new Error('No se pudo obtener el lead')
       const leadData = await leadResponse.json()
-      
-      if (!leadData.manychatId) {
-        toast.error('Lead no está sincronizado con Manychat')
-        return
-      }
-
-      const response = await fetch('/api/manychat/tags', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subscriberId: parseInt(leadData.manychatId),
-          tagName,
-          action: 'remove',
-        }),
+      const currentTags = Array.isArray(leadData.tags) ? leadData.tags : (typeof leadData.tags === 'string' ? (() => { try { return JSON.parse(leadData.tags) } catch { return [] } })() : [])
+      const newTags = currentTags.filter((t: string) => t !== tagName)
+      const response = await fetch(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags }),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Error al remover tag')
       }
-
       toast.success(`Tag "${tagName}" removido`)
       setShowDropdown(false)
-      // Notificar al padre para refrescar datos si es necesario
-      // Por ahora solo cerramos el dropdown, los tags se actualizarán en la próxima carga
     } catch (error: any) {
       console.error('Error removing tag:', error)
       toast.error(error.message || 'Error al remover tag')

@@ -4,8 +4,8 @@ import { GET } from '../route'
 import { getServerSession } from 'next-auth/next'
 import { setupSupabaseFetchMocks, createMockFetchResponse, mockLeads } from '@/__tests__/mocks/supabase'
 
-// Mock NextAuth
-vi.mock('next-auth', () => ({
+// Mock NextAuth (la ruta importa desde 'next-auth/next')
+vi.mock('next-auth/next', () => ({
   getServerSession: vi.fn(),
 }))
 
@@ -126,7 +126,7 @@ describe('/api/dashboard/metrics', () => {
         status: 500,
         statusText: 'Internal Server Error',
         json: vi.fn().mockResolvedValue({ error: 'Database error' }),
-      text: vi.fn().mockResolvedValue('Internal Server Error'),
+        text: vi.fn().mockResolvedValue('Internal Server Error'),
         headers: new Headers()
       })
 
@@ -134,8 +134,10 @@ describe('/api/dashboard/metrics', () => {
       const response = await GET(request)
       const data = await response.json()
 
-      expect(response.status).toBe(500)
-      expect(data.error).toBe('Failed to fetch metrics')
+      // La ruta devuelve 200 con métricas vacías cuando falla Supabase
+      expect(response.status).toBe(200)
+      expect(data.totalLeads).toBe(0)
+      expect(data.warning).toBeDefined()
     })
 
     it('should handle network errors', async () => {
@@ -149,8 +151,10 @@ describe('/api/dashboard/metrics', () => {
       const response = await GET(request)
       const data = await response.json()
 
-      expect(response.status).toBe(500)
-      expect(data.error).toBe('Failed to fetch metrics')
+      // La ruta devuelve 200 con métricas vacías cuando hay error de red
+      expect(response.status).toBe(200)
+      expect(data.totalLeads).toBe(0)
+      expect(data.warning).toBeDefined()
     })
   })
 

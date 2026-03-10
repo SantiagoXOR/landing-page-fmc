@@ -1,9 +1,5 @@
 import { supabase } from '@/lib/db'
 import { ConversationService } from './conversation-service'
-import { ManychatService } from './manychat-service'
-import { ManychatSyncService } from './manychat-sync-service'
-import { MessagingService } from './messaging-service'
-import { ManychatMessage, ManychatSendMessageResponse } from '@/types/manychat'
 import { WhatsAppBusinessAPI, WhatsAppAPIError, formatWhatsAppNumber, isValidWhatsAppNumber } from '@/lib/integrations/whatsapp-business-api'
 import { logger } from '@/lib/logger'
 
@@ -48,53 +44,25 @@ export interface SendMessageData {
 }
 
 export class WhatsAppService {
-  // Cliente robusto de WhatsApp Business API
+  // Cliente de WhatsApp Business API (Meta)
   private static whatsappClient: WhatsAppBusinessAPI | null = WhatsAppBusinessAPI.fromEnv()
-  
-  // Usar Manychat como prioridad
-  private static readonly USE_MANYCHAT = ManychatService.isConfigured()
 
   /**
-   * Verificar si WhatsApp está configurado
+   * Verificar si WhatsApp está configurado (Meta API)
    */
   static isConfigured(): boolean {
-    return this.USE_MANYCHAT || !!this.whatsappClient
+    return !!this.whatsappClient
   }
 
   /**
-   * Detectar si el error es de ventana de 24 horas (código 3011)
+   * Obtener proveedor activo (solo Meta/WhatsApp o ninguno)
    */
-  private static is24HourWindowError(response: ManychatSendMessageResponse): boolean {
-    // Detectar código 3011 en details (puede estar en details.code o details.details.code)
-    if (response.details) {
-      const code = response.details.code || (response.details as any).details?.code
-      if (code === 3011 || code === '3011') {
-        return true
-      }
-    }
-    
-    // Detectar por mensaje de error
-    const errorMessage = response.error?.toLowerCase() || ''
-    const detailsMessage = (response.details as any)?.message?.toLowerCase() || ''
-    return errorMessage.includes('24 hour') || 
-           errorMessage.includes('message tag') ||
-           errorMessage.includes('last interaction') ||
-           detailsMessage.includes('24 hour') ||
-           detailsMessage.includes('message tag') ||
-           detailsMessage.includes('last interaction')
+  static getActiveProvider(): 'whatsapp' | 'none' {
+    return this.whatsappClient ? 'whatsapp' : 'none'
   }
 
   /**
-   * Obtener proveedor activo (manychat o whatsapp)
-   */
-  static getActiveProvider(): 'manychat' | 'whatsapp' | 'none' {
-    if (this.USE_MANYCHAT) return 'manychat'
-    if (this.whatsappClient) return 'whatsapp'
-    return 'none'
-  }
-
-  /**
-   * Indica si se puede enviar por Meta API (para priorizar Meta en el chat con USE_META_WHATSAPP_FOR_CHAT)
+   * Indica si se puede enviar por Meta API
    */
   static canSendViaMeta(): boolean {
     return !!this.whatsappClient
@@ -180,595 +148,19 @@ export class WhatsAppService {
   }
 
   /**
-   * Enviar mensaje por WhatsApp (usando Manychat o Meta API)
+   * Enviar mensaje por WhatsApp (Meta API)
    */
   static async sendMessage(data: SendMessageData) {
     try {
-      // Si Manychat está configurado, usarlo
-      if (this.USE_MANYCHAT) {
-        return await this.sendMessageViaManychat(data)
-      }
-
-      // Fallback a Meta API
       return await this.sendMessageViaMetaAPI(data)
     } catch (error) {
-      console.error('Error sending WhatsApp message:', error)
+      logger.error('Error sending WhatsApp message', { error, to: data.to?.substring(0, 5) + '***' })
       throw error
     }
   }
 
   /**
-   * Enviar mensaje usando Manychat
-   * Usa el nuevo MessagingService para mejor detección de canal y manejo de errores
-   */
-  private static async sendMessageViaManychat(data: SendMessageData) {
-    try {
-      logger.info('Enviando mensaje vía ManyChat', {
-        to: data.to.substring(0, 5) + '***',
-        messageType: data.messageType || 'text',
-        hasMedia: !!data.mediaUrl
-      })
-
-      // Intentar obtener subscriber primero
-      let subscriber = await ManychatService.getSubscriberByPhone(data.to)
-      
-      // Si no hay subscriber o no tiene ID válido, intentar sincronizar usando leadId
-      if (!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
-        logger.debug('Subscriber no encontrado o sin ID válido, intentando sincronizar lead', {
-          phone: data.to.substring(0, 5) + '***',
-          hasLeadId: !!data.leadId,
-          subscriberHasKey: subscriber?.key ? true : false
-        })
-        
-        // Usar leadId directamente si está disponible, de lo contrario buscar por teléfono
-        let lead = null
-        if (data.leadId) {
-          lead = await supabase.findLeadById(data.leadId)
-          logger.info('Lead obtenido por ID', {
-            leadId: data.leadId,
-            found: !!lead
-          })
-        }
-        
-        // Si no se encontró por ID, intentar por teléfono
-        if (!lead) {
-          lead = await supabase.findLeadByPhoneOrDni(data.to)
-          logger.info('Lead obtenido por teléfono', {
-            phone: data.to.substring(0, 5) + '***',
-            found: !!lead
-          })
-        }
-
-        if (lead) {
-          logger.info('Lead encontrado, sincronizando a ManyChat', {
-            leadId: lead.id,
-            phone: data.to.substring(0, 5) + '***'
-          })
-          
-          try {
-            // Sincronizar lead a Manychat
-            await ManychatSyncService.syncLeadToManychat(lead.id)
-            
-            // Intentar obtener subscriber nuevamente después de sincronizar
-            subscriber = await ManychatService.getSubscriberByPhone(data.to)
-            
-            if (subscriber && subscriber.id && typeof subscriber.id === 'number' && subscriber.id > 0) {
-              logger.info('Subscriber válido obtenido después de sincronización', {
-                subscriberId: subscriber.id
-              })
-            } else {
-              logger.warn('Subscriber no encontrado o sin ID válido después de sincronización', {
-                leadId: lead.id,
-                phone: data.to.substring(0, 5) + '***',
-                hasSubscriber: !!subscriber,
-                subscriberId: subscriber?.id
-              })
-            }
-          } catch (syncError: any) {
-            logger.error('Error sincronizando lead a ManyChat', {
-              error: syncError.message,
-              leadId: lead.id,
-              phone: data.to.substring(0, 5) + '***'
-            })
-            // Continuar intentando enviar el mensaje, puede que el subscriber ya exista
-          }
-        } else {
-          logger.warn('Lead no encontrado para sincronizar', {
-            phone: data.to.substring(0, 5) + '***',
-            leadId: data.leadId
-          })
-        }
-      }
-      
-      // Si aún no hay subscriber o no tiene ID válido después de todos los intentos,
-      // intentar obtener el subscriber_id usando otras estrategias
-      if (!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
-        logger.warn('Subscriber no encontrado o sin ID válido, intentando obtener ID usando otras estrategias', {
-          phone: data.to.substring(0, 5) + '***',
-          hasSubscriber: !!subscriber,
-          subscriberKey: subscriber?.key
-        })
-
-        // Estrategia 1: Usar manychatId guardado en el lead
-        if (data.leadId) {
-          const lead = await supabase.findLeadById(data.leadId)
-          
-          if (lead && lead.manychatId) {
-            logger.info('Intentando usar manychatId del lead para obtener subscriber', {
-              leadId: data.leadId,
-              manychatId: lead.manychatId,
-              phone: data.to.substring(0, 5) + '***'
-            })
-            
-            try {
-              // Intentar obtener subscriber usando el manychatId guardado
-              const subscriberById = await ManychatService.getSubscriberById(lead.manychatId)
-              
-              if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
-                logger.info('Subscriber válido obtenido usando manychatId del lead', {
-                  subscriberId: subscriberById.id,
-                  manychatId: lead.manychatId
-                })
-                subscriber = subscriberById
-              } else {
-                // Si getSubscriberById retorna null o subscriber sin ID válido, intentar usar manychatId directamente
-                logger.warn('Subscriber obtenido por manychatId pero sin ID válido o retornó null, intentando usar manychatId directamente', {
-                  manychatId: lead.manychatId,
-                  hasSubscriber: !!subscriberById,
-                  subscriberId: subscriberById?.id,
-                  subscriberKey: subscriberById?.key
-                })
-                
-                // Intentar usar el manychatId directamente como subscriber_id
-                const manychatIdAsNumber = typeof lead.manychatId === 'string' 
-                  ? parseInt(lead.manychatId) 
-                  : lead.manychatId
-                
-                if (manychatIdAsNumber && !isNaN(manychatIdAsNumber) && manychatIdAsNumber > 0) {
-                  logger.info('Intentando enviar mensaje usando manychatId directamente como subscriber_id', {
-                    manychatId: manychatIdAsNumber,
-                    phone: data.to.substring(0, 5) + '***'
-                  })
-                  
-                  // Preparar mensaje según el tipo
-                  const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
-                  const messages: any[] = []
-
-                  if (messageType === 'text') {
-                    messages.push({
-                      type: 'text',
-                      text: data.message
-                    })
-                  } else if (data.mediaUrl) {
-                    if (messageType === 'image') {
-                      messages.push({
-                        type: 'image',
-                        url: data.mediaUrl,
-                        caption: data.message || undefined
-                      })
-                    } else if (messageType === 'video') {
-                      messages.push({
-                        type: 'video',
-                        url: data.mediaUrl,
-                        caption: data.message || undefined
-                      })
-                    } else if (messageType === 'file') {
-                      messages.push({
-                        type: 'file',
-                        url: data.mediaUrl,
-                        filename: data.message || 'document'
-                      })
-                    } else if (messageType === 'audio') {
-                      messages.push({
-                        type: 'audio',
-                        url: data.mediaUrl
-                      })
-                    }
-                  }
-
-                  // Intentar enviar mensaje usando manychatId directamente
-                  const sendResponse = await ManychatService.sendMessage(manychatIdAsNumber, messages)
-                  
-                  if (sendResponse.status === 'success') {
-                    logger.info('Mensaje enviado exitosamente usando manychatId directamente como subscriber_id', {
-                      manychatId: manychatIdAsNumber,
-                      messageId: sendResponse.data?.message_id
-                    })
-                    
-                    return {
-                      success: true,
-                      messageId: sendResponse.data?.message_id || 'sent_by_manychat_id',
-                      provider: 'manychat',
-                      channel: 'whatsapp',
-                    }
-                  } else {
-                    // Detectar error de ventana de 24 horas
-                    if (this.is24HourWindowError(sendResponse)) {
-                      logger.warn('Error de ventana de 24 horas detectado', {
-                        manychatId: manychatIdAsNumber,
-                        error: sendResponse.error,
-                        errorCode: sendResponse.error_code,
-                        details: sendResponse.details
-                      })
-                      
-                      throw new Error(
-                        'No se puede enviar el mensaje porque el contacto no ha interactuado en las últimas 24 horas. ' +
-                        'Para enviar mensajes fuera de la ventana de 24 horas, ManyChat requiere usar un template de WhatsApp aprobado. ' +
-                        'Por favor, contacta al soporte para configurar templates o espera a que el contacto envíe un mensaje primero.'
-                      )
-                    }
-                    
-                    logger.warn('Error enviando mensaje usando manychatId directamente', {
-                      manychatId: manychatIdAsNumber,
-                      error: sendResponse.error,
-                      errorCode: sendResponse.error_code
-                    })
-                    // Continuar con las otras estrategias
-                  }
-                }
-              }
-            } catch (error: any) {
-              // Si el error es de ventana de 24 horas, propagarlo inmediatamente sin intentar otras estrategias
-              if (error.message && (
-                error.message.includes('24 horas') ||
-                error.message.includes('ventana de 24') ||
-                error.message.includes('template de WhatsApp')
-              )) {
-                throw error
-              }
-              
-              logger.error('Error obteniendo subscriber por manychatId', {
-                error: error.message,
-                stack: error.stack,
-                manychatId: lead.manychatId
-              })
-              
-              // Si hay un error pero tenemos manychatId, intentar usarlo directamente
-              const manychatIdAsNumber = typeof lead.manychatId === 'string' 
-                ? parseInt(lead.manychatId) 
-                : lead.manychatId
-              
-              if (manychatIdAsNumber && !isNaN(manychatIdAsNumber) && manychatIdAsNumber > 0) {
-                logger.info('Error obteniendo subscriber, intentando usar manychatId directamente como último recurso', {
-                  manychatId: manychatIdAsNumber,
-                  error: error.message
-                })
-                
-                try {
-                  // Preparar mensaje según el tipo
-                  const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
-                  const messages: any[] = []
-
-                  if (messageType === 'text') {
-                    messages.push({
-                      type: 'text',
-                      text: data.message
-                    })
-                  } else if (data.mediaUrl) {
-                    if (messageType === 'image') {
-                      messages.push({
-                        type: 'image',
-                        url: data.mediaUrl,
-                        caption: data.message || undefined
-                      })
-                    } else if (messageType === 'video') {
-                      messages.push({
-                        type: 'video',
-                        url: data.mediaUrl,
-                        caption: data.message || undefined
-                      })
-                    } else if (messageType === 'file') {
-                      messages.push({
-                        type: 'file',
-                        url: data.mediaUrl,
-                        filename: data.message || 'document'
-                      })
-                    } else if (messageType === 'audio') {
-                      messages.push({
-                        type: 'audio',
-                        url: data.mediaUrl
-                      })
-                    }
-                  }
-
-                  const sendResponse = await ManychatService.sendMessage(manychatIdAsNumber, messages)
-                  
-                  if (sendResponse.status === 'success') {
-                    logger.info('Mensaje enviado exitosamente usando manychatId directamente después de error', {
-                      manychatId: manychatIdAsNumber,
-                      messageId: sendResponse.data?.message_id
-                    })
-                    
-                    return {
-                      success: true,
-                      messageId: sendResponse.data?.message_id || 'sent_by_manychat_id',
-                      provider: 'manychat',
-                      channel: 'whatsapp',
-                    }
-                  } else {
-                    // Detectar error de ventana de 24 horas
-                    if (this.is24HourWindowError(sendResponse)) {
-                      logger.warn('Error de ventana de 24 horas detectado después de error', {
-                        manychatId: manychatIdAsNumber,
-                        error: sendResponse.error,
-                        errorCode: sendResponse.error_code,
-                        details: sendResponse.details
-                      })
-                      
-                      throw new Error(
-                        'No se puede enviar el mensaje porque el contacto no ha interactuado en las últimas 24 horas. ' +
-                        'Para enviar mensajes fuera de la ventana de 24 horas, ManyChat requiere usar un template de WhatsApp aprobado. ' +
-                        'Por favor, contacta al soporte para configurar templates o espera a que el contacto envíe un mensaje primero.'
-                      )
-                    }
-                    
-                    logger.warn('Error enviando mensaje usando manychatId directamente después de error', {
-                      manychatId: manychatIdAsNumber,
-                      error: sendResponse.error,
-                      errorCode: sendResponse.error_code
-                    })
-                  }
-                } catch (sendError: any) {
-                  // Si el error es de ventana de 24 horas, propagarlo inmediatamente
-                  if (sendError.message && (
-                    sendError.message.includes('24 horas') ||
-                    sendError.message.includes('ventana de 24') ||
-                    sendError.message.includes('template de WhatsApp')
-                  )) {
-                    throw sendError
-                  }
-                  
-                  logger.error('Error enviando mensaje usando manychatId directamente después de error', {
-                    error: sendError.message,
-                    stack: sendError.stack,
-                    manychatId: manychatIdAsNumber
-                  })
-                }
-              }
-            }
-          }
-        }
-
-        // Estrategia 2: Intentar extraer subscriber_id del key si tiene formato específico
-        if ((!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) && subscriber?.key) {
-          // Intentar extraer subscriber_id del key si tiene formato "user:123456789" o similar
-          const keyMatch = subscriber.key.match(/user[:_](\d+)/i)
-          if (keyMatch && keyMatch[1]) {
-            const extractedId = parseInt(keyMatch[1])
-            if (extractedId && extractedId > 0) {
-              logger.info('Intentando usar ID extraído del key del subscriber', {
-                extractedId,
-                key: subscriber.key.substring(0, 30) + '...',
-                phone: data.to.substring(0, 5) + '***'
-              })
-              
-              try {
-                const subscriberById = await ManychatService.getSubscriberById(extractedId)
-                if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
-                  logger.info('Subscriber válido obtenido usando ID extraído del key', {
-                    subscriberId: subscriberById.id
-                  })
-                  subscriber = subscriberById
-                }
-              } catch (error: any) {
-                logger.warn('Error obteniendo subscriber por ID extraído del key', {
-                  error: error.message,
-                  extractedId
-                })
-              }
-            }
-          }
-        }
-
-        // Estrategia 3: Intentar usar el key directamente como subscriber_id (algunos formatos de ManyChat aceptan esto)
-        if ((!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) && subscriber?.key) {
-          // Intentar parsear el key como número si es posible
-          const keyAsNumber = parseInt(subscriber.key)
-          if (!isNaN(keyAsNumber) && keyAsNumber > 0) {
-            logger.info('Intentando usar key como subscriber_id numérico', {
-              keyAsNumber,
-              key: subscriber.key.substring(0, 30) + '...',
-              phone: data.to.substring(0, 5) + '***'
-            })
-            
-            try {
-              const subscriberById = await ManychatService.getSubscriberById(keyAsNumber)
-              if (subscriberById && subscriberById.id && typeof subscriberById.id === 'number' && subscriberById.id > 0) {
-                logger.info('Subscriber válido obtenido usando key como subscriber_id', {
-                  subscriberId: subscriberById.id
-                })
-                subscriber = subscriberById
-              }
-            } catch (error: any) {
-              logger.warn('Error obteniendo subscriber usando key como subscriber_id', {
-                error: error.message,
-                keyAsNumber
-              })
-            }
-          }
-        }
-
-        // Si después de todas las estrategias aún no tenemos un subscriber válido,
-        // intentar usar teléfono directamente como último recurso
-        if (!subscriber || !subscriber.id || (typeof subscriber.id === 'number' && subscriber.id <= 0)) {
-          logger.warn('Subscriber no encontrado o sin ID válido después de todas las estrategias, intentando usar teléfono directamente como último recurso', {
-            phone: data.to.substring(0, 5) + '***',
-            hasSubscriber: !!subscriber,
-            subscriberKey: subscriber?.key
-          })
-
-          // Preparar mensaje según el tipo
-          const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
-          const messages: any[] = []
-
-          if (messageType === 'text') {
-            messages.push({
-              type: 'text',
-              text: data.message
-            })
-          } else if (data.mediaUrl) {
-            if (messageType === 'image') {
-              messages.push({
-                type: 'image',
-                url: data.mediaUrl,
-                caption: data.message || undefined
-              })
-            } else if (messageType === 'video') {
-              messages.push({
-                type: 'video',
-                url: data.mediaUrl,
-                caption: data.message || undefined
-              })
-            } else if (messageType === 'file') {
-              messages.push({
-                type: 'file',
-                url: data.mediaUrl,
-                filename: data.message || 'document'
-              })
-            } else if (messageType === 'audio') {
-              messages.push({
-                type: 'audio',
-                url: data.mediaUrl
-              })
-            }
-          }
-
-          // Intentar enviar usando teléfono directamente
-          try {
-            const phoneResponse = await ManychatService.sendMessageByPhone(data.to, messages)
-            
-            if (phoneResponse.status === 'success') {
-              logger.info('Mensaje enviado exitosamente usando teléfono directamente', {
-                phone: data.to.substring(0, 5) + '***',
-                messageId: phoneResponse.data?.message_id
-              })
-
-              return {
-                success: true,
-                messageId: phoneResponse.data?.message_id || 'sent_by_phone',
-                provider: 'manychat',
-                channel: 'whatsapp',
-              }
-            } else {
-              logger.error('Error enviando mensaje usando teléfono directamente', {
-                phone: data.to.substring(0, 5) + '***',
-                error: phoneResponse.error,
-                errorCode: phoneResponse.error_code,
-                details: phoneResponse.details
-              })
-              
-              // Detectar error específico de subscriber_id requerido
-              const errorMessage = phoneResponse.error?.toLowerCase() || ''
-              const errorDetails = phoneResponse.details as any
-              const hasSubscriberIdError = errorMessage.includes('subscriber_id cannot be blank') ||
-                                         errorMessage.includes('subscriber_id') && errorMessage.includes('blank') ||
-                                         (errorDetails?.messages && Array.isArray(errorDetails.messages) &&
-                                          errorDetails.messages.some((m: any) => 
-                                            m.message?.toLowerCase().includes('subscriber_id cannot be blank')
-                                          ))
-              
-              if (hasSubscriberIdError) {
-                throw new Error(
-                  'ManyChat requiere un subscriber_id válido para enviar mensajes. Por favor, sincroniza el contacto primero desde la página del lead usando el botón "Actualizar sincronización". ' +
-                  'Si el problema persiste, contacta al soporte.'
-                )
-              }
-              
-              // Si el error es sobre permisos, proporcionar mensaje más específico
-              if (phoneResponse.error_code?.includes('PERMISSION') || 
-                  phoneResponse.error?.toLowerCase().includes('permission denied')) {
-                throw new Error('ManyChat requiere permisos adicionales para enviar mensajes. Por favor, contacta al soporte de ManyChat para habilitar esta funcionalidad.')
-              }
-              
-              // Si falla, continuar con el error original
-              throw new Error(phoneResponse.error || 'Error enviando mensaje por ManyChat usando teléfono')
-            }
-          } catch (phoneError: any) {
-            // Si el error de teléfono es diferente, lanzarlo
-            if (phoneError.message && !phoneError.message.includes('Error enviando mensaje por ManyChat')) {
-              throw phoneError
-            }
-            
-            // Si falla el envío por teléfono, lanzar error descriptivo
-            // ManyChat requiere subscriber_id y no acepta solo phone
-            const errorMessage = `No se puede enviar el mensaje porque ManyChat requiere un subscriber_id válido y el contacto no está completamente sincronizado. Por favor, sincroniza el contacto primero desde la página del lead usando el botón "Actualizar sincronización".`
-            logger.error('No se puede enviar mensaje: subscriber no encontrado y falló envío por teléfono', {
-              phone: data.to.substring(0, 5) + '***',
-              phoneError: phoneError.message,
-              hasSubscriber: !!subscriber,
-              subscriberKey: subscriber?.key,
-              leadId: data.leadId
-            })
-            throw new Error(errorMessage)
-          }
-        }
-      }
-
-      // Si llegamos aquí, el subscriber tiene un ID válido
-      // Asegurar que tenga teléfono configurado
-      if (subscriber && !subscriber.whatsapp_phone && !subscriber.phone) {
-        logger.info('Subscriber sin teléfono configurado, asignando teléfono', {
-          subscriberId: subscriber.id,
-          phone: data.to.substring(0, 5) + '***'
-        })
-        subscriber.whatsapp_phone = data.to
-        subscriber.phone = data.to
-      } else if (subscriber && !subscriber.whatsapp_phone && subscriber.phone) {
-        // Si tiene phone pero no whatsapp_phone, asignar whatsapp_phone también
-        subscriber.whatsapp_phone = subscriber.phone
-      } else if (subscriber && subscriber.whatsapp_phone && !subscriber.phone) {
-        // Si tiene whatsapp_phone pero no phone, asignar phone también
-        subscriber.phone = subscriber.whatsapp_phone
-      }
-
-      // Usar el nuevo MessagingService para mejor manejo multi-canal
-      // Mapear messageType 'document' a 'file' para ManyChat
-      const messageType = data.messageType === 'document' ? 'file' : data.messageType || 'text'
-
-      const result = await MessagingService.sendMessage({
-        to: {
-          phone: data.to,
-        },
-        message: data.message,
-        messageType: messageType as 'text' | 'image' | 'video' | 'file' | 'audio',
-        mediaUrl: data.mediaUrl,
-        channel: 'auto', // Detectar automáticamente
-      })
-
-      if (result.success) {
-        logger.info('Mensaje enviado exitosamente vía ManyChat', {
-          messageId: result.messageId,
-          channel: result.channel,
-          subscriberId: result.subscriberId
-        })
-
-        return {
-          success: true,
-          messageId: result.messageId,
-          provider: 'manychat',
-          channel: result.channel,
-        }
-      } else {
-        logger.error('Error enviando mensaje vía ManyChat', {
-          error: result.error,
-          errorCode: result.errorCode,
-          channel: result.channel
-        })
-        
-        throw new Error(result.error || 'Error enviando mensaje por Manychat')
-      }
-    } catch (error: any) {
-      logger.error('Error en sendMessageViaManychat', {
-        error: error.message,
-        stack: error.stack,
-        to: data.to.substring(0, 5) + '***'
-      })
-      throw error
-    }
-  }
-
-  /**
-   * Enviar mensaje usando Meta API (fallback) con el cliente robusto
+   * Enviar mensaje usando Meta API (WhatsApp Business API)
    */
   private static async sendMessageViaMetaAPI(data: SendMessageData) {
     try {
@@ -800,16 +192,15 @@ export class WhatsAppService {
           filename: data.messageType === 'document' ? 'document.pdf' : undefined,
         })
       } else {
-        // Fallback a texto
         response = await this.whatsappClient.sendTextMessage({
           to: formattedPhone,
           text: data.message,
         })
       }
 
-      console.log('[WhatsApp] Message sent successfully:', {
+      logger.info('Message sent successfully', {
         messageId: response.messages?.[0]?.id,
-        to: formattedPhone,
+        to: formattedPhone.substring(0, 5) + '***',
         type: data.messageType || 'text',
       })
 
@@ -820,24 +211,18 @@ export class WhatsAppService {
         waId: response.contacts?.[0]?.wa_id,
       }
     } catch (error) {
-      console.error('[WhatsApp] Error sending message:', error)
-      
-      // Manejo especial para errores de la API de WhatsApp
       if (error instanceof WhatsAppAPIError) {
-        console.error('[WhatsApp] API Error Details:', error.getDetails())
-        
         if (error.isRateLimitError()) {
           throw new Error('Rate limit exceeded. Please try again later.')
         }
-        
         if (error.isInvalidNumberError()) {
           throw new Error(`Invalid phone number: ${data.to}`)
         }
       }
-      
       throw error
     }
   }
+
 
   /**
    * Crear mensaje en la base de datos

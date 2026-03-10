@@ -17,28 +17,6 @@ export async function GET(request: NextRequest) {
     const assignedTo = searchParams.get('assignedTo')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
-    const sync = searchParams.get('sync') === 'true' // Sincronizar con Manychat antes de devolver
-
-    // Si se solicita sincronización, primero sincronizar con Manychat
-    if (sync) {
-      try {
-        logger.info('Sincronizando conversaciones desde Manychat')
-        // Importar y llamar directamente al handler de sincronización
-        const { POST: syncManychat } = await import('./sync-manychat/route')
-        const syncResponse = await syncManychat()
-
-        if (syncResponse.ok) {
-          const syncData = await syncResponse.json()
-          logger.info(`Sincronización completada: ${syncData.synced} conversaciones`)
-        } else {
-          logger.warn('Error en sincronización, continuando con datos locales')
-        }
-      } catch (syncError: any) {
-        logger.error('Error durante sincronización', { error: syncError.message })
-        // Continuar con datos locales si la sincronización falla
-      }
-    }
-
     const conversations = await ConversationService.getConversations({
       userId,
       status,

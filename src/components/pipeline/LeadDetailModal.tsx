@@ -24,12 +24,8 @@ import {
   ExternalLink,
   Calendar,
   FileText,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle
 } from 'lucide-react'
 import Link from 'next/link'
-import { useToast } from '@/components/ui/toast'
 
 interface LeadDetailModalProps {
   lead: PipelineLead | null
@@ -80,10 +76,6 @@ const extractCustomFieldValue = (value: any): string => {
 export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalProps) {
   const [leadDetails, setLeadDetails] = useState<LeadDetails | null>(null)
   const [loading, setLoading] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const { addToast } = useToast()
-
   useEffect(() => {
     if (open && lead) {
       fetchLeadDetails()
@@ -106,58 +98,6 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
       console.error('Error fetching lead details:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleSyncManychat = async () => {
-    if (!lead || !leadDetails) return
-
-    try {
-      setSyncing(true)
-      setSyncStatus('idle')
-      
-      const response = await fetch(`/api/leads/${lead.id}/sync-manychat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al sincronizar desde Manychat')
-      }
-
-      const result = await response.json()
-      
-      setSyncStatus('success')
-      addToast({
-        title: 'Sincronización exitosa',
-        description: 'Los datos del lead han sido actualizados desde Manychat',
-        type: 'success',
-      })
-
-      // Recargar los detalles del lead después de sincronizar
-      await fetchLeadDetails()
-
-      // Resetear estado de éxito después de 3 segundos
-      setTimeout(() => {
-        setSyncStatus('idle')
-      }, 3000)
-    } catch (error: any) {
-      setSyncStatus('error')
-      addToast({
-        title: 'Error al sincronizar',
-        description: error.message || 'No se pudo sincronizar el lead desde Manychat',
-        type: 'error',
-      })
-
-      // Resetear estado de error después de 5 segundos
-      setTimeout(() => {
-        setSyncStatus('idle')
-      }, 5000)
-    } finally {
-      setSyncing(false)
     }
   }
 
@@ -442,59 +382,18 @@ export function LeadDetailModal({ lead, open, onOpenChange }: LeadDetailModalPro
                 </div>
               )}
 
-              {/* Datos de Manychat */}
+              {/* Datos de contacto / externo */}
               {(leadDetails.manychatId || Object.keys(customFields).length > 0 || tags.length > 0 || leadDetails.telefono) && (
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Tag className="h-4 w-4" />
-                      Datos de Manychat
-                    </h3>
-                    <Button
-                      onClick={handleSyncManychat}
-                      disabled={syncing || (!leadDetails.manychatId && !leadDetails.telefono)}
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                    >
-                      {syncing ? (
-                        <>
-                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
-                          Sincronizando...
-                        </>
-                      ) : syncStatus === 'success' ? (
-                        <>
-                          <CheckCircle2 className="h-3 w-3 mr-2 text-green-600" />
-                          Sincronizado
-                        </>
-                      ) : syncStatus === 'error' ? (
-                        <>
-                          <AlertCircle className="h-3 w-3 mr-2 text-red-600" />
-                          Error
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-3 w-3 mr-2" />
-                          Sincronizar desde Manychat
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Tag className="h-4 w-4" />
+                    Datos del contacto
+                  </h3>
                   {leadDetails.manychatId && (
                     <div className="mb-4">
-                      <label className="text-xs text-muted-foreground">ID Manychat</label>
+                      <label className="text-xs text-muted-foreground">ID externo</label>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm font-mono">{leadDetails.manychatId}</span>
-                        <Link
-                          href={`https://manychat.com/subscribers/${leadDetails.manychatId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          Ver en Manychat
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
                       </div>
                     </div>
                   )}

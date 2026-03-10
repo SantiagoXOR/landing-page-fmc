@@ -78,7 +78,7 @@ export function PipelineFiltersDrawer({
 
       try {
         setLoadingTags(true)
-        const response = await fetch('/api/manychat/tags')
+        const response = await fetch('/api/tags/list')
         if (response.ok) {
           const data = await response.json()
           const tagsData = data.tags || []

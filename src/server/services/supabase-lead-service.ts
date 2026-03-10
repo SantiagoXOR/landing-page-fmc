@@ -540,12 +540,42 @@ export class SupabaseLeadService {
 
   async deleteLead(id: string): Promise<void> {
     try {
+      // Eliminar en cascada para respetar FKs: mensajes → conversaciones → eventos / ManychatSync → lead
+      const convRes = await this.makeRequest(`conversations?lead_id=eq.${id}&select=id`)
+      const conversations = (await convRes.json()) as { id: string }[]
+      const convIds = Array.isArray(conversations) ? conversations.map((c) => c.id) : []
+
+      for (const convId of convIds) {
+        await this.makeRequest(`messages?conversation_id=eq.${convId}`, { method: 'DELETE' })
+      }
+      if (convIds.length > 0) {
+        await this.makeRequest(`conversations?lead_id=eq.${id}`, { method: 'DELETE' })
+      }
+
+      try {
+        await this.makeRequest(`Event?leadId=eq.${id}`, { method: 'DELETE' })
+      } catch {
+        // Puede no existir tabla Event o usar lead_id; intentar LeadEvent
+        await this.makeRequest(`LeadEvent?lead_id=eq.${id}`, { method: 'DELETE' }).catch(() => {})
+      }
+
+      try {
+        await this.makeRequest(`ManychatSync?leadId=eq.${id}`, { method: 'DELETE' })
+      } catch {
+        await this.makeRequest(`ManychatSync?lead_id=eq.${id}`, { method: 'DELETE' }).catch(() => {})
+      }
+
+      try {
+        await this.makeRequest(`lead_pipeline?lead_id=eq.${id}`, { method: 'DELETE' })
+      } catch {
+        // Ignorar si la tabla no existe o no hay filas
+      }
+
       await this.makeRequest(`Lead?id=eq.${id}`, {
         method: 'DELETE'
       })
 
       logger.info('Lead deleted successfully', { leadId: id })
-
     } catch (error: any) {
       logger.error('Error deleting lead', { error: error.message, leadId: id })
       throw error
@@ -554,7 +584,7 @@ export class SupabaseLeadService {
 
   async findLeadByPhone(telefono: string): Promise<Lead | null> {
     try {
-      const response = await this.makeRequest(`Lead?telefono=eq.${telefono}&select=*`)
+      const response = await this.makeRequest(`Lead?telefono=eq.${encodeURIComponent(telefono)}&select=*`)
       const result = await response.json()
       
       return Array.isArray(result) && result.length > 0 ? result[0] : null

@@ -5,6 +5,7 @@ import { ConversationService } from '@/server/services/conversation-service'
 import { ManychatWebhookEvent, ManychatSubscriber } from '@/types/manychat'
 import { supabase } from '@/lib/db'
 import { formatWhatsAppNumber } from '@/lib/integrations/whatsapp-business-api'
+import { parseFormMessage, updateLeadFromParsedForm } from '@/lib/form-message-parser'
 
 export async function GET(request: NextRequest) {
   // Verificación del webhook de WhatsApp (Meta) o Manychat
@@ -223,6 +224,39 @@ async function handleMetaWebhook(body: any) {
               leadId: lead?.id,
               platformIdByPhone: formattedPhone,
             })
+
+            // Si el mensaje es "Solicitud de Crédito" (formulario), actualizar custom fields y asignar tag en el CRM
+            // (cuando el webhook de Meta apunta al CRM, UChat no recibe el mensaje; esta lógica replica el efecto en el CRM)
+            const rawText = message.text?.body
+            if (rawText && rawText.includes('Solicitud de Crédito') && lead?.id) {
+              try {
+                if (supabase.client) {
+                  const parsed = parseFormMessage(rawText)
+                  if (parsed) {
+                    await updateLeadFromParsedForm(lead.id, parsed, supabase.client)
+                    console.log('[WhatsApp Webhook] Lead actualizado con datos de Solicitud de Crédito', { leadId: lead.id })
+                  }
+                }
+                let currentTags: string[] = []
+                if (lead.tags) {
+                  try {
+                    currentTags = Array.isArray(lead.tags) ? lead.tags : JSON.parse(String(lead.tags))
+                  } catch {
+                    currentTags = []
+                  }
+                }
+                if (!currentTags.includes('solicitud-en-proceso')) {
+                  currentTags.push('solicitud-en-proceso')
+                  await supabase.updateLead(lead.id, {
+                    tags: JSON.stringify(currentTags),
+                    updatedAt: new Date().toISOString(),
+                  })
+                  console.log('[WhatsApp Webhook] Tag solicitud-en-proceso asignado al lead', { leadId: lead.id })
+                }
+              } catch (err) {
+                console.error('[WhatsApp Webhook] Error procesando Solicitud de Crédito (custom fields / tag):', err)
+              }
+            }
           }
 
           // Procesar estados de mensajes (sent, delivered, read) y persistir en DB

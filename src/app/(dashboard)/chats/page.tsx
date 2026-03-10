@@ -201,12 +201,19 @@ export default function ChatsPage() {
       })
 
       if (response.ok) {
-        // Actualizar la conversación local
-        const updatedConversation = {
-          ...selectedConversation,
-          messages: [
-            ...selectedConversation.messages,
-            {
+        const data = await response.json().catch(() => ({}))
+        const serverMessage = data.message
+        // Usar el mensaje devuelto por la API (con id real) o optimista
+        const newMessage = serverMessage
+          ? {
+              id: serverMessage.id,
+              direction: 'outbound' as const,
+              content: serverMessage.content ?? message,
+              messageType: serverMessage.messageType ?? messageType,
+              sentAt: serverMessage.sentAt ?? new Date().toISOString(),
+              readAt: serverMessage.readAt
+            }
+          : {
               id: Date.now().toString(),
               direction: 'outbound' as const,
               content: message,
@@ -214,18 +221,31 @@ export default function ChatsPage() {
               sentAt: new Date().toISOString(),
               readAt: undefined
             }
-          ]
-        }
-        setSelectedConversation(updatedConversation)
-        
-        // Actualizar la lista de conversaciones
-        setConversations(prev => 
-          prev.map(conv => 
-            conv.id === selectedConversation.id 
+        setSelectedConversation(prev => prev ? {
+          ...prev,
+          messages: [...prev.messages, newMessage]
+        } : prev)
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === selectedConversation.id
               ? { ...conv, lastMessageAt: new Date().toISOString() }
               : conv
           )
         )
+        // Refrescar conversación desde el servidor para mantener historial al día (por si se envió desde otro lugar)
+        fetch(`/api/conversations/${selectedConversation.id}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data?.conversation?.messages) {
+              setSelectedConversation(prev => prev ? {
+                ...prev,
+                messages: data.conversation.messages,
+                lastMessageAt: data.conversation.lastMessageAt ?? prev.lastMessageAt,
+                createdAt: data.conversation.createdAt ?? prev.createdAt
+              } : prev)
+            }
+          })
+          .catch(() => {})
       }
     } catch {
       // Error silencioso

@@ -1,4 +1,5 @@
 import { WhatsAppService } from './whatsapp-service'
+import { WhatsAppAPIError } from '@/lib/integrations/whatsapp-business-api'
 import type {
   SendMessageParams,
   SendMessageResult,
@@ -7,6 +8,9 @@ import type {
   MessagingChannel,
 } from '@/types/messaging'
 import { logger } from '@/lib/logger'
+
+const WHATSAPP_TOKEN_EXPIRED_MESSAGE =
+  'El token de WhatsApp (Meta) ha expirado. Renoválo en Meta for Developers y actualizá WHATSAPP_ACCESS_TOKEN en la configuración del proyecto.'
 
 /**
  * Servicio unificado para envío de mensajes.
@@ -117,6 +121,21 @@ export class MessagingService {
         stack: error?.stack,
         params: this.sanitizeParams(params),
       })
+      const isTokenExpired =
+        error instanceof WhatsAppAPIError &&
+        error.errorData?.error?.code === 190
+      const isTokenExpiredMessage =
+        typeof error?.message === 'string' &&
+        (error.message.includes('Session has expired') ||
+          error.message.includes('Error validating access token'))
+      if (isTokenExpired || isTokenExpiredMessage) {
+        return {
+          success: false,
+          error: WHATSAPP_TOKEN_EXPIRED_MESSAGE,
+          errorCode: 'WHATSAPP_TOKEN_EXPIRED',
+          channel: 'whatsapp',
+        }
+      }
       return {
         success: false,
         error: error?.message || 'Error interno al enviar mensaje',

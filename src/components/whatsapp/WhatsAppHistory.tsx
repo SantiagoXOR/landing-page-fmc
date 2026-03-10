@@ -26,16 +26,18 @@ interface WhatsAppMessage {
 interface WhatsAppHistoryProps {
   leadId: string
   telefono: string
+  /** Al cambiar, se vuelven a cargar los mensajes (ej. tras enviar uno desde el CRM). */
+  refreshTrigger?: number
 }
 
-export default function WhatsAppHistory({ leadId, telefono }: WhatsAppHistoryProps) {
+export default function WhatsAppHistory({ leadId, telefono, refreshTrigger }: WhatsAppHistoryProps) {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchMessages()
-  }, [leadId])
+  }, [leadId, refreshTrigger])
 
   const fetchMessages = async () => {
     try {

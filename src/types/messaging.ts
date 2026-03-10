@@ -31,6 +31,7 @@ export type SendMessageErrorCode =
   | 'INVALID_EMAIL'
   | 'MESSAGE_TOO_LONG'
   | 'UNSUPPORTED_MESSAGE_TYPE'
+  | 'WHATSAPP_TOKEN_EXPIRED'
   | 'INTERNAL_ERROR'
 
 export interface SendMessageResult {

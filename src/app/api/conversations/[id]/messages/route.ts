@@ -191,7 +191,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Construir identificadores para MessagingService (soporta WhatsApp, Instagram, Facebook)
     const manychatId = (conversation.lead as { manychatId?: string })?.manychatId
     const platformId = conversation.platformId || (conversation as { platform_id?: string }).platform_id
-    const phoneNumber = conversation.lead?.telefono
+    const platform = (conversation.platform || 'whatsapp').toLowerCase()
+    let phoneNumber = conversation.lead?.telefono
+    // Para WhatsApp, usar platformId como teléfono si el lead no tiene telefono (ej. conversación creada por webhook)
+    if (!phoneNumber && platform === 'whatsapp' && platformId && typeof platformId === 'string' && /^\+?\d+$/.test(platformId)) {
+      phoneNumber = platformId
+    }
     const email = conversation.lead?.email
 
     // subscriberId: prioridad manychatId del lead, luego platformId (para IG/FB es el subscriber_id)
@@ -225,7 +230,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Detectar canal desde la conversación
-    const platform = (conversation.platform || 'whatsapp').toLowerCase()
     const channel = platform === 'whatsapp' ? 'whatsapp' as const :
                     platform === 'instagram' ? 'instagram' as const :
                     platform === 'facebook' || platform === 'messenger' ? 'facebook' as const : 'auto' as const

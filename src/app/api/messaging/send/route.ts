@@ -149,6 +149,21 @@ export async function POST(request: NextRequest) {
       subscriberId: validatedData.to.subscriberId,
     }
 
+    // Resolver conversationId desde leadId si no se envió (para guardar el mensaje en el historial del CRM)
+    let conversationIdToUse = validatedData.conversationId
+    if (!conversationIdToUse && validatedData.leadId && validatedData.channel === 'whatsapp' && to.phone) {
+      let conv = await ConversationService.findConversationByLeadAndPlatform(validatedData.leadId, 'whatsapp')
+      if (!conv) {
+        const created = await ConversationService.createConversation({
+          platform: 'whatsapp',
+          platformId: to.phone,
+          leadId: validatedData.leadId,
+        })
+        conv = created as { id: string }
+      }
+      conversationIdToUse = conv?.id ?? undefined
+    }
+
     // Enviar mensaje usando MessagingService
     const result = await MessagingService.sendMessage({
       to,
@@ -179,11 +194,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Si se proporcionó conversationId, crear registro de mensaje en la base de datos
-    if (validatedData.conversationId && result.messageId) {
+    // Si tenemos conversationId (enviado o resuelto desde leadId), crear registro de mensaje en la base de datos
+    if (conversationIdToUse && result.messageId) {
       try {
         await WhatsAppService.createMessage({
-          conversationId: validatedData.conversationId,
+          conversationId: conversationIdToUse,
           direction: 'outbound',
           content: validatedData.message,
           messageType: validatedData.messageType,
@@ -192,17 +207,17 @@ export async function POST(request: NextRequest) {
         })
 
         // Actualizar última actividad de la conversación
-        await ConversationService.updateLastActivity(validatedData.conversationId)
+        await ConversationService.updateLastActivity(conversationIdToUse)
 
         logger.debug('Mensaje registrado en base de datos', {
-          conversationId: validatedData.conversationId,
+          conversationId: conversationIdToUse,
           messageId: result.messageId
         })
       } catch (error: any) {
         // Log pero no fallar el request si el mensaje ya se envió
         logger.warn('Error registrando mensaje en base de datos', {
           error: error.message,
-          conversationId: validatedData.conversationId,
+          conversationId: conversationIdToUse,
           messageId: result.messageId
         })
       }
@@ -212,7 +227,7 @@ export async function POST(request: NextRequest) {
       messageId: result.messageId,
       channel: result.channel,
       subscriberId: result.subscriberId,
-      conversationId: validatedData.conversationId,
+      conversationId: conversationIdToUse,
       leadId: validatedData.leadId,
       userId: session.user.id
     })
@@ -222,7 +237,7 @@ export async function POST(request: NextRequest) {
       messageId: result.messageId,
       channel: result.channel,
       subscriberId: result.subscriberId,
-      conversationId: validatedData.conversationId,
+      conversationId: conversationIdToUse,
     }, { status: 201 })
 
   } catch (error: any) {
@@ -232,16 +247,25 @@ export async function POST(request: NextRequest) {
       userId: (await getServerSession(authOptions))?.user?.id
     })
 
-    if (error.message.includes('Insufficient permissions')) {
+    if (error.message?.includes('Insufficient permissions')) {
       return NextResponse.json(
         { error: 'Sin permisos' },
         { status: 403 }
       )
     }
 
+    const tokenExpired =
+      error.message?.includes('Session has expired') ||
+      error.message?.includes('Error validating access token')
+    const friendlyTokenMessage =
+      'El token de WhatsApp (Meta) ha expirado. Renoválo en Meta for Developers y actualizá WHATSAPP_ACCESS_TOKEN en la configuración del proyecto.'
+
     return NextResponse.json(
-      { 
-        error: error.message || 'Error interno del servidor al enviar mensaje'
+      {
+        error: tokenExpired
+          ? friendlyTokenMessage
+          : error.message || 'Error interno del servidor al enviar mensaje',
+        ...(tokenExpired && { errorCode: 'WHATSAPP_TOKEN_EXPIRED' }),
       },
       { status: 500 }
     )

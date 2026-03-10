@@ -59,7 +59,15 @@ interface ScoringResult {
   motivos: string[]
 }
 
-function LeadMessageForm({ telefono, onSent }: { telefono: string; onSent: () => void }) {
+function LeadMessageForm({
+  leadId,
+  telefono,
+  onSent,
+}: {
+  leadId: string
+  telefono: string
+  onSent: () => void
+}) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +81,7 @@ function LeadMessageForm({ telefono, onSent }: { telefono: string; onSent: () =>
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          leadId,
           to: { phone: telefono },
           message: message.trim(),
           channel: 'whatsapp',
@@ -114,6 +123,7 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true)
   const [scoring, setScoring] = useState(false)
   const [scoringResult, setScoringResult] = useState<ScoringResult | null>(null)
+  const [historyRefresh, setHistoryRefresh] = useState(0)
   
   const fetchLead = useCallback(async () => {
     try {
@@ -767,8 +777,12 @@ export default function LeadDetailPage() {
                   <CardContent>
                     <TabsContent value="send" className="mt-0">
                       <LeadMessageForm
+                        leadId={lead.id}
                         telefono={lead.telefono}
-                        onSent={fetchLead}
+                        onSent={() => {
+                          fetchLead()
+                          setHistoryRefresh((r) => r + 1)
+                        }}
                       />
                     </TabsContent>
                     
@@ -788,6 +802,7 @@ export default function LeadDetailPage() {
                       <WhatsAppHistory
                         leadId={lead.id}
                         telefono={lead.telefono}
+                        refreshTrigger={historyRefresh}
                       />
                     </TabsContent>
                   </CardContent>

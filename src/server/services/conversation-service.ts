@@ -170,6 +170,7 @@ export class ConversationService {
       const transformed = {
         id: conversation.id,
         platform: conversation.platform || 'whatsapp',
+        platformId: conversation.platform_id || conversation.platformId,
         status: conversation.status || 'open',
         assignedTo: conversation.assigned_to,
         lastMessageAt: toISOString(conversation.last_message_at || conversation.created_at),

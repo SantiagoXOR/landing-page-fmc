@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,6 +59,9 @@ interface ScoringResult {
   motivos: string[]
 }
 
+const ACCEPT_ATTACHMENTS = 'image/jpeg,image/png,image/webp,image/gif,audio/mpeg,audio/ogg,audio/webm,audio/mp4,audio/aac,audio/mp3,.mp3,.pdf,.doc,.docx,.xls,.xlsx,.txt'
+const MAX_FILE_SIZE_MB = 16
+
 function LeadMessageForm({
   leadId,
   telefono,
@@ -70,10 +73,11 @@ function LeadMessageForm({
 }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!message.trim()) return
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const sendPayload = async (payload: { message: string; messageType?: string; mediaUrl?: string }) => {
     setSending(true)
     setError(null)
     try {
@@ -83,7 +87,9 @@ function LeadMessageForm({
         body: JSON.stringify({
           leadId,
           to: { phone: telefono },
-          message: message.trim(),
+          message: payload.message,
+          messageType: payload.messageType ?? 'text',
+          mediaUrl: payload.mediaUrl,
           channel: 'whatsapp',
         }),
       })
@@ -99,19 +105,83 @@ function LeadMessageForm({
       setSending(false)
     }
   }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!message.trim()) return
+    await sendPayload({ message: message.trim() })
+  }
+
+  const handleAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setError(null)
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      setError(`El archivo no puede superar ${MAX_FILE_SIZE_MB} MB`)
+      return
+    }
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/messaging/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Error al subir el archivo')
+        return
+      }
+      if (!data.url || !data.messageType) {
+        setError('Respuesta inválida del servidor')
+        return
+      }
+      const caption = message.trim()
+      await sendPayload({
+        message: caption || '(archivo adjunto)',
+        messageType: data.messageType,
+        mediaUrl: data.url,
+      })
+    } catch (err) {
+      setError('Error de conexión al subir el archivo')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const busy = sending || uploading
+
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPT_ATTACHMENTS}
+        className="hidden"
+        onChange={handleAttachmentChange}
+      />
       <textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Escribe un mensaje de WhatsApp..."
         className="w-full min-h-[80px] px-3 py-2 border rounded-md text-sm"
-        disabled={sending}
+        disabled={busy}
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" size="sm" disabled={sending || !message.trim()}>
-        {sending ? 'Enviando...' : 'Enviar por WhatsApp'}
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          title="Imagen, audio o documento (máx. 16 MB)"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploading ? 'Subiendo...' : 'Adjuntar'}
+        </Button>
+        <Button type="submit" size="sm" disabled={busy || !message.trim()}>
+          {sending ? 'Enviando...' : 'Enviar por WhatsApp'}
+        </Button>
+      </div>
     </form>
   )
 }

@@ -144,24 +144,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    const { message, messageType = 'text', mediaUrl } = body || {}
+    const { message = '', messageType = 'text', mediaUrl } = body || {}
+    const messageStr = typeof message === 'string' ? message : ''
 
-    // Validación de mensaje
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      logger.warn('Intento de enviar mensaje vacío', {
-        conversationId: params.id,
-        userId: session.user.id
-      })
+    // Debe haber texto o archivo adjunto (mediaUrl)
+    if (!messageStr.trim() && !mediaUrl) {
       return NextResponse.json(
-        { error: 'El mensaje no puede estar vacío' },
+        { error: 'Escribe un mensaje o adjunta un archivo (imagen, audio o documento)' },
         { status: 400 }
       )
     }
 
-    if (message.length > 4096) {
+    if (messageStr.length > 4096) {
       logger.warn('Mensaje demasiado largo', {
         conversationId: params.id,
-        messageLength: message.length,
+        messageLength: messageStr.length,
         userId: session.user.id
       })
       return NextResponse.json(
@@ -240,7 +237,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Envío solo vía MessagingService (internamente usa Meta/WhatsApp)
     const sendResult = await MessagingService.sendMessage({
       to,
-      message: message.trim(),
+      message: messageStr.trim() || (mediaUrl ? '(archivo adjunto)' : ''),
       messageType: effectiveMessageType,
       mediaUrl,
       channel,
@@ -283,7 +280,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       messageRecord = await WhatsAppService.createMessage({
         conversationId: params.id,
         direction: 'outbound',
-        content: message.trim(),
+        content: messageStr.trim() || (mediaUrl ? '(archivo adjunto)' : ''),
         messageType,
         mediaUrl,
         platformMsgId: sendResult.messageId,

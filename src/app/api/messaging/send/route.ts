@@ -33,10 +33,10 @@ import { z } from 'zod'
  * }
  */
 
-// Esquema de validación
+// Esquema de validación (leadId/conversationId pueden ser UUID de Supabase o CUID)
 const SendMessageSchema = z.object({
-  leadId: z.string().cuid().optional(),
-  conversationId: z.string().cuid().optional(),
+  leadId: z.string().min(1).max(100).optional(),
+  conversationId: z.string().min(1).max(100).optional(),
   to: z.object({
     phone: z.string().optional(),
     email: z.string().email().optional(),
@@ -45,14 +45,17 @@ const SendMessageSchema = z.object({
     (data) => data.phone || data.email || data.subscriberId,
     { message: 'Debe proporcionar al menos un identificador (phone, email o subscriberId)' }
   ),
-  message: z.string().min(1).max(4096),
+  message: z.string().max(4096).optional().default(''),
   messageType: z.enum(['text', 'image', 'video', 'file', 'audio']).optional().default('text'),
   mediaUrl: z.string().url().optional(),
   caption: z.string().optional(),
   filename: z.string().optional(),
   channel: z.enum(['whatsapp', 'instagram', 'facebook', 'auto']).optional().default('auto'),
   tag: z.string().optional(),
-})
+}).refine(
+  (data) => (data.message && data.message.trim().length > 0) || (data.mediaUrl && data.messageType && data.messageType !== 'text'),
+  { message: 'Escribe un mensaje o adjunta un archivo (imagen, audio o documento)', path: ['message'] }
+)
 
 export async function POST(request: NextRequest) {
   try {

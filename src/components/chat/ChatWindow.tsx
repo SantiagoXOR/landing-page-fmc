@@ -8,9 +8,12 @@ import { MessageBubble } from './MessageBubble'
 import { EmptyState } from './EmptyState'
 import { FlowIndicator } from './FlowIndicator'
 import { TagPill } from './TagPill'
-import { Send, Paperclip, Smile, MoreVertical, Tag } from 'lucide-react'
+import { Send, Paperclip, Smile, MoreVertical, Tag, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Conversation, Message } from '@/types/chat'
+
+const ACCEPT_ATTACHMENTS = 'image/jpeg,image/png,image/webp,image/gif,audio/mpeg,audio/ogg,audio/webm,audio/mp4,audio/aac,audio/mp3,.mp3,.pdf,.doc,.docx,.xls,.xlsx,.txt'
+const MAX_FILE_SIZE_MB = 16
 
 interface ChatWindowProps {
   conversation?: Conversation
@@ -23,8 +26,11 @@ interface ChatWindowProps {
 export function ChatWindow({ conversation, onSendMessage, onTakeControl, onReleaseControl, className }: ChatWindowProps) {
   const [message, setMessage] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -34,12 +40,48 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
     scrollToBottom()
   }, [conversation?.messages])
 
-  const handleSendMessage = () => {
-    if (!message.trim() || !conversation) return
+  const handleSendMessage = (overrideMessage?: string, overrideType?: string, overrideMediaUrl?: string) => {
+    const text = overrideMessage !== undefined ? overrideMessage : message.trim()
+    const type = overrideType ?? 'text'
+    const media = overrideMediaUrl
+    if (!conversation) return
+    if (!text && !media) return
 
-    onSendMessage(message.trim(), 'text')
+    onSendMessage(text || (media ? '(archivo adjunto)' : ''), type, media)
     setMessage('')
     setIsTyping(false)
+  }
+
+  const handleAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !conversation) return
+    e.target.value = ''
+    setUploadError(null)
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      setUploadError(`El archivo no puede superar ${MAX_FILE_SIZE_MB} MB`)
+      return
+    }
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/messaging/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) {
+        setUploadError(data.error || 'Error al subir el archivo')
+        return
+      }
+      if (!data.url || !data.messageType) {
+        setUploadError('Respuesta inválida del servidor')
+        return
+      }
+      const caption = message.trim()
+      handleSendMessage(caption, data.messageType, data.url)
+    } catch (err) {
+      setUploadError('Error de conexión al subir el archivo')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -161,9 +203,27 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
 
       {/* Input de mensaje - Responsive */}
       <div className="p-2 sm:p-3 md:p-4 border-t border-gray-200 flex-shrink-0">
+        {uploadError && (
+          <p className="text-xs text-red-600 mb-1.5">{uploadError}</p>
+        )}
         <div className="flex items-center space-x-1.5 sm:space-x-2">
-          <Button variant="ghost" size="sm" className="h-8 w-8 sm:h-9 sm:w-9 p-0 flex-shrink-0">
-            <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPT_ATTACHMENTS}
+            className="hidden"
+            onChange={handleAttachmentChange}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 sm:h-9 sm:w-9 p-0 flex-shrink-0"
+            title="Imagen, audio o documento (máx. 16 MB)"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> : <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
           </Button>
           
           <div className="flex-1 relative">
@@ -179,6 +239,8 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
               variant="ghost"
               size="sm"
               className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 sm:h-7 sm:w-7 p-0"
+              title="Emojis (próximamente)"
+              disabled
             >
               <Smile className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>

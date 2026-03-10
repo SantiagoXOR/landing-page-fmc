@@ -212,6 +212,82 @@ export class SupabaseStorageService {
     }
   }
 
+  /** Tipos MIME permitidos para adjuntos de chat (imagen, audio, documento) */
+  private static readonly CHAT_ATTACHMENT_MIMES: Record<string, 'image' | 'audio' | 'file'> = {
+    'image/jpeg': 'image',
+    'image/png': 'image',
+    'image/webp': 'image',
+    'image/gif': 'image',
+    'audio/mpeg': 'audio',
+    'audio/mp3': 'audio',
+    'audio/ogg': 'audio',
+    'audio/webm': 'audio',
+    'audio/mp4': 'audio',
+    'audio/aac': 'audio',
+    'application/pdf': 'file',
+    'application/msword': 'file',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'file',
+    'application/vnd.ms-excel': 'file',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'file',
+    'text/plain': 'file',
+  }
+
+  private static readonly CHAT_MAX_FILE_SIZE = 16 * 1024 * 1024 // 16MB (WhatsApp recomienda hasta 16MB para documentos)
+
+  /**
+   * Subir adjunto para chat/WhatsApp (imagen, audio o documento).
+   * No guarda metadata en tabla documents; solo Storage y devuelve URL firmada.
+   */
+  static async uploadChatAttachment(file: File, userId: string): Promise<{ url: string; messageType: 'image' | 'audio' | 'file'; filename: string }> {
+    try {
+      if (!supabase.client) {
+        throw new Error('Database connection error')
+      }
+
+      const mime = file.type || ''
+      const messageType = this.CHAT_ATTACHMENT_MIMES[mime] ?? (mime.startsWith('image/') ? 'image' : mime.startsWith('audio/') ? 'audio' : 'file')
+
+      if (!['image', 'audio', 'file'].includes(messageType) && !mime.startsWith('image/') && !mime.startsWith('audio/')) {
+        throw new Error(`Tipo de archivo no permitido: ${mime}. Use imagen, audio o documento (PDF, Word, Excel).`)
+      }
+
+      if (file.size > this.CHAT_MAX_FILE_SIZE) {
+        throw new Error(`El archivo no debe superar ${this.CHAT_MAX_FILE_SIZE / 1024 / 1024}MB`)
+      }
+
+      await this.initializeBucket()
+
+      const ext = file.name.split('.').pop() || 'bin'
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
+      const timestamp = Date.now()
+      const randomStr = Math.random().toString(36).substring(7)
+      const filename = `chat-attachments/${userId}/${timestamp}-${randomStr}-${safeName}`
+
+      const { error } = await supabase.client.storage
+        .from(this.BUCKET_NAME)
+        .upload(filename, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: mime || undefined,
+        })
+
+      if (error) throw error
+
+      const { data: urlData, error: urlError } = await supabase.client.storage
+        .from(this.BUCKET_NAME)
+        .createSignedUrl(filename, 365 * 24 * 60 * 60)
+
+      if (urlError || !urlData?.signedUrl) {
+        throw new Error(urlError?.message || 'No se pudo generar la URL del archivo')
+      }
+
+      return { url: urlData.signedUrl, messageType, filename: file.name }
+    } catch (error) {
+      console.error('[Storage] Error uploading chat attachment:', error)
+      throw error
+    }
+  }
+
   /**
    * Obtener documentos de un lead
    */

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { DEALERS, type Dealer } from '@/lib/dealers-data'
+import { getWhatsAppUrl, WHATSAPP_NUMBER_E164 } from '@/lib/landing-utils'
 import { DealerCard } from '@/components/concesionarias/DealerCard'
 import { DealerFilters } from '@/components/concesionarias/DealerFilters'
 import { DealersMap } from '@/components/concesionarias/DealersMap'
@@ -147,7 +148,7 @@ export default function ConcesionariasPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <a
-              href="https://wa.me/5493704069592"
+              href={getWhatsAppUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center px-6 py-3 bg-[#25D366] text-white rounded-md hover:bg-[#20BA5A] transition-colors font-acto-semibold"
@@ -155,7 +156,7 @@ export default function ConcesionariasPage() {
               Contactar por WhatsApp
             </a>
             <a
-              href="tel:+543704069592"
+              href={`tel:+${WHATSAPP_NUMBER_E164}`}
               className="inline-flex items-center justify-center px-6 py-3 bg-fmc-purple text-white rounded-md hover:bg-fmc-purple/90 transition-colors font-acto-semibold"
             >
               Llamar ahora

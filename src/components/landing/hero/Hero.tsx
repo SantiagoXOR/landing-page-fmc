@@ -5,6 +5,7 @@ import { useParallax } from "./useParallax";
 import { getHeroImages } from "@/lib/landing-images";
 import type { HeroProps } from "./types";
 import { Button } from "@/components/ui/button";
+import { getWhatsAppUrl } from "@/lib/landing-utils";
 
 export default function Hero({ className = "" }: HeroProps) {
   const { bgRef, fgRef } = useParallax({ 
@@ -143,7 +144,7 @@ export default function Hero({ className = "" }: HeroProps) {
               </Button>
               {/* Botón WhatsApp verde (full width) */}
               <Button asChild size="lg" className="w-full font-acto-bold bg-fmc-green text-white hover:bg-fmc-green/90 rounded-full">
-                <a href="https://wa.me/543704069592" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                <a href={getWhatsAppUrl()} target="_blank" rel="noopener noreferrer">WhatsApp</a>
               </Button>
             </div>
           </div>

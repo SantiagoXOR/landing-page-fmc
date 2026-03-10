@@ -240,7 +240,7 @@ export function CreditForm() {
         }
       }
 
-      // Número de WhatsApp corregido: +54 9 3704 06-9592 -> 5493704069592
+      // Número de WhatsApp: +54 9 3705 00-9173 -> 5493705009173 (landing-utils)
       // Usar API clásica mejora compatibilidad de emojis en Web y móviles
       const whatsappUrl = getWhatsAppUrl(safeMessage)
       window.open(whatsappUrl, '_blank')
@@ -411,7 +411,7 @@ export function CreditForm() {
                           <FormLabel className="font-acto-semibold text-fmc-purple">Teléfono *</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="3704069592" 
+                              placeholder="3705009173" 
                               className={cn(inputClasses)} 
                               aria-invalid={!!form.formState.errors.telefono}
                               {...field} 

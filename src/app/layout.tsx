@@ -126,7 +126,7 @@ export default function RootLayout({
               url: siteUrl,
               logo: `${siteUrl}/landing/logofmc.svg`,
               image: `${siteUrl}/landing/seo/og-image-1.png`,
-              telephone: '+543704069592',
+              telephone: '+543705009173',
               address: {
                 '@type': 'PostalAddress',
                 addressLocality: 'Formosa',

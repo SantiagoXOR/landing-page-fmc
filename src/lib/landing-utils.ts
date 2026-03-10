@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // WhatsApp helpers (unificación de número y URL)
-export const WHATSAPP_NUMBER_E164 = '5493704069592'
+export const WHATSAPP_NUMBER_E164 = '5493705009173'
 
 export function getWhatsAppUrl(message?: string) {
   const base = `https://api.whatsapp.com/send?phone=${WHATSAPP_NUMBER_E164}`

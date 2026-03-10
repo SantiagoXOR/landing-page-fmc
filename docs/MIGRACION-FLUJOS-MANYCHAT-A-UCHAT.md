@@ -46,6 +46,62 @@ Guía para replicar en **UChat** los flujos de automatización que tenías en Ma
 
 ---
 
+## Flujo 0: Lead nuevo (primer mensaje por WhatsApp)
+
+**Objetivo:** Cuando alguien escribe por primera vez al WhatsApp, etiquetarlo como `lead-nuevo`, (opcional) hacer solicitud externa a formosafmc.com.ar, enviar mensaje de bienvenida con CTA "Pedí tu crédito" y, si hace clic en el CTA, etiquetar como `solicitando-documentos` y establecer origen WhatsApp.
+
+**Disparador:** El CRM recibe todos los mensajes por el webhook de Meta. Si el lead **no tiene** la etiqueta `lead-nuevo`, el CRM llama al **Inbound Webhook** de UChat "Lead nuevo". UChat no tiene un trigger nativo "cualquier mensaje entrante" cuando el webhook apunta al CRM; por eso usamos Inbound Webhook llamado por el CRM.
+
+### En UChat: pasos del flujo "Lead nuevo"
+
+1. **Crear el Inbound Webhook**
+   - **Tools** → **Inbound Webhooks** → **New Inbound Webhook**.
+   - Nombre: `Lead nuevo (desde CRM)`.
+   - **Values to Identify a User:** identificar por **phone** (ej. campo `phone` en el JSON).
+   - **Mapping:** mapear `first_name` al custom field de nombre si lo usas en el mensaje.
+   - Asociar este webhook al **Sub Flow "Lead nuevo"** (cuando reciba datos, ir a ese subflujo).
+   - Guardar, activar y copiar la **URL del webhook**.
+
+2. **Sub Flow "Lead nuevo"** (mismo estilo que el diagrama):
+   - **Acciones (Action Step):**
+     - (Opcional) **External Request** a `https://www.formosafmc.com.ar` si necesitas notificar al backend.
+     - **Add Tag** → `lead-nuevo`.
+   - **Send Message Step** (WhatsApp):
+     - Imagen + texto de bienvenida, ej.: *"¡Hola {{First Name}}! 🚚💨 Somos Prendarios del Banco Formosa. ¿Cómo podemos ayudarte hoy?"*
+     - **Botón CTA "Pedí tu Crédito":** la URL del botón debe ser la **landing page del formulario** (ej. `https://www.formosafmc.com.ar` o la ruta del formulario de crédito). Así el usuario interesado abre la página, completa el formulario y lo envía por WhatsApp; ese envío dispara el flujo **Solicitud de Crédito**.
+   - Desde el **clic en el botón** (o respuesta del usuario), siguiente bloque:
+   - **Acciones #2 (Action Step):**
+     - **Add Tag** → `solicitando-documentos`.
+     - **Establecer campo de usuario** (custom field que necesites).
+     - **Establecer origen** para WhatsApp si UChat lo tiene.
+   - (Opcional) **Iniciar Automatización** → subflujo "INFORMACION | WhatsApp" u otro.
+
+3. **Etiquetas y custom fields**
+   - En **Contents → Tags** crear: `lead-nuevo`, `solicitando-documentos`.
+   - Custom field de nombre (ej. `nombre` o `Nombre`) para `{{nombre}}` en mensajes.
+
+4. **Publicar** el flujo.
+
+### En el CRM
+
+En `.env.local` o Vercel:
+
+```bash
+UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL=https://...  # URL del Inbound Webhook "Lead nuevo"
+```
+
+Cuando llega **cualquier** mensaje de WhatsApp y el lead **no tiene** la etiqueta `lead-nuevo`, el CRM hace **POST** a esa URL con:
+
+```json
+{ "phone": "549...", "first_name": "Nombre" }
+```
+
+El CRM también asigna la etiqueta `lead-nuevo` al lead en la base de datos para no volver a llamar al webhook en mensajes siguientes.
+
+**Cierre del ciclo:** El flujo "Lead nuevo" redirige al usuario (CTA) a la landing del formulario. Cuando el usuario completa el formulario y lo envía por WhatsApp, ese mensaje (con "Solicitud de Crédito") dispara el flujo **Solicitud de Crédito** en el CRM y en UChat.
+
+---
+
 ## Flujo 1: Solicitud de crédito (mensaje → etiqueta → mensaje)
 
 **En ManyChat:**  
@@ -218,6 +274,7 @@ Disparador: "Otro flujo" (RESPUESTA MENSAJE | Whatsapp) o (deshabilitado) usuari
 
 | Flujo | Disparador en UChat | Pasos del Sub Flow |
 |-------|---------------------|--------------------|
+| 0 – Lead nuevo | Inbound Webhook (CRM llama cuando lead sin tag "lead-nuevo") | (Opc.) External Request → Add Tag "lead-nuevo" → Send Message (bienvenida + CTA); al clic CTA: Add Tag "solicitando-documentos", set origen WhatsApp, Iniciar Automatización |
 | 1 – Solicitud de crédito | Keywords "contains" frase solicitud | Add Tag "solicitud-en-proceso" → Send Message *(CRM recibe mensaje desde Meta; External Request opcional)* |
 | 2 – Historial desfavorable | Mismo flujo que añade tag, o Inbound Webhook (CRM) | Send Message (texto desfavorable) |
 | 3 – Crédito preaprobado | Mismo flujo que añade tag, o Inbound Webhook (CRM) | Send Message (texto + imagen + botón) |
@@ -298,13 +355,17 @@ Ref: [Inbound Webhooks](https://docs.uchat.com.au/flow-builder/tools/inbound-web
 
 #### 2. Configurar el CRM
 
-En el CRM (Vercel o `.env.local`), define:
+En el CRM (Vercel o `.env.local`), define las URLs de los Inbound Webhooks:
 
 ```bash
+# Flujo "Solicitud de Crédito" (mensaje contiene "Solicitud de Crédito")
 UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL=https://...
+
+# Flujo "Lead nuevo" (primer mensaje de un lead; ver Flujo 0 más arriba)
+UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL=https://...
 ```
 
-Pega la URL completa del Inbound Webhook que creaste en UChat.
+Pega la URL completa de cada Inbound Webhook que crees en UChat.
 
 #### 3. Qué envía el CRM
 

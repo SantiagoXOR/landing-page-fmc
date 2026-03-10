@@ -178,6 +178,48 @@ async function handleMetaWebhook(body: any) {
               platformIdByPhone: formattedPhone,
             })
 
+            // Flujo "lead-nuevo": cuando alguien escribe por primera vez (sin etiqueta lead-nuevo), llamar a UChat
+            // para que envíe el mensaje de bienvenida y aplique la etiqueta en UChat (como en el diagrama del flujo).
+            if (lead?.id) {
+              let leadTags: string[] = []
+              if (lead.tags) {
+                try {
+                  leadTags = Array.isArray(lead.tags) ? lead.tags : JSON.parse(String(lead.tags))
+                } catch {
+                  leadTags = []
+                }
+              }
+              if (!leadTags.includes('lead-nuevo')) {
+                const uchatLeadNuevoUrl = (process.env.UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL || '').trim()
+                if (uchatLeadNuevoUrl) {
+                  const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)
+                  const firstName = contactName?.split(/\s+/)[0] || lead.nombre?.split(/\s+/)[0]
+                  const payload: Record<string, string | number> = { phone: formattedPhone }
+                  if (firstName) payload.first_name = firstName
+                  fetch(uchatLeadNuevoUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                  }).then((res) => {
+                    if (!res.ok) {
+                      console.warn('[WhatsApp Webhook] UChat Inbound Webhook lead-nuevo respondió', res.status, { url: uchatLeadNuevoUrl })
+                    } else {
+                      console.log('[WhatsApp Webhook] UChat Inbound Webhook lead-nuevo llamado', { phone: formattedPhone })
+                    }
+                  }).catch((err) => {
+                    console.error('[WhatsApp Webhook] Error llamando a UChat Inbound Webhook lead-nuevo:', err)
+                  })
+                }
+                leadTags.push('lead-nuevo')
+                await supabase.updateLead(lead.id, {
+                  tags: JSON.stringify(leadTags),
+                  updatedAt: new Date().toISOString(),
+                })
+                ;(lead as { tags?: string }).tags = JSON.stringify(leadTags)
+                console.log('[WhatsApp Webhook] Tag lead-nuevo asignado al lead', { leadId: lead.id })
+              }
+            }
+
             // Si el mensaje es "Solicitud de Crédito" (formulario), actualizar custom fields y asignar tag en el CRM,
             // y reenviar a UChat Inbound Webhook para que el bot ejecute el flujo y envíe la respuesta (Opción B).
             const rawText = message.text?.body

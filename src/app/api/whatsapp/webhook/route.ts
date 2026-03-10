@@ -225,8 +225,8 @@ async function handleMetaWebhook(body: any) {
               platformIdByPhone: formattedPhone,
             })
 
-            // Si el mensaje es "Solicitud de Crédito" (formulario), actualizar custom fields y asignar tag en el CRM
-            // (cuando el webhook de Meta apunta al CRM, UChat no recibe el mensaje; esta lógica replica el efecto en el CRM)
+            // Si el mensaje es "Solicitud de Crédito" (formulario), actualizar custom fields y asignar tag en el CRM,
+            // y reenviar a UChat Inbound Webhook para que el bot ejecute el flujo y envíe la respuesta (Opción B).
             const rawText = message.text?.body
             if (rawText && rawText.includes('Solicitud de Crédito') && lead?.id) {
               try {
@@ -252,6 +252,28 @@ async function handleMetaWebhook(body: any) {
                     updatedAt: new Date().toISOString(),
                   })
                   console.log('[WhatsApp Webhook] Tag solicitud-en-proceso asignado al lead', { leadId: lead.id })
+                }
+                // Reenviar a UChat Inbound Webhook para que ejecute el flujo "Solicitud de Crédito" y envíe la respuesta al usuario
+                const uchatWebhookUrl = (process.env.UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL || '').trim()
+                if (uchatWebhookUrl) {
+                  const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)
+                  const firstName = contactName?.split(/\s+/)[0] || lead.nombre?.split(/\s+/)[0]
+                  const payload: Record<string, string | number> = { phone: formattedPhone }
+                  if (firstName) payload.first_name = firstName
+                  // Fire-and-forget: no bloquear la respuesta a Meta
+                  fetch(uchatWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                  }).then((res) => {
+                    if (!res.ok) {
+                      console.warn('[WhatsApp Webhook] UChat Inbound Webhook respondió', res.status, { url: uchatWebhookUrl })
+                    } else {
+                      console.log('[WhatsApp Webhook] UChat Inbound Webhook llamado para Solicitud de Crédito', { phone: formattedPhone })
+                    }
+                  }).catch((err) => {
+                    console.error('[WhatsApp Webhook] Error llamando a UChat Inbound Webhook:', err)
+                  })
                 }
               } catch (err) {
                 console.error('[WhatsApp Webhook] Error procesando Solicitud de Crédito (custom fields / tag):', err)

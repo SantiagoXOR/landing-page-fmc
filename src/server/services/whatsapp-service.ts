@@ -157,14 +157,15 @@ export class WhatsAppService {
         })
       }
 
-      // Crear mensaje
+      // Crear mensaje (platform_msg_id debe ser el ID del mensaje de Meta, único por mensaje; no el teléfono)
+      const messageIdFromMeta = message.id
       await this.createMessage({
         conversationId: conversation.id,
         direction: 'inbound',
         content,
         messageType,
         mediaUrl,
-        platformMsgId: platformId
+        platformMsgId: messageIdFromMeta || undefined
       })
 
       // Actualizar última actividad

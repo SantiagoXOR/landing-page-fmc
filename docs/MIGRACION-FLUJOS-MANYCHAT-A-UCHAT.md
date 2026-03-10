@@ -275,7 +275,53 @@ Si en la vista de **Chats** no ves mensajes del usuario o del bot, revisa lo sig
 
 ### Mensaje del bot, etiqueta y custom fields cuando el webhook apunta al CRM
 
-Si el webhook de Meta apunta al CRM, UChat no recibe el mensaje y el flujo del bot no se ejecuta. El CRM ahora, al recibir un mensaje que **contiene "Solicitud de Crédito"**, parsea el texto (formato Solicitud de Crédito - Moto), **actualiza los custom fields del lead** y **asigna la etiqueta "solicitud-en-proceso"** en el CRM. Para que el bot envíe la respuesta por WhatsApp, UChat debe recibir el mensaje (webhook Meta → UChat o CRM reenvía a UChat).
+Si el webhook de Meta apunta al CRM, UChat no recibe el mensaje y el flujo del bot no se ejecuta. El CRM ahora, al recibir un mensaje que **contiene "Solicitud de Crédito"**, parsea el texto (formato Solicitud de Crédito - Moto), **actualiza los custom fields del lead** y **asigna la etiqueta "solicitud-en-proceso"** en el CRM.
+
+Para que **el bot envíe la respuesta** por WhatsApp hay dos opciones: **A)** webhook de Meta a UChat (y Uchat → CRM); **B)** mantener Meta → CRM y que el CRM **reenvíe** el mensaje a UChat (recomendado si quieres seguir recibiendo todo en el CRM primero).
+
+---
+
+### Opción B: CRM reenvía a UChat (Inbound Webhook)
+
+Con el webhook de Meta apuntando al CRM, el CRM puede llamar al **Inbound Webhook** de UChat cuando el mensaje contiene "Solicitud de Crédito". UChat identifica al usuario por teléfono, ejecuta el subflujo "Solicitud de Crédito" (Add Tag + Send Message) y envía la respuesta al usuario por WhatsApp.
+
+#### 1. Crear el Inbound Webhook en UChat
+
+1. En UChat → **Tools** → **Inbound Webhooks** → **New Inbound Webhook**.
+2. Nombre sugerido: `Solicitud de Crédito (desde CRM)`.
+3. En **Values to Identify a User**, indica que el usuario se identifica por **phone** (ruta en el JSON, ej. `phone`).
+4. En **Mapping**, si quieres enviar el nombre: mapea `first_name` a tu custom field de nombre (opcional).
+5. **Asocia el webhook al subflujo "Solicitud de Crédito"**: entra al subflujo que debe ejecutarse (el que tiene Add Tag + Send Message) y configura que este Inbound Webhook lo dispare (según la UI de UChat: "When this webhook receives data, go to this subflow" o similar).
+6. Guarda y **activa** el webhook. Copia la **URL del webhook** (POST).
+
+Ref: [Inbound Webhooks](https://docs.uchat.com.au/flow-builder/tools/inbound-webhooks.html).
+
+#### 2. Configurar el CRM
+
+En el CRM (Vercel o `.env.local`), define:
+
+```bash
+UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL=https://...
+```
+
+Pega la URL completa del Inbound Webhook que creaste en UChat.
+
+#### 3. Qué envía el CRM
+
+Cuando un mensaje entrante (desde Meta al CRM) **contiene "Solicitud de Crédito"**, el CRM hace un **POST** a esa URL con un JSON como:
+
+```json
+{
+  "phone": "5493547527070",
+  "first_name": "Santiago"
+}
+```
+
+`phone` es el teléfono en formato E.164 (el mismo que usa el CRM). UChat usa `phone` para encontrar o crear el usuario y luego ejecuta el subflujo "Solicitud de Crédito", que añade la etiqueta y envía el mensaje de confirmación.
+
+#### 4. Probar
+
+Envía por WhatsApp un mensaje que contenga "Solicitud de Crédito" (o el formulario completo). Deberías recibir la respuesta del bot ("¡Hola …! Estamos revisando tu solicitud…"). En el CRM seguirán actualizándose custom fields y la etiqueta porque el webhook de Meta ya hace eso; además, el CRM llama al Inbound Webhook para que UChat envíe la respuesta.
 
 ---
 

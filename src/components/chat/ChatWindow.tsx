@@ -247,7 +247,7 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
           </div>
           
           <Button
-            onClick={handleSendMessage}
+            onClick={() => handleSendMessage()}
             disabled={!message.trim()}
             className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-auto md:px-3 p-0 md:p-2 flex-shrink-0"
           >

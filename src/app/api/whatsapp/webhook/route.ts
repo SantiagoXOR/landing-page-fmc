@@ -354,12 +354,27 @@ async function handleMetaWebhook(body: any) {
                 console.error('[WhatsApp Webhook] Error procesando Solicitud de Crédito (custom fields / tag):', err)
               }
             } else if (rawText && lead?.id && hadLeadNuevoBefore) {
-              // Mensaje de consulta (no es "Solicitud de Crédito"): reenviar a UChat Inbound Webhook "Consultas - Carla"
-              // para que el AI Agent Carla responda. Solo si el lead YA TENÍA lead-nuevo antes de este mensaje,
-              // así no llamamos a Carla en el mismo mensaje en que enviamos la bienvenida (Lead nuevo).
-              // Await para preservar orden: no devolver 200 a Meta hasta que UChat reciba este mensaje (evita que
-              // $.message llegue tarde y Carla responda a una consulta anterior).
+              // Flujo de consultas (Consultas - Carla): solo responde si el lead tiene la etiqueta lead-nuevo.
+              // Segundo mensaje en adelante: asignar tag solicitando-info para indicar que está consultando.
               {
+                let consultaTags: string[] = []
+                if (lead.tags) {
+                  try {
+                    consultaTags = Array.isArray(lead.tags) ? lead.tags : JSON.parse(String(lead.tags))
+                  } catch {
+                    consultaTags = []
+                  }
+                }
+                if (!consultaTags.includes('solicitando-info')) {
+                  consultaTags.push('solicitando-info')
+                  await supabase.updateLead(lead.id, {
+                    tags: JSON.stringify(consultaTags),
+                    updatedAt: new Date().toISOString(),
+                  })
+                  ;(lead as { tags?: string }).tags = JSON.stringify(consultaTags)
+                  console.log('[WhatsApp Webhook] Tag solicitando-info asignado al lead (flujo consulta)', { leadId: lead.id })
+                }
+
                 const uchatCarlaUrl = (process.env.UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL || '').trim()
                 if (uchatCarlaUrl) {
                   const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)

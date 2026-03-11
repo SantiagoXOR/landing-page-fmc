@@ -227,6 +227,24 @@ Si en **Webhook logs** el call a "Consultas - Carla (desde CRM)" sale **Success*
 
 **Resumen:** Webhook Success + AI Usage Logs vacío = el subflujo se ejecuta pero el paso que llama a Carla no corre o no recibe el mensaje. Revisar: subflujo con paso AI Agent → Carla, mapeo de `message` a un campo que ese paso use como entrada, Trigger workflow de Carla = Consultas - Carla, y Publish.
 
+### 5.7 La respuesta debe enviarse por WhatsApp (Send Message)
+
+Aunque el webhook devuelva **Success** y Carla genere una respuesta, el usuario **solo la recibe si el flujo envía un mensaje por WhatsApp** al contacto identificado por `phone`.
+
+1. **Paso "Send Message" después del AI Agent**  
+   El subflujo "Consultas - Carla" (o Main Flow si el webhook apunta ahí) debe tener **después** del paso del AI Agent un paso **Send Message** que envíe la respuesta al usuario. El contenido suele ser una variable como `{{Last AI Agent Reply}}` o el equivalente en tu versión de UChat.
+
+2. **Destinatario**  
+   El mensaje debe enviarse al **mismo contacto** que identificó el webhook (por `phone`). UChat suele hacerlo automáticamente cuando el webhook identifica al usuario por `phone` y el flujo se ejecuta "en nombre" de ese contacto; si hay opción de elegir destinatario, debe ser "current user" o el contacto del webhook.
+
+3. **Orden típico del subflujo (Inbound Webhook)**  
+   - Start → (opcional: set custom field con `message` si no se mapea directo)  
+   - **Action** → AI Actions → **Carla** (con Custom input text = campo donde mapeaste `message`, ej. `{{Extra Info}}`)  
+   - **Send Message** → contenido = `{{Last AI Agent Reply}}` (o similar), enviar a la conversación actual  
+   - End  
+
+Si falta el paso **Send Message** o no usa la variable de la respuesta de Carla, el lead no verá ninguna respuesta en WhatsApp.
+
 ---
 
 ## 6. Después de guardar (checklist)

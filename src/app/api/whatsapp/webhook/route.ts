@@ -141,6 +141,21 @@ async function handleMetaWebhook(body: any) {
 
           // Procesar cada mensaje
           for (const message of messages) {
+            const platformMsgId = message.id
+            // Evitar procesar el mismo mensaje dos veces (Meta puede reenviar el webhook)
+            if (platformMsgId && supabase.client) {
+              const { data: existing } = await supabase.client
+                .from('messages')
+                .select('id')
+                .eq('platform_msg_id', platformMsgId)
+                .limit(1)
+                .maybeSingle()
+              if (existing) {
+                console.log('[WhatsApp Webhook] Mensaje ya procesado (entrega duplicada de Meta), omitiendo', { platformMsgId })
+                continue
+              }
+            }
+
             const phoneNumber = message.from
             const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)
             const messageText = message.text?.body || '[Multimedia]'

@@ -399,6 +399,23 @@ async function handleMetaWebhook(body: any) {
                 }
               }
 
+              // Cooldown por lead: no repetir la misma respuesta si ya se llamó a Carla hace menos de 20 s (ej. "hola!" + "s" seguidos).
+              const CARLA_COOLDOWN_SEC = 20
+              if (shouldCallCarla && lead.id && supabase.client) {
+                const { data: lastRow } = await supabase.client
+                  .from('carla_webhook_last_per_lead')
+                  .select('sent_at')
+                  .eq('lead_id', lead.id)
+                  .maybeSingle()
+                if (lastRow?.sent_at) {
+                  const elapsed = (Date.now() - new Date(lastRow.sent_at).getTime()) / 1000
+                  if (elapsed < CARLA_COOLDOWN_SEC) {
+                    shouldCallCarla = false
+                    console.log('[WhatsApp Webhook] Consultas - Carla en cooldown para este lead, omitiendo', { leadId: lead.id, elapsedSec: Math.round(elapsed) })
+                  }
+                }
+              }
+
               if (shouldCallCarla) {
                 let consultaTags: string[] = []
                 if (lead.tags) {
@@ -440,6 +457,12 @@ async function handleMetaWebhook(body: any) {
                       console.warn('[WhatsApp Webhook] UChat Inbound Webhook Consultas - Carla respondió', res.status, { url: uchatCarlaUrl })
                     } else {
                       console.log('[WhatsApp Webhook] UChat Inbound Webhook Consultas - Carla llamado', { phone: formattedPhone })
+                      // Registrar para cooldown y no repetir mensaje en los próximos 20 s
+                      if (supabase.client && lead?.id) {
+                        await supabase.client
+                          .from('carla_webhook_last_per_lead')
+                          .upsert({ lead_id: lead.id, sent_at: new Date().toISOString() }, { onConflict: 'lead_id' })
+                      }
                     }
                   } catch (err) {
                     console.error('[WhatsApp Webhook] Error llamando a UChat Inbound Webhook Consultas - Carla:', err)

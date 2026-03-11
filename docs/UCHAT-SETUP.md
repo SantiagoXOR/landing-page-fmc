@@ -62,9 +62,33 @@ Solo aplica si **tú** configuras una app en [developers.facebook.com](https://d
 | 1 | Meta for Developers → Tu app → WhatsApp | Añadir producto WhatsApp si no está. |
 | 2 | WhatsApp → Configuración | Anotar **Phone Number ID** y generar **Access Token** (permanente). |
 | 3 | WhatsApp → Webhook | Si el webhook va al **CRM**: URL = `https://tu-dominio.com/api/whatsapp/webhook`, Verify Token = valor de `WHATSAPP_VERIFY_TOKEN`. |
-| 4 | Suscripciones | Suscribir a `messages` (y si aplica `message_status`). |
+| 4 | Suscripciones | Suscribir a `messages` (y si aplica `message_echoes`, `message_template_status_update`). |
 
 Si **todo** pasa por Uchat (recomendado para flujos/bots), el webhook de Meta puede apuntar solo a Uchat; el CRM no necesita webhook directo de Meta y se alimenta por [Webhook Uchat → CRM](#5-webhook-uchat--crm).
+
+### 3.1 Webhook en Vercel (CRM recibe los mensajes)
+
+Cuando el webhook de **Meta** apunta al CRM (modelo que usamos con Lead nuevo y Solicitud de Crédito), la URL debe ser la de tu app desplegada en Vercel:
+
+1. **Ruta en el código (ya existe):** `src/app/api/whatsapp/webhook/route.ts` → en producción responde en:
+   ```
+   https://[TU-APP].vercel.app/api/whatsapp/webhook
+   ```
+   (Reemplaza `[TU-APP]` por el nombre de tu proyecto en Vercel o tu dominio propio.)
+
+2. **En Vercel → Project → Settings → Environment Variables**, asegúrate de tener:
+   - `WHATSAPP_VERIFY_TOKEN` = el mismo valor que pondrás en Meta como "Verify token".
+   - `UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL` = URL del Inbound Webhook "Lead nuevo" de UChat.
+   - `UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL` = URL del Inbound Webhook "Solicitud de Crédito" de UChat.
+   - `UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL` = URL del Inbound Webhook "Consultas - Carla" de UChat (para que el AI Agent Carla responda consultas).
+   - Resto de variables WhatsApp/Supabase según [Variables de entorno del CRM](#4-variables-de-entorno-del-crm).
+
+3. **En Meta for Developers** → Tu app → **WhatsApp** → **Configuración** → **Webhook**:
+   - **Callback URL:** `https://[TU-APP].vercel.app/api/whatsapp/webhook`
+   - **Verify token:** el valor de `WHATSAPP_VERIFY_TOKEN` (ej. una cadena alfanumérica que definas).
+   - Pulsar **Verify and Save**. Luego en **Webhook fields** suscribir al menos a **messages** (y si quieres ver mensajes enviados por el negocio en el CRM, también **message_echoes**).
+
+Si no configuras la Callback URL en Meta, los mensajes de WhatsApp no llegarán al CRM y no se dispararán los flujos Lead nuevo ni Solicitud de Crédito.
 
 ---
 

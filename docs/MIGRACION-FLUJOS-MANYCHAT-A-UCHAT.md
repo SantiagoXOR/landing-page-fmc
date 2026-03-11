@@ -275,6 +275,7 @@ Disparador: "Otro flujo" (RESPUESTA MENSAJE | Whatsapp) o (deshabilitado) usuari
 | Flujo | Disparador en UChat | Pasos del Sub Flow |
 |-------|---------------------|--------------------|
 | 0 – Lead nuevo | Inbound Webhook (CRM llama cuando lead sin tag "lead-nuevo") | (Opc.) External Request → Add Tag "lead-nuevo" → Send Message (bienvenida + CTA); al clic CTA: Add Tag "solicitando-documentos", set origen WhatsApp, Iniciar Automatización |
+| 0b – Consultas (Carla) | Keywords Default Reply (cualquier mensaje que no sea "Solicitud de Crédito") | AI Agent Step → Carla (base de conocimiento Prendarios). Ver [UCHAT-AI-AGENT-CARLA.md](./UCHAT-AI-AGENT-CARLA.md). |
 | 1 – Solicitud de crédito | Keywords "contains" frase solicitud | Add Tag "solicitud-en-proceso" → Send Message *(CRM recibe mensaje desde Meta; External Request opcional)* |
 | 2 – Historial desfavorable | Mismo flujo que añade tag, o Inbound Webhook (CRM) | Send Message (texto desfavorable) |
 | 3 – Crédito preaprobado | Mismo flujo que añade tag, o Inbound Webhook (CRM) | Send Message (texto + imagen + botón) |
@@ -363,6 +364,9 @@ UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL=https://...
 
 # Flujo "Lead nuevo" (primer mensaje de un lead; ver Flujo 0 más arriba)
 UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL=https://...
+
+# Flujo "Consultas - Carla" (respuesta del AI Agent a consultas; ver UCHAT-AI-AGENT-CARLA.md)
+UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL=https://...
 ```
 
 Pega la URL completa de cada Inbound Webhook que crees en UChat.

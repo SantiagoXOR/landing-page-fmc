@@ -277,6 +277,47 @@ async function handleMetaWebhook(body: any) {
               } catch (err) {
                 console.error('[WhatsApp Webhook] Error procesando Solicitud de Crédito (custom fields / tag):', err)
               }
+            } else if (rawText && lead?.id) {
+              // Mensaje de consulta (no es "Solicitud de Crédito"): reenviar a UChat Inbound Webhook "Consultas - Carla"
+              // para que el AI Agent Carla responda con la base de conocimiento. Solo si el lead ya tiene lead-nuevo
+              // (no es el primer mensaje) para no enviar bienvenida + respuesta de Carla a la vez.
+              let hasLeadNuevo = false
+              if (lead.tags) {
+                try {
+                  const tags = Array.isArray(lead.tags) ? lead.tags : JSON.parse(String(lead.tags))
+                  hasLeadNuevo = tags.includes('lead-nuevo')
+                } catch {
+                  // ignore
+                }
+              }
+              if (hasLeadNuevo) {
+                const uchatCarlaUrl = (process.env.UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL || '').trim()
+                if (uchatCarlaUrl) {
+                  const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)
+                  const firstName = contactName?.split(/\s+/)[0] || lead.nombre?.split(/\s+/)[0]
+                  const payload: Record<string, string> = {
+                    phone: formattedPhone,
+                    message: rawText,
+                  }
+                  if (firstName) payload.first_name = firstName
+                  console.log('[WhatsApp Webhook] Llamando a UChat Inbound Webhook Consultas - Carla', { phone: formattedPhone })
+                  fetch(uchatCarlaUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                  }).then((res) => {
+                    if (!res.ok) {
+                      console.warn('[WhatsApp Webhook] UChat Inbound Webhook Consultas - Carla respondió', res.status, { url: uchatCarlaUrl })
+                    } else {
+                      console.log('[WhatsApp Webhook] UChat Inbound Webhook Consultas - Carla llamado', { phone: formattedPhone })
+                    }
+                  }).catch((err) => {
+                    console.error('[WhatsApp Webhook] Error llamando a UChat Inbound Webhook Consultas - Carla:', err)
+                  })
+                } else {
+                  console.warn('[WhatsApp Webhook] UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL no configurada; Carla no responderá consultas', { leadId: lead.id })
+                }
+              }
             }
           }
 

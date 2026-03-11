@@ -136,7 +136,7 @@ export default function ChatsPage() {
     }
   }, [fetchConversations])
 
-  // Actualizar al volver a la pestaña si pasaron más de 2 minutos
+  // Actualizar al volver a la pestaña: lista y mensajes de la conversación abierta (para ver envíos/automatizaciones nuevos)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return
@@ -146,10 +146,26 @@ export default function ChatsPage() {
         fetchConversations()
         localStorage.setItem('lastConversationsRefresh', now.toString())
       }
+      // Refrescar mensajes de la conversación seleccionada para mostrar mensajes enviados o automatizaciones
+      if (selectedConversation?.id) {
+        fetch(`/api/conversations/${selectedConversation.id}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data?.conversation?.messages) {
+              setSelectedConversation(prev => prev ? {
+                ...prev,
+                messages: data.conversation.messages,
+                lastMessageAt: data.conversation.lastMessageAt ?? prev.lastMessageAt,
+                createdAt: data.conversation.createdAt ?? prev.createdAt
+              } : prev)
+            }
+          })
+          .catch(() => {})
+      }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [fetchConversations])
+  }, [fetchConversations, selectedConversation?.id])
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation)
@@ -304,6 +320,23 @@ export default function ChatsPage() {
     // Implementar lógica para agregar notas
   }
 
+  const refreshSelectedConversation = useCallback(() => {
+    if (!selectedConversation?.id) return
+    fetch(`/api/conversations/${selectedConversation.id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.conversation?.messages) {
+          setSelectedConversation(prev => prev ? {
+            ...prev,
+            messages: data.conversation.messages,
+            lastMessageAt: data.conversation.lastMessageAt ?? prev.lastMessageAt,
+            createdAt: data.conversation.createdAt ?? prev.createdAt
+          } : prev)
+        }
+      })
+      .catch(() => {})
+  }, [selectedConversation?.id])
+
   const menuActions = (
     <div className="flex items-center gap-2">
       <DropdownMenu>
@@ -328,6 +361,15 @@ export default function ChatsPage() {
             )} />
             {loading ? 'Recargando...' : 'Actualizar conversaciones'}
           </DropdownMenuItem>
+          {selectedConversation && (
+            <DropdownMenuItem
+              onClick={refreshSelectedConversation}
+              className="cursor-pointer"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refrescar mensajes de esta conversación
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

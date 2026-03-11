@@ -234,24 +234,30 @@ export class WhatsAppService {
     messageType: string
     mediaUrl?: string
     platformMsgId?: string
+    isFromBot?: boolean
   }) {
     try {
       if (!supabase.client) {
         throw new Error('Database connection error')
       }
 
+      const row: Record<string, unknown> = {
+        conversation_id: data.conversationId,
+        direction: data.direction,
+        content: data.content,
+        message_type: data.messageType,
+        media_url: data.mediaUrl,
+        platform_msg_id: data.platformMsgId,
+        sent_at: new Date().toISOString(),
+        delivered_at: data.direction === 'outbound' ? new Date().toISOString() : null,
+      }
+      if (data.isFromBot !== undefined) {
+        row.is_from_bot = data.isFromBot
+      }
+
       const { data: message, error } = await supabase.client
         .from('messages')
-        .insert({
-          conversation_id: data.conversationId,
-          direction: data.direction,
-          content: data.content,
-          message_type: data.messageType,
-          media_url: data.mediaUrl,
-          platform_msg_id: data.platformMsgId,
-          sent_at: new Date().toISOString(),
-          delivered_at: data.direction === 'outbound' ? new Date().toISOString() : null,
-        })
+        .insert(row)
         .select()
         .single()
 

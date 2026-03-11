@@ -73,6 +73,7 @@ async function handleMetaWebhook(body: any) {
     // Procesar cada entrada del webhook
     for (const entry of body.entry || []) {
       for (const change of entry.changes || []) {
+        // message_echoes: mensajes enviados por el negocio (agente o automatización). Suscribir este campo en Meta para que se vean en el panel de chat.
         if (change.field === 'message_echoes') {
           await handleMessageEchoes(change.value)
           continue
@@ -196,6 +197,7 @@ async function handleMetaWebhook(body: any) {
                   const firstName = contactName?.split(/\s+/)[0] || lead.nombre?.split(/\s+/)[0]
                   const payload: Record<string, string | number> = { phone: formattedPhone }
                   if (firstName) payload.first_name = firstName
+                  console.log('[WhatsApp Webhook] Llamando a UChat Inbound Webhook lead-nuevo', { phone: formattedPhone })
                   fetch(uchatLeadNuevoUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -209,6 +211,8 @@ async function handleMetaWebhook(body: any) {
                   }).catch((err) => {
                     console.error('[WhatsApp Webhook] Error llamando a UChat Inbound Webhook lead-nuevo:', err)
                   })
+                } else {
+                  console.warn('[WhatsApp Webhook] UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL no configurada; no se envía mensaje de bienvenida a UChat', { leadId: lead.id })
                 }
                 leadTags.push('lead-nuevo')
                 await supabase.updateLead(lead.id, {
@@ -312,7 +316,39 @@ async function handleMetaWebhook(body: any) {
 }
 
 /**
- * Procesar message_echoes: mensajes enviados por el negocio (para mostrarlos en el historial del CRM)
+ * Extraer texto/contenido de un mensaje echo (enviado por el negocio) para guardarlo en el historial.
+ * Meta puede enviar text, template, interactive, image, etc.
+ */
+function getEchoMessageContent(message: any): { content: string; messageType: string } {
+  if (message.text?.body) {
+    return { content: message.text.body, messageType: 'text' }
+  }
+  if (message.template?.components) {
+    const body = message.template.components?.find((c: any) => c.type === 'body')
+    const text = body?.parameters?.map((p: any) => p.text).join(' ') || message.template.name || '[Plantilla]'
+    return { content: text, messageType: 'text' }
+  }
+  if (message.interactive?.body?.text) {
+    return { content: message.interactive.body.text, messageType: 'text' }
+  }
+  if (message.interactive?.type === 'button' && message.interactive?.action?.buttons) {
+    const btn = message.interactive.action.buttons[0]
+    return { content: btn?.reply?.title || '[Botón]', messageType: 'text' }
+  }
+  if (message.interactive?.type === 'list') {
+    const desc = message.interactive.body?.text || message.interactive.action?.title
+    return { content: desc || '[Lista]', messageType: 'text' }
+  }
+  const type = message.type || 'unknown'
+  if (type === 'image') return { content: message.image?.caption || '[Imagen]', messageType: 'image' }
+  if (type === 'video') return { content: message.video?.caption || '[Video]', messageType: 'video' }
+  if (type === 'audio') return { content: '[Audio]', messageType: 'audio' }
+  if (type === 'document') return { content: message.document?.filename || '[Documento]', messageType: 'document' }
+  return { content: '[Mensaje]', messageType: type }
+}
+
+/**
+ * Procesar message_echoes: mensajes enviados por el negocio (agente o automatización) para mostrarlos en el CRM.
  */
 /**
  * Handler para message_template_status_update (estado de plantillas: aprobadas, rechazadas, etc.)
@@ -356,14 +392,14 @@ async function handleMessageEchoes(value: any) {
         console.log('[WhatsApp Webhook] Echo: no conversation for lead', lead.id)
         continue
       }
-      const content = message.text?.body || '[Multimedia]'
-      const messageType = message.type || 'text'
+      const { content, messageType } = getEchoMessageContent(message)
       await WhatsAppService.createMessage({
         conversationId: conv.id,
         direction: 'outbound',
         content,
-        messageType,
+        messageType: messageType === 'document' ? 'file' : messageType,
         platformMsgId: message.id,
+        isFromBot: true,
       })
       await ConversationService.updateLastActivity(conv.id)
       console.log('[WhatsApp Webhook] Echo saved for lead', lead.id)

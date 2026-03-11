@@ -490,25 +490,18 @@ export class ConversationService {
         throw new Error('Database connection error')
       }
 
-      // Primero buscar la conversación del lead
+      // Buscar la conversación más reciente del lead para esta plataforma (puede haber más de una)
       const { data: conversation, error: conversationError } = await supabase.client
         .from('conversations')
         .select('id')
         .eq('lead_id', leadId)
         .eq('platform', platform)
-        .single()
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-      if (conversationError) {
-        if (conversationError.code === 'PGRST116') {
-          // No hay conversación, retornar array vacío
-          return []
-        }
-        throw conversationError
-      }
-
-      if (!conversation) {
-        return []
-      }
+      if (conversationError) throw conversationError
+      if (!conversation?.id) return []
 
       // Obtener mensajes de la conversación
       const { data: messages, error: messagesError } = await supabase.client

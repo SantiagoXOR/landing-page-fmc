@@ -247,37 +247,55 @@ async function handleMetaWebhook(body: any) {
                 console.log('[WhatsApp Webhook] Lead ya tiene etiqueta lead-nuevo; no se llama a UChat lead-nuevo', { leadId: lead.id, tags: leadTags })
               }
               if (!leadTags.includes('lead-nuevo')) {
-                // Persistir el tag ANTES de llamar a UChat para evitar doble disparo si Meta reenvía el webhook o hay concurrencia
-                leadTags.push('lead-nuevo')
-                await supabase.updateLead(lead.id, {
-                  tags: JSON.stringify(leadTags),
-                  updatedAt: new Date().toISOString(),
-                })
-                ;(lead as { tags?: string }).tags = JSON.stringify(leadTags)
-                console.log('[WhatsApp Webhook] Tag lead-nuevo asignado al lead', { leadId: lead.id })
+                // Claim atómico: solo una petición puede insertar en lead_nuevo_webhook_sent; evita doble disparo con requests paralelos o reintentos de Meta
+                let shouldTriggerUchat = true
+                if (supabase.client) {
+                  const { data, error } = await supabase.client
+                    .from('lead_nuevo_webhook_sent')
+                    .insert({ lead_id: lead.id })
+                    .select('lead_id')
+                    .maybeSingle()
+                  if (error?.code === '23505') {
+                    // Unique violation: otra petición ya disparó el webhook para este lead
+                    shouldTriggerUchat = false
+                    console.log('[WhatsApp Webhook] Lead-nuevo ya enviado por otra petición, omitiendo', { leadId: lead.id })
+                  } else if (error) {
+                    console.warn('[WhatsApp Webhook] Error en claim lead_nuevo_webhook_sent (se intenta enviar igual)', { leadId: lead.id, code: error.code })
+                  }
+                }
 
-                const uchatLeadNuevoUrl = (process.env.UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL || '').trim()
-                if (uchatLeadNuevoUrl) {
-                  const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)
-                  const firstName = contactName?.split(/\s+/)[0] || lead.nombre?.split(/\s+/)[0]
-                  const payload: Record<string, string | number> = { phone: formattedPhone }
-                  if (firstName) payload.first_name = firstName
-                  console.log('[WhatsApp Webhook] Llamando a UChat Inbound Webhook lead-nuevo', { phone: formattedPhone })
-                  fetchWithRetry(
-                    uchatLeadNuevoUrl,
-                    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
-                    'lead-nuevo'
-                  ).then((res) => {
-                    if (!res.ok) {
-                      console.warn('[WhatsApp Webhook] UChat Inbound Webhook lead-nuevo respondió', res.status, { url: uchatLeadNuevoUrl })
-                    } else {
-                      console.log('[WhatsApp Webhook] UChat Inbound Webhook lead-nuevo llamado', { phone: formattedPhone })
-                    }
-                  }).catch((err) => {
-                    console.error('[WhatsApp Webhook] Error llamando a UChat Inbound Webhook lead-nuevo:', err)
+                if (shouldTriggerUchat) {
+                  leadTags.push('lead-nuevo')
+                  await supabase.updateLead(lead.id, {
+                    tags: JSON.stringify(leadTags),
+                    updatedAt: new Date().toISOString(),
                   })
-                } else {
-                  console.warn('[WhatsApp Webhook] UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL no configurada; no se envía mensaje de bienvenida a UChat', { leadId: lead.id })
+                  ;(lead as { tags?: string }).tags = JSON.stringify(leadTags)
+                  console.log('[WhatsApp Webhook] Tag lead-nuevo asignado al lead', { leadId: lead.id })
+
+                  const uchatLeadNuevoUrl = (process.env.UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL || '').trim()
+                  if (uchatLeadNuevoUrl) {
+                    const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)
+                    const firstName = contactName?.split(/\s+/)[0] || lead.nombre?.split(/\s+/)[0]
+                    const payload: Record<string, string | number> = { phone: formattedPhone }
+                    if (firstName) payload.first_name = firstName
+                    console.log('[WhatsApp Webhook] Llamando a UChat Inbound Webhook lead-nuevo', { phone: formattedPhone })
+                    fetchWithRetry(
+                      uchatLeadNuevoUrl,
+                      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+                      'lead-nuevo'
+                    ).then((res) => {
+                      if (!res.ok) {
+                        console.warn('[WhatsApp Webhook] UChat Inbound Webhook lead-nuevo respondió', res.status, { url: uchatLeadNuevoUrl })
+                      } else {
+                        console.log('[WhatsApp Webhook] UChat Inbound Webhook lead-nuevo llamado', { phone: formattedPhone })
+                      }
+                    }).catch((err) => {
+                      console.error('[WhatsApp Webhook] Error llamando a UChat Inbound Webhook lead-nuevo:', err)
+                    })
+                  } else {
+                    console.warn('[WhatsApp Webhook] UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL no configurada; no se envía mensaje de bienvenida a UChat', { leadId: lead.id })
+                  }
                 }
               }
             }

@@ -155,7 +155,7 @@ Si el webhook de **Meta** apunta al **CRM (Vercel)**, los mensajes no llegan a U
    `UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL=https://...`  
    con esa URL.
 
-El CRM envía un POST con `{ "phone": "...", "first_name": "...", "message": "texto del mensaje del usuario" }`. Solo se llama para mensajes de **texto** que **no** contienen "Solicitud de Crédito" y cuando el lead **ya tiene** la etiqueta lead-nuevo (para no duplicar con la bienvenida).
+El CRM envía un POST con `{ "phone": "...", "first_name": "...", "message": "texto del mensaje del usuario", "message_id": "wamid.xxx", "timestamp": "ISO8601" }`. El CRM **espera** la respuesta de UChat antes de devolver 200 a Meta para preservar el orden (evitar que Carla responda a una consulta anterior). Solo se llama para mensajes de **texto** que **no** contienen "Solicitud de Crédito" y cuando el lead **ya tiene** la etiqueta lead-nuevo (para no duplicar con la bienvenida).
 
 ### 5.2 Disparar el subflujo con Default Reply (Keywords)
 

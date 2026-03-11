@@ -355,8 +355,24 @@ async function handleMetaWebhook(body: any) {
               }
             } else if (rawText && lead?.id && hadLeadNuevoBefore) {
               // Flujo de consultas (Consultas - Carla): solo responde si el lead tiene la etiqueta lead-nuevo.
-              // Segundo mensaje en adelante: asignar tag solicitando-info para indicar que está consultando.
-              {
+              // Claim atómico por mensaje: solo una petición puede llamar a Carla por cada platform_msg_id (evita duplicado en 3er mensaje o reintentos de Meta).
+              const platformMsgId = message.id
+              let shouldCallCarla = true
+              if (platformMsgId && supabase.client) {
+                const { error } = await supabase.client
+                  .from('carla_webhook_sent')
+                  .insert({ platform_msg_id: platformMsgId })
+                  .select('platform_msg_id')
+                  .maybeSingle()
+                if (error?.code === '23505') {
+                  shouldCallCarla = false
+                  console.log('[WhatsApp Webhook] Mensaje ya enviado a Consultas - Carla, omitiendo', { platformMsgId })
+                } else if (error) {
+                  console.warn('[WhatsApp Webhook] Error en claim carla_webhook_sent (se intenta enviar igual)', { platformMsgId, code: error.code })
+                }
+              }
+
+              if (shouldCallCarla) {
                 let consultaTags: string[] = []
                 if (lead.tags) {
                   try {

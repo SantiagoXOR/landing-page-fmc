@@ -247,6 +247,15 @@ async function handleMetaWebhook(body: any) {
                 console.log('[WhatsApp Webhook] Lead ya tiene etiqueta lead-nuevo; no se llama a UChat lead-nuevo', { leadId: lead.id, tags: leadTags })
               }
               if (!leadTags.includes('lead-nuevo')) {
+                // Persistir el tag ANTES de llamar a UChat para evitar doble disparo si Meta reenvía el webhook o hay concurrencia
+                leadTags.push('lead-nuevo')
+                await supabase.updateLead(lead.id, {
+                  tags: JSON.stringify(leadTags),
+                  updatedAt: new Date().toISOString(),
+                })
+                ;(lead as { tags?: string }).tags = JSON.stringify(leadTags)
+                console.log('[WhatsApp Webhook] Tag lead-nuevo asignado al lead', { leadId: lead.id })
+
                 const uchatLeadNuevoUrl = (process.env.UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL || '').trim()
                 if (uchatLeadNuevoUrl) {
                   const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)
@@ -270,13 +279,6 @@ async function handleMetaWebhook(body: any) {
                 } else {
                   console.warn('[WhatsApp Webhook] UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL no configurada; no se envía mensaje de bienvenida a UChat', { leadId: lead.id })
                 }
-                leadTags.push('lead-nuevo')
-                await supabase.updateLead(lead.id, {
-                  tags: JSON.stringify(leadTags),
-                  updatedAt: new Date().toISOString(),
-                })
-                ;(lead as { tags?: string }).tags = JSON.stringify(leadTags)
-                console.log('[WhatsApp Webhook] Tag lead-nuevo asignado al lead', { leadId: lead.id })
               }
             }
 

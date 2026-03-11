@@ -5,6 +5,40 @@ import { supabase } from '@/lib/db'
 import { formatWhatsAppNumber } from '@/lib/integrations/whatsapp-business-api'
 import { parseFormMessage, updateLeadFromParsedForm } from '@/lib/form-message-parser'
 
+const UCHAT_FETCH_RETRIES = 3
+const UCHAT_FETCH_DELAY_MS = 800
+
+/**
+ * fetch con reintentos para llamadas a UChat (mitiga ECONNRESET / TLS intermitentes).
+ * Reintenta en fallos de red o si la respuesta es 5xx.
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  label: string
+): Promise<Response> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= UCHAT_FETCH_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, options)
+      if (res.status >= 500 && attempt < UCHAT_FETCH_RETRIES) {
+        lastError = new Error(`HTTP ${res.status}`)
+        await new Promise((r) => setTimeout(r, UCHAT_FETCH_DELAY_MS * attempt))
+        continue
+      }
+      return res
+    } catch (err) {
+      lastError = err
+      if (attempt < UCHAT_FETCH_RETRIES) {
+        await new Promise((r) => setTimeout(r, UCHAT_FETCH_DELAY_MS * attempt))
+      } else {
+        throw lastError
+      }
+    }
+  }
+  throw lastError
+}
+
 export async function GET(request: NextRequest) {
   // Verificación del webhook de WhatsApp (Meta) o Manychat
   const { searchParams } = new URL(request.url)
@@ -194,6 +228,9 @@ async function handleMetaWebhook(body: any) {
                 }
               }
               hadLeadNuevoBefore = leadTags.includes('lead-nuevo')
+              if (hadLeadNuevoBefore) {
+                console.log('[WhatsApp Webhook] Lead ya tiene etiqueta lead-nuevo; no se llama a UChat lead-nuevo', { leadId: lead.id, tags: leadTags })
+              }
               if (!leadTags.includes('lead-nuevo')) {
                 const uchatLeadNuevoUrl = (process.env.UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL || '').trim()
                 if (uchatLeadNuevoUrl) {
@@ -202,11 +239,11 @@ async function handleMetaWebhook(body: any) {
                   const payload: Record<string, string | number> = { phone: formattedPhone }
                   if (firstName) payload.first_name = firstName
                   console.log('[WhatsApp Webhook] Llamando a UChat Inbound Webhook lead-nuevo', { phone: formattedPhone })
-                  fetch(uchatLeadNuevoUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                  }).then((res) => {
+                  fetchWithRetry(
+                    uchatLeadNuevoUrl,
+                    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+                    'lead-nuevo'
+                  ).then((res) => {
                     if (!res.ok) {
                       console.warn('[WhatsApp Webhook] UChat Inbound Webhook lead-nuevo respondió', res.status, { url: uchatLeadNuevoUrl })
                     } else {
@@ -264,11 +301,11 @@ async function handleMetaWebhook(body: any) {
                   const payload: Record<string, string | number> = { phone: formattedPhone }
                   if (firstName) payload.first_name = firstName
                   // Fire-and-forget: no bloquear la respuesta a Meta
-                  fetch(uchatWebhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                  }).then((res) => {
+                  fetchWithRetry(
+                    uchatWebhookUrl,
+                    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+                    'Solicitud de Crédito'
+                  ).then((res) => {
                     if (!res.ok) {
                       console.warn('[WhatsApp Webhook] UChat Inbound Webhook respondió', res.status, { url: uchatWebhookUrl })
                     } else {
@@ -296,11 +333,11 @@ async function handleMetaWebhook(body: any) {
                   }
                   if (firstName) payload.first_name = firstName
                   console.log('[WhatsApp Webhook] Llamando a UChat Inbound Webhook Consultas - Carla', { phone: formattedPhone })
-                  fetch(uchatCarlaUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                  }).then((res) => {
+                  fetchWithRetry(
+                    uchatCarlaUrl,
+                    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+                    'Consultas - Carla'
+                  ).then((res) => {
                     if (!res.ok) {
                       console.warn('[WhatsApp Webhook] UChat Inbound Webhook Consultas - Carla respondió', res.status, { url: uchatCarlaUrl })
                     } else {

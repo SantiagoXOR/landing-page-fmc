@@ -223,9 +223,11 @@ class SupabaseClient {
   }
 
   async findLeadByPhoneOrDni(telefono: string, dni?: string) {
-    let query = `telefono=eq.${telefono}`
+    // Codificar valor para que + no se interprete como espacio en la URL (evita no encontrar el lead y re-enviar lead-nuevo)
+    const telEnc = encodeURIComponent(telefono)
+    let query = `telefono=eq.${telEnc}`
     if (dni) {
-      query = `or=(telefono.eq.${telefono},dni.eq.${dni})`
+      query = `or=(telefono.eq.${telEnc},dni.eq.${encodeURIComponent(dni)})`
     }
 
     const leads = await this.request(`/Lead?${query}&select=*&limit=1`)

@@ -327,9 +327,9 @@ export class WhatsAppService {
 
       console.log('[WhatsApp] Message status updated:', { platformMsgId, status })
 
-      if (status === 'read' && this.whatsappClient) {
-        await this.whatsappClient.markAsRead(platformMsgId)
-      }
+      // No llamar a markAsRead aquí: este método se usa al procesar el webhook de Meta
+      // (statuses = mensajes que nosotros enviamos y el usuario leyó). La API "Mark as read"
+      // es solo para marcar mensajes entrantes del usuario como leídos; usar su ID aquí da (#100) Invalid parameter.
     } catch (error) {
       console.error('[WhatsApp] Error updating message status:', error)
     }

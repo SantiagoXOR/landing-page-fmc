@@ -301,12 +301,12 @@ async function handleMetaWebhook(body: any) {
                   }
                 }
                 if (!currentTags.includes('solicitud-en-proceso')) {
-                  currentTags.push('solicitud-en-proceso')
+                  // En "solicitud en proceso" el lead debe tener solo este tag (quita lead-nuevo y evita reenvío del flujo bienvenida)
                   await supabase.updateLead(lead.id, {
-                    tags: JSON.stringify(currentTags),
+                    tags: JSON.stringify(['solicitud-en-proceso']),
                     updatedAt: new Date().toISOString(),
                   })
-                  console.log('[WhatsApp Webhook] Tag solicitud-en-proceso asignado al lead', { leadId: lead.id })
+                  console.log('[WhatsApp Webhook] Tag solicitud-en-proceso asignado al lead (tags normalizados)', { leadId: lead.id })
                 }
                 // Reenviar a UChat Inbound Webhook para que ejecute el flujo "Solicitud de Crédito" y envíe la respuesta al usuario
                 const uchatWebhookUrl = (process.env.UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL || '').trim()

@@ -287,14 +287,22 @@ export class WhatsAppService {
   static async updateMessageStatus(
     platformMsgId: string,
     status: 'sent' | 'delivered' | 'read',
-    timestamp?: string
+    timestamp?: string | number
   ) {
     try {
       if (!supabase.client) {
         throw new Error('Database connection error')
       }
 
-      const ts = timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
+      // Meta envía timestamp en segundos Unix; evitar RangeError: Invalid time value
+      let ts: string
+      if (timestamp == null || timestamp === '') {
+        ts = new Date().toISOString()
+      } else {
+        const n = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp
+        const date = !Number.isNaN(n) && n > 0 ? new Date(n < 1e12 ? n * 1000 : n) : new Date(timestamp as string)
+        ts = Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString()
+      }
       const updates: Record<string, string> = {}
 
       if (status === 'sent') {

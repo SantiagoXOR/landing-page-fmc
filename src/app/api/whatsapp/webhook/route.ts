@@ -181,6 +181,9 @@ async function handleMetaWebhook(body: any) {
 
             // Flujo "lead-nuevo": cuando alguien escribe por primera vez (sin etiqueta lead-nuevo), llamar a UChat
             // para que envíe el mensaje de bienvenida y aplique la etiqueta en UChat (como en el diagrama del flujo).
+            // Guardamos si ya tenía lead-nuevo ANTES de modificar, para no llamar a Consultas - Carla en el mismo mensaje
+            // (evitar que bienvenida y Carla compitan o que solo llegue la bienvenida).
+            let hadLeadNuevoBefore = false
             if (lead?.id) {
               let leadTags: string[] = []
               if (lead.tags) {
@@ -190,6 +193,7 @@ async function handleMetaWebhook(body: any) {
                   leadTags = []
                 }
               }
+              hadLeadNuevoBefore = leadTags.includes('lead-nuevo')
               if (!leadTags.includes('lead-nuevo')) {
                 const uchatLeadNuevoUrl = (process.env.UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL || '').trim()
                 if (uchatLeadNuevoUrl) {
@@ -277,20 +281,11 @@ async function handleMetaWebhook(body: any) {
               } catch (err) {
                 console.error('[WhatsApp Webhook] Error procesando Solicitud de Crédito (custom fields / tag):', err)
               }
-            } else if (rawText && lead?.id) {
+            } else if (rawText && lead?.id && hadLeadNuevoBefore) {
               // Mensaje de consulta (no es "Solicitud de Crédito"): reenviar a UChat Inbound Webhook "Consultas - Carla"
-              // para que el AI Agent Carla responda con la base de conocimiento. Solo si el lead ya tiene lead-nuevo
-              // (no es el primer mensaje) para no enviar bienvenida + respuesta de Carla a la vez.
-              let hasLeadNuevo = false
-              if (lead.tags) {
-                try {
-                  const tags = Array.isArray(lead.tags) ? lead.tags : JSON.parse(String(lead.tags))
-                  hasLeadNuevo = tags.includes('lead-nuevo')
-                } catch {
-                  // ignore
-                }
-              }
-              if (hasLeadNuevo) {
+              // para que el AI Agent Carla responda. Solo si el lead YA TENÍA lead-nuevo antes de este mensaje,
+              // así no llamamos a Carla en el mismo mensaje en que enviamos la bienvenida (Lead nuevo).
+              {
                 const uchatCarlaUrl = (process.env.UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL || '').trim()
                 if (uchatCarlaUrl) {
                   const contactName = getContactNameFromWebhook(phoneNumber, contacts, message)

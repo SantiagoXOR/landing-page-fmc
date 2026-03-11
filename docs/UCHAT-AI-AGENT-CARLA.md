@@ -4,6 +4,31 @@ Referencia para configurar el agente **Carla** en UChat (Add AI Agent). Copiar y
 
 ---
 
+## Documentación oficial UChat (AI Agents y flows)
+
+| Recurso | URL | Contenido |
+|--------|-----|-----------|
+| **Create AI Agent** (training) | https://uchat.au/uchat-training/ai-agent-2-1-create-ai-agent | Crear agente, persona, skills, constraints; **activar el agente en el Flow Builder** (Action → Add Item → **AI Actions** → elegir el agente). |
+| **AI Task Explained** | https://uchat.au/uchat-training/ai-agent-2-3-ai-task | Uso de AI Tasks en flujos (ej. follow-ups, análisis de historial). |
+| **AI Hub / AI Agents** | https://uchat.au/uchat-training/ai-agent-1-1-overview | Resumen del AI Hub y capacidades. |
+| **Troubleshooting AI Agents** | https://uchat.au/uchat-training/ai-agent-3-2-troubleshooting | Diagnóstico cuando el agente no responde. |
+| **Flow Builder Overview** | https://docs.uchat.com.au/flow-builder/ | Tipos de flujo, subflujos, pasos (Send Message, Action, etc.). |
+| **Send Users to different Flows using AI Functions** | https://uchat.au/uchat-training/ai-agent-4-94-send-users-to-different-flows-using-ai-functions | Enrutar usuarios con AI Functions. |
+
+### Cómo activar el AI Agent en un flujo (según documentación)
+
+1. Abrir el **Flow Builder** y el subflujo donde debe actuar el agente (ej. **Consultas - Carla**).
+2. Añadir un paso de tipo **Action** (Select Next Step → **Action**).
+3. Dentro del nodo **Action**, hacer clic en **"Add Item"** (o "Use the buttons below to add action item").
+4. Ir a la sección **"AI Actions"** (icono de sparkle/estrella).
+5. **Elegir tu AI Agent** (ej. **Carla - Asistente Prendarios**) de la lista. Eso añade la acción que invoca al agente en ese paso.
+6. Configurar "Next step after actions are performed" si hace falta y guardar.
+7. **Publish** el flujo.
+
+Así el agente se ejecuta cuando el flujo llega a ese Action y responde con su prompt/base de conocimiento.
+
+---
+
 ## 1. Name (obligatorio, máx. 50 caracteres)
 
 ```
@@ -179,6 +204,28 @@ Solicitud de Crédito  → Sub Flow "Consultas - Carla"
 ### 5.5 Publicar
 
 Después de guardar el subflujo y la Default Reply, en el Flow Builder pulsar **Publish** para que la versión en borrador sea la activa.
+
+---
+
+## 5.6 Diagnóstico: webhook Success pero Carla no responde (AI Usage Logs vacío)
+
+Si en **Webhook logs** el call a "Consultas - Carla (desde CRM)" sale **Success** pero en **AI Usage Logs** no aparece nada y el usuario no recibe respuesta de Carla, el Inbound Webhook llega a UChat pero **el AI Agent no se está ejecutando**. Causas habituales:
+
+1. **El subflujo no invoca a Carla**  
+   El subflujo "Consultas - Carla" debe tener **al menos un paso que ejecute el AI Agent** (Carla). Si el subflujo está vacío (solo Start → fin) o solo hace otra cosa, la IA no se dispara. Revisar que haya un paso tipo "AI Agent" / "Invoke AI" que use a **Carla - Asistente Prendarios** y que ese paso esté conectado desde el inicio.
+
+2. **El mensaje del usuario no llega al agente (trigger por webhook)**  
+   Cuando el flujo se dispara por **Inbound Webhook**, el mensaje del usuario viene en el payload (`message`), no en el hilo de conversación. Hay que:
+   - En el **Inbound Webhook** → **Mapping**, mapear el campo **`message`** del JSON a un **custom field** o al campo que UChat use como “último mensaje del usuario” o “input para el AI Agent” (nombre puede ser `last_message`, `user_message`, o el que indique la UI).
+   - En el subflujo, asegurarse de que el paso del **AI Agent** use ese campo como **entrada** (input/prompt del usuario). Si el agente no recibe texto de entrada, no generará respuesta y no verás uso en AI Usage Logs.
+
+3. **Trigger workflow del agente**  
+   En **AI Agents** → Carla → **Trigger workflow** debe apuntar al subflujo **Consultas - Carla**. Si está vacío o apunta a otro flujo, las llamadas al webhook no ejecutarán a Carla.
+
+4. **Publicación**  
+   Después de tocar el subflujo o el webhook, hacer **Publish** en el Flow Builder para que los cambios estén activos.
+
+**Resumen:** Webhook Success + AI Usage Logs vacío = el subflujo se ejecuta pero el paso que llama a Carla no corre o no recibe el mensaje. Revisar: subflujo con paso AI Agent → Carla, mapeo de `message` a un campo que ese paso use como entrada, Trigger workflow de Carla = Consultas - Carla, y Publish.
 
 ---
 

@@ -172,35 +172,62 @@ async function handleMetaWebhook(body: any) {
             let lead = await supabase.findLeadByPhoneOrDni(formattedPhone) || 
                       await supabase.findLeadByPhoneOrDni(phoneNumber)
 
-            // Auto-crear lead si no existe
+            // Auto-crear lead si no existe. Claim por teléfono evita dos registros cuando llegan "hola" y "1" seguidos.
             if (!lead) {
-              console.log('[WhatsApp Webhook] Creating new lead for:', phoneNumber)
-              
-              try {
-                lead = await supabase.createLead({
-                  nombre: contactName || `Lead WhatsApp ${phoneNumber.slice(-4)}`,
-                  telefono: formattedPhone,
-                  origen: 'whatsapp',
-                  estado: 'NUEVO',
-                  notas: `Lead creado automáticamente desde WhatsApp.\nPrimer mensaje: ${messageText}`,
-                })
+              let canCreate = true
+              if (supabase.client) {
+                const { error } = await supabase.client
+                  .from('lead_creation_claim')
+                  .insert({ telefono: formattedPhone })
+                  .select('telefono')
+                  .maybeSingle()
+                if (error?.code === '23505') canCreate = false // otra petición ya está creando este teléfono
+                else if (error) {
+                  console.warn('[WhatsApp Webhook] Error en claim lead_creation_claim, se intenta crear igual', { code: error.code })
+                }
+              }
 
-                console.log('[WhatsApp Webhook] Lead created successfully:', lead.id)
+              if (!canCreate) {
+                // Otra petición creó o está creando el lead; esperar y buscar hasta encontrarlo
+                for (let attempt = 0; attempt < 8; attempt++) {
+                  await new Promise((r) => setTimeout(r, 200 + attempt * 100))
+                  lead = await supabase.findLeadByPhoneOrDni(formattedPhone) || await supabase.findLeadByPhoneOrDni(phoneNumber)
+                  if (lead) {
+                    console.log('[WhatsApp Webhook] Lead encontrado tras claim (otra petición lo creó)', { leadId: lead.id })
+                    break
+                  }
+                }
+              }
 
-                // Registrar evento de creación
-                await supabase.createEvent({
-                  leadId: lead.id,
-                  tipo: 'lead_created_from_whatsapp',
-                  payload: JSON.stringify({
-                    phoneNumber,
-                    contactName,
-                    firstMessage: messageText,
-                    messageType: message.type,
-                  }),
-                })
-              } catch (error) {
-                console.error('[WhatsApp Webhook] Error creating lead:', error)
-                // Continuar procesamiento incluso si falla la creación del lead
+              if (!lead && canCreate) {
+                console.log('[WhatsApp Webhook] Creating new lead for:', phoneNumber)
+                try {
+                  lead = await supabase.createLead({
+                    nombre: contactName || `Lead WhatsApp ${phoneNumber.slice(-4)}`,
+                    telefono: formattedPhone,
+                    origen: 'whatsapp',
+                    estado: 'NUEVO',
+                    notas: `Lead creado automáticamente desde WhatsApp.\nPrimer mensaje: ${messageText}`,
+                  })
+                  console.log('[WhatsApp Webhook] Lead created successfully:', lead.id)
+                  await supabase.createEvent({
+                    leadId: lead.id,
+                    tipo: 'lead_created_from_whatsapp',
+                    payload: JSON.stringify({
+                      phoneNumber,
+                      contactName,
+                      firstMessage: messageText,
+                      messageType: message.type,
+                    }),
+                  })
+                } catch (error: any) {
+                  const isConflict = error?.message?.includes('409') || error?.message?.includes('Conflict')
+                  if (isConflict) {
+                    lead = await supabase.findLeadByPhoneOrDni(formattedPhone) || await supabase.findLeadByPhoneOrDni(phoneNumber)
+                    if (lead) console.log('[WhatsApp Webhook] Lead ya existía (409), usando existente:', lead.id)
+                  }
+                  if (!lead) console.error('[WhatsApp Webhook] Error creating lead:', error)
+                }
               }
             } else {
               console.log('[WhatsApp Webhook] Lead found:', lead.id)

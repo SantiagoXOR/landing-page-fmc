@@ -60,11 +60,23 @@ async function calculatePeriodMetrics(
   stalledLeads: number
 }> {
   try {
-    // Obtener TODOS los leads (no solo del período para totalLeads)
-    const { leads: allLeads } = await supabaseLeadService.getLeads({
-      limit: 10000,
-      offset: 0
-    })
+    // Obtener leads con paginación para evitar límite 1000 de Supabase
+    const PAGE_SIZE = 1000
+    const MAX_LEADS = 50000
+    let allLeads: any[] = []
+    let totalFromApi = 0
+
+    let offset = 0
+    do {
+      const { leads, total } = await supabaseLeadService.getLeads({
+        limit: PAGE_SIZE,
+        offset
+      })
+      totalFromApi = total
+      allLeads = allLeads.concat(leads || [])
+      offset += PAGE_SIZE
+      if ((leads?.length ?? 0) < PAGE_SIZE || allLeads.length >= totalFromApi || allLeads.length >= MAX_LEADS) break
+    } while (true)
 
     // Filtrar leads por fecha de creación para métricas del período
     const periodLeads = allLeads.filter(lead => {
@@ -134,7 +146,7 @@ async function calculatePeriodMetrics(
       // Primero verificar por etapa del pipeline
       if (pipelineInfo) {
         const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || ''
-        // Preaprobados: solo etapa PREAPROBADO (métrica principal)
+        // Preaprobados: etapa PREAPROBADO o tags preaprobado/pre-aprobado
         if (pipelineInfo.current_stage === 'PREAPROBADO') {
           preapprovedCount++
         }
@@ -143,6 +155,11 @@ async function calculatePeriodMetrics(
         } else if (stageId === 'cerrado-perdido' || pipelineInfo.current_stage === 'RECHAZADO' || pipelineInfo.current_stage === 'CIERRE_PERDIDO') {
           isRejected = true
         }
+      }
+
+      // Preaprobados por tags (respaldo si no está en etapa PREAPROBADO)
+      if (tagsLower.some(t => t === 'preaprobado' || t === 'pre-aprobado') && pipelineMap.get(leadId)?.current_stage !== 'PREAPROBADO') {
+        preapprovedCount++
       }
 
       // Luego verificar por tags
@@ -163,42 +180,46 @@ async function calculatePeriodMetrics(
       if (isRejected) rejectedCount++
     }
 
-    // Calcular métricas del período para urgentes y estancados
-    for (const lead of periodLeads) {
+    // Calcular urgentes y estancados sobre TODOS los leads (no solo del período)
+    for (const lead of allLeads) {
       const leadId = lead.id as string
       const pipelineInfo = pipelineMap.get(leadId)
 
-      // Calcular score y urgencia
       if (pipelineInfo) {
         const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
         const stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt || new Date())
         const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
 
-        // Contar urgentes (high o critical)
         if (timeScore.urgency === 'high' || timeScore.urgency === 'critical') {
           urgentCount++
         }
-
-        // Contar estancados (15+ días)
         if (timeScore.daysInStage >= 15) {
           stalledCount++
         }
-
-        // Acumular tiempo en etapa
-        totalTimeInStage += timeScore.daysInStage
-        leadsWithTimeData++
-
-        // Determinar prioridad basada en score
         if (timeScore.urgency === 'critical' || timeScore.urgency === 'high') {
           highPriorityCount++
         }
       }
     }
 
+    // Promedio de tiempo en etapa: solo sobre leads del período
+    for (const lead of periodLeads) {
+      const leadId = lead.id as string
+      const pipelineInfo = pipelineMap.get(leadId)
+
+      if (pipelineInfo) {
+        const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
+        const stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt || new Date())
+        const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
+        totalTimeInStage += timeScore.daysInStage
+        leadsWithTimeData++
+      }
+    }
+
     const averageTimeInStage = leadsWithTimeData > 0 ? totalTimeInStage / leadsWithTimeData : 0
 
     return {
-      totalLeads: allLeads.length, // Total de TODOS los leads
+      totalLeads: totalFromApi > 0 ? totalFromApi : allLeads.length, // Total real desde API (evita techo 1000)
       preapprovedLeads: preapprovedCount,
       approvedLeads: approvedCount,
       rejectedLeads: rejectedCount,

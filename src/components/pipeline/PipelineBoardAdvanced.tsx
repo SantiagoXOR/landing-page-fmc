@@ -51,6 +51,10 @@ interface PipelineBoardAdvancedProps {
   onStageClick?: (stage: PipelineStage) => void
   onAddLead?: (stageId: string) => void
   onLeadMoved?: (leadId: string, newStageId: string) => void
+  onLoadMore?: (stageId: string) => void
+  getHasMore?: (stageId: string) => boolean
+  getLoadingMore?: (stageId: string) => boolean
+  getTotalCount?: (stageId: string) => number
   isLoading?: boolean
   className?: string
 }
@@ -63,6 +67,10 @@ export function PipelineBoardAdvanced({
   onStageClick,
   onAddLead,
   onLeadMoved,
+  onLoadMore,
+  getHasMore,
+  getLoadingMore,
+  getTotalCount,
   isLoading = false,
   className = ''
 }: PipelineBoardAdvancedProps) {
@@ -591,6 +599,10 @@ export function PipelineBoardAdvanced({
                         onLeadMove={handleLeadMoveToStage}
                         onLeadMoved={onLeadMoved}
                         scrollContainerRef={scrollContainerRef}
+                        onLoadMore={onLoadMore}
+                        getHasMore={getHasMore}
+                        getLoadingMore={getLoadingMore}
+                        getTotalCount={getTotalCount}
                       />
                     </div>
                   )
@@ -645,7 +657,13 @@ interface PipelineStageColumnProps {
   onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
   onLeadMoved?: (leadId: string, newStageId: string) => void
   scrollContainerRef: React.RefObject<HTMLDivElement>
+  onLoadMore?: (stageId: string) => void
+  getHasMore?: (stageId: string) => boolean
+  getLoadingMore?: (stageId: string) => boolean
+  getTotalCount?: (stageId: string) => number
 }
+
+const SCROLL_LOAD_THRESHOLD = 200
 
 function PipelineStageColumn({
   stage,
@@ -663,7 +681,11 @@ function PipelineStageColumn({
   stages,
   onLeadMove,
   onLeadMoved,
-  scrollContainerRef
+  scrollContainerRef,
+  onLoadMore,
+  getHasMore,
+  getLoadingMore,
+  getTotalCount
 }: PipelineStageColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
@@ -848,7 +870,7 @@ function PipelineStageColumn({
                 {stage.name}
               </CardTitle>
               <Badge variant="secondary" className="text-xs">
-                {stats.count}
+                {getTotalCount && getTotalCount(stage.id) > 0 ? getTotalCount(stage.id) : stats.count}
               </Badge>
             </div>
             
@@ -888,6 +910,14 @@ function PipelineStageColumn({
           onMouseMove={handleContentMouseMove}
           onMouseUp={handleContentMouseUp}
           onMouseLeave={handleContentMouseLeave}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            if (!onLoadMore || !getHasMore?.(stage.id) || getLoadingMore?.(stage.id)) return
+            const { scrollTop, scrollHeight, clientHeight } = el
+            if (scrollTop + clientHeight >= scrollHeight - SCROLL_LOAD_THRESHOLD) {
+              onLoadMore(stage.id)
+            }
+          }}
         >
           {leads.map((lead) => (
             <LeadCard
@@ -903,7 +933,11 @@ function PipelineStageColumn({
               onLeadMoved={onLeadMoved}
             />
           ))}
-          
+          {onLoadMore && getHasMore?.(stage.id) && getLoadingMore?.(stage.id) && (
+            <div className="flex justify-center py-3">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
           {leads.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />

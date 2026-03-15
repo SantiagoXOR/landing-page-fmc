@@ -60,9 +60,10 @@ async function calculatePeriodMetrics(
   stalledLeads: number
 }> {
   try {
-    // Obtener leads con paginación para evitar límite 1000 de Supabase
+    // Obtener leads con paginación para evitar límite 1000 de Supabase.
+    // MAX_LEADS limita el volumen para que getLeadPipelines y el loop terminen en tiempo razonable.
     const PAGE_SIZE = 1000
-    const MAX_LEADS = 50000
+    const MAX_LEADS = 15000
     let allLeads: any[] = []
     let totalFromApi = 0
 
@@ -74,9 +75,18 @@ async function calculatePeriodMetrics(
       })
       totalFromApi = total
       allLeads = allLeads.concat(leads || [])
-      offset += PAGE_SIZE
       if ((leads?.length ?? 0) < PAGE_SIZE || allLeads.length >= totalFromApi || allLeads.length >= MAX_LEADS) break
+      offset += PAGE_SIZE
     } while (true)
+
+    // Deduplicar por id por si la paginación devolvió filas repetidas (límite de Supabase, etc.)
+    const seenIds = new Set<string>()
+    allLeads = allLeads.filter(l => {
+      const id = l.id as string | undefined
+      if (!id || seenIds.has(id)) return false
+      seenIds.add(id)
+      return true
+    })
 
     // Filtrar leads por fecha de creación para métricas del período
     const periodLeads = allLeads.filter(lead => {

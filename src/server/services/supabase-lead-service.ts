@@ -702,49 +702,46 @@ export class SupabaseLeadService {
     }
   }
 
+  /** Tamaño de lote para no exceder longitud de URL en filtro in.(...) */
+  private static readonly LEAD_PIPELINES_BATCH_SIZE = 150
+
   /**
-   * Obtiene información del pipeline (current_stage) para múltiples leads
-   * Maneja errores gracefully si la tabla no existe
+   * Obtiene información del pipeline (current_stage) para múltiples leads.
+   * Hace requests por lotes para no exceder el límite de longitud de URL.
    */
   async getLeadPipelines(leadIds: string[]): Promise<Map<string, { current_stage: string; stage_entered_at: string }>> {
     const pipelineMap = new Map<string, { current_stage: string; stage_entered_at: string }>()
-    
-    if (leadIds.length === 0) {
-      return pipelineMap
-    }
+    if (leadIds.length === 0) return pipelineMap
 
-    try {
-      // Construir filtro para obtener información de pipeline de múltiples leads
-      const response = await this.makeRequest(
-        `lead_pipeline?lead_id=in.(${leadIds.join(',')})&select=lead_id,current_stage,stage_entered_at`
-      )
-      
-      const pipelines = await response.json()
-      
-      if (!Array.isArray(pipelines)) {
-        logger.warn('getLeadPipelines: response is not an array', { response: pipelines })
-        return pipelineMap
-      }
-
-      pipelines.forEach((pipeline: any) => {
-        if (pipeline.lead_id && pipeline.current_stage) {
-          pipelineMap.set(pipeline.lead_id, {
-            current_stage: pipeline.current_stage,
-            stage_entered_at: pipeline.stage_entered_at || new Date().toISOString()
-          })
+    const batchSize = SupabaseLeadService.LEAD_PIPELINES_BATCH_SIZE
+    for (let i = 0; i < leadIds.length; i += batchSize) {
+      const batch = leadIds.slice(i, i + batchSize)
+      try {
+        const response = await this.makeRequest(
+          `lead_pipeline?lead_id=in.(${batch.join(',')})&select=lead_id,current_stage,stage_entered_at`
+        )
+        const pipelines = await response.json()
+        if (!Array.isArray(pipelines)) {
+          logger.warn('getLeadPipelines: response is not an array', { batchIndex: i / batchSize })
+          continue
         }
-      })
-
-      return pipelineMap
-
-    } catch (error: any) {
-      // Si la tabla no existe o hay un error, simplemente retornar mapa vacío
-      logger.warn('Could not fetch lead pipelines', {
-        error: error.message,
-        leadCount: leadIds.length
-      })
-      return pipelineMap
+        pipelines.forEach((pipeline: any) => {
+          if (pipeline.lead_id && pipeline.current_stage) {
+            pipelineMap.set(pipeline.lead_id, {
+              current_stage: pipeline.current_stage,
+              stage_entered_at: pipeline.stage_entered_at || new Date().toISOString()
+            })
+          }
+        })
+      } catch (error: any) {
+        logger.warn('Could not fetch lead pipelines batch', {
+          error: error.message,
+          batchIndex: Math.floor(i / batchSize),
+          batchSize: batch.length
+        })
+      }
     }
+    return pipelineMap
   }
 }
 

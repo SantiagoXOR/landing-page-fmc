@@ -191,13 +191,14 @@ export async function GET(
       }, { status: 500 })
     }
 
-    // Obtener lead_ids de lead_pipeline que están en las etapas especificadas
-    // Usar solo los stages válidos
+    // Obtener lead_ids de lead_pipeline que están en las etapas especificadas.
+    // Ordenar por stage_entered_at desc para que la primera página sean los más recientes (como en producción).
     logger.debug('Fetching pipelines for stage', { stageId, validStages, offset, limit })
     const { data: pipelines, error: pipelineError } = await supabaseClient
       .from('lead_pipeline')
       .select('lead_id, current_stage, stage_entered_at, assigned_to')
       .in('current_stage', validStages)
+      .order('stage_entered_at', { ascending: false, nullsFirst: false })
       .range(offset, offset + limit - 1)
     
     logger.debug('Pipelines fetched', { 
@@ -318,11 +319,10 @@ export async function GET(
       }
     })
 
-    // Mapear leads a PipelineLead
+    // Mapear leads a PipelineLead (la query a Lead no preserva orden; leadIds viene ordenado por stage_entered_at desc)
     const pipelineLeads: PipelineLead[] = []
     for (const lead of leads) {
       if (!lead.id || !leadIds.includes(lead.id)) continue
-      
       try {
         const leadId = lead.id as string
         const pipelineInfo = pipelineMap.get(leadId) || null
@@ -335,34 +335,15 @@ export async function GET(
       }
     }
 
-    // Ordenar por fecha de entrada a la etapa: más recientes primero (newest first)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-
-    const priorityLeadsWith24hWindow: PipelineLead[] = []
-    const otherLeads: PipelineLead[] = []
-
-    for (const pipelineLead of pipelineLeads) {
-      const isPriority = pipelineLead.priority === 'high' || pipelineLead.priority === 'urgent'
-      const stageEntry = pipelineLead.stageEntryDate ? new Date(pipelineLead.stageEntryDate).getTime() : 0
-      const enteredThisStageRecently = stageEntry && stageEntry >= twentyFourHoursAgo.getTime()
-
-      if (isPriority && enteredThisStageRecently) {
-        priorityLeadsWith24hWindow.push(pipelineLead)
-      } else {
-        otherLeads.push(pipelineLead)
-      }
+    // Ordenar exactamente como vino de lead_pipeline: más recientes primero (leadIds ya viene ordenado por stage_entered_at desc)
+    const orderByLeadIds = (a: PipelineLead, b: PipelineLead) => {
+      const i = leadIds.indexOf(a.id)
+      const j = leadIds.indexOf(b.id)
+      return i - j
     }
+    pipelineLeads.sort(orderByLeadIds)
 
-    const sortByStageEntryDesc = (a: PipelineLead, b: PipelineLead) => {
-      const dateA = a.stageEntryDate ? new Date(a.stageEntryDate).getTime() : 0
-      const dateB = b.stageEntryDate ? new Date(b.stageEntryDate).getTime() : 0
-      return dateB - dateA // Descendente: más recientes en la etapa primero
-    }
-
-    priorityLeadsWith24hWindow.sort(sortByStageEntryDesc)
-    otherLeads.sort(sortByStageEntryDesc)
-
-    const sortedPipelineLeads = [...priorityLeadsWith24hWindow, ...otherLeads]
+    const sortedPipelineLeads = pipelineLeads
 
     return NextResponse.json(sortedPipelineLeads, {
       headers: {

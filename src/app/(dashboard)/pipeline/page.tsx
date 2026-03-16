@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { PermissionGuard } from '@/components/auth/PermissionGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,38 +31,20 @@ import { LoadingSpinner } from '@/components/ui/loading-states'
 import { toast } from 'sonner'
 import { pipelineService } from '@/services/pipeline-service'
 import { PipelineStage, PipelineLead, DragDropResult } from '@/types/pipeline'
-import { usePipelineMetrics, formatChange, getTrendColor, getTrendIcon } from '@/hooks/usePipelineMetrics'
+import { usePipelineMetrics, formatChange, formatChangeLabel, getTrendColor, getTrendIcon } from '@/hooks/usePipelineMetrics'
 
 // Constantes para el caché en sessionStorage
 const CACHE_KEY = 'pipeline_data_cache'
 const CACHE_TIMESTAMP_KEY = 'pipeline_data_cache_timestamp'
 const CACHE_VERSION_KEY = 'pipeline_data_cache_version'
-const CACHE_VERSION = '3.0.0' // 3.0: carga por columna con scroll infinito
+const CACHE_VERSION = '2.0.0' // Incrementar cuando cambie la lógica de ordenamiento
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutos en milisegundos
-const LEADS_PAGE_SIZE = 30
 
-// Mapeo nombre de etapa (UI) -> slug para API /api/pipeline/stages/[stageId]/leads
-const STAGE_NAME_TO_SLUG: Record<string, string> = {
-  'Cliente Nuevo': 'cliente-nuevo',
-  'Consultando Crédito': 'consultando-credito',
-  'Solicitando Documentación': 'solicitando-docs',
-  'Listo para Análisis': 'listo-analisis',
-  'Preaprobado': 'preaprobado',
-  'Rechazado': 'rechazado',
-  'Aprobado': 'aprobado',
-  'En Seguimiento': 'en-seguimiento',
-  'Cerrado Ganado': 'cerrado-ganado',
-  'Encuesta Satisfacción': 'encuesta-satisfaccion',
-  'Solicitar Referido': 'solicitar-referido'
-}
+type CachedPipelineData = { stages: PipelineStage[], leads: PipelineLead[], metrics?: any }
+type CacheResult = { data: CachedPipelineData; expired: boolean } | null
 
-function stageNameToSlug(name: string): string | null {
-  const slug = STAGE_NAME_TO_SLUG[name] ?? name.toLowerCase().replace(/\s+/g, '-').replace(/[áéíóú]/g, (c) => ({ á: 'a', é: 'e', í: 'i', ó: 'o', ú: 'u' }[c] ?? c))
-  return slug || null
-}
-
-// Funciones de caché
-const getCachedData = (): { stages: PipelineStage[], leads: PipelineLead[], metrics?: any } | null => {
+/** Devuelve datos de caché si existen. Si están expirados, los devuelve igual con expired: true (stale-while-revalidate). */
+const getCachedData = (): CacheResult => {
   if (typeof window === 'undefined') return null
   
   try {
@@ -70,7 +52,6 @@ const getCachedData = (): { stages: PipelineStage[], leads: PipelineLead[], metr
     const timestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY)
     const cachedVersion = sessionStorage.getItem(CACHE_VERSION_KEY)
     
-    // Invalidar caché si la versión no coincide
     if (cachedVersion !== CACHE_VERSION) {
       console.log(`🔄 Versión de caché desactualizada (${cachedVersion} vs ${CACHE_VERSION}), invalidando...`)
       sessionStorage.removeItem(CACHE_KEY)
@@ -87,19 +68,15 @@ const getCachedData = (): { stages: PipelineStage[], leads: PipelineLead[], metr
     const now = Date.now()
     const cacheTime = parseInt(timestamp, 10)
     const age = now - cacheTime
+    const expired = age > CACHE_TTL
+    const data = JSON.parse(cached) as CachedPipelineData
     
-    // Verificar si el caché ha expirado
-    if (age > CACHE_TTL) {
-      console.log(`⏰ Caché expirado (edad: ${Math.round(age / 1000)}s, TTL: ${CACHE_TTL / 1000}s)`)
-      sessionStorage.removeItem(CACHE_KEY)
-      sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
-      sessionStorage.removeItem(CACHE_VERSION_KEY)
-      return null
+    if (expired) {
+      console.log(`⏰ Caché expirado (edad: ${Math.round(age / 1000)}s), mostrando datos en caché y revalidando en segundo plano`)
+    } else {
+      console.log(`✅ Caché encontrado (edad: ${Math.round(age / 1000)}s, stages: ${data.stages?.length || 0}, leads: ${data.leads?.length || 0})`)
     }
-    
-    const data = JSON.parse(cached)
-    console.log(`✅ Caché encontrado (edad: ${Math.round(age / 1000)}s, stages: ${data.stages?.length || 0}, leads: ${data.leads?.length || 0})`)
-    return data
+    return { data, expired }
   } catch (error) {
     console.error('❌ Error reading cache:', error)
     return null
@@ -136,50 +113,32 @@ function PipelinePage() {
   const hasLoadedRef = useRef(false)
   const isRefreshing = useRef(false)
   
-  // Inicializar estado - verificar caché solo en el cliente
+  // Inicializar estado - verificar caché solo en el cliente (incl. stale para stale-while-revalidate)
   const getInitialState = () => {
     if (typeof window === 'undefined') {
       return {
         stages: [] as PipelineStage[],
-        leadsByStage: {} as Record<string, PipelineLead[]>,
-        totalCountByStage: {} as Record<string, number>,
-        pageByStage: {} as Record<string, number>,
-        hasMoreByStage: {} as Record<string, boolean>,
-        loadingMoreByStage: {} as Record<string, boolean>,
+        leads: [] as PipelineLead[],
         metrics: null,
         isLoading: true
       }
     }
     
-    const cachedData = getCachedData()
-    const hasCachedData = cachedData && cachedData.stages && cachedData.leads
+    const cacheResult = getCachedData()
+    const hasCachedData = cacheResult?.data?.stages?.length && cacheResult.data.leads
     
-    if (hasCachedData) {
-      const stagesFromCache = cachedData.stages
-      const leadsFromCache = cachedData.leads || []
-      const byStage: Record<string, PipelineLead[]> = {}
-      stagesFromCache.forEach((s: PipelineStage) => {
-        byStage[s.id] = leadsFromCache.filter((l: PipelineLead) => l.stageId === s.id)
-      })
+    if (hasCachedData && cacheResult.data) {
       return {
-        stages: stagesFromCache,
-        leadsByStage: byStage,
-        totalCountByStage: {},
-        pageByStage: {},
-        hasMoreByStage: {},
-        loadingMoreByStage: {},
-        metrics: cachedData.metrics || null,
+        stages: cacheResult.data.stages,
+        leads: cacheResult.data.leads,
+        metrics: cacheResult.data.metrics ?? null,
         isLoading: false
       }
     }
     
     return {
       stages: [] as PipelineStage[],
-      leadsByStage: {} as Record<string, PipelineLead[]>,
-      totalCountByStage: {} as Record<string, number>,
-      pageByStage: {} as Record<string, number>,
-      hasMoreByStage: {} as Record<string, boolean>,
-      loadingMoreByStage: {} as Record<string, boolean>,
+      leads: [] as PipelineLead[],
       metrics: null,
       isLoading: true
     }
@@ -187,15 +146,10 @@ function PipelinePage() {
   
   const initialState = getInitialState()
   const [stages, setStages] = useState<PipelineStage[]>(initialState.stages)
-  const [leadsByStage, setLeadsByStage] = useState<Record<string, PipelineLead[]>>(initialState.leadsByStage)
-  const leads = useMemo(() => stages.flatMap((s) => leadsByStage[s.id] || []), [stages, leadsByStage])
-  const [totalCountByStage, setTotalCountByStage] = useState<Record<string, number>>(initialState.totalCountByStage)
-  const [pageByStage, setPageByStage] = useState<Record<string, number>>(initialState.pageByStage)
-  const [hasMoreByStage, setHasMoreByStage] = useState<Record<string, boolean>>(initialState.hasMoreByStage)
-  const [loadingMoreByStage, setLoadingMoreByStage] = useState<Record<string, boolean>>(initialState.loadingMoreByStage)
+  const [leads, setLeads] = useState<PipelineLead[]>(initialState.leads)
+  const [isLoading, setIsLoading] = useState(initialState.isLoading)
   const [error, setError] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<any>(initialState.metrics)
-  const [isLoading, setIsLoading] = useState(initialState.isLoading)
   const [activeTab, setActiveTab] = useState('board')
   const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -206,21 +160,36 @@ function PipelinePage() {
   // Verificar y aplicar caché inmediatamente después del montaje en el cliente
   useEffect(() => {
     if (typeof window === 'undefined') return
+    
     if ((stages.length === 0 || leads.length === 0) && isLoading) {
-      const cachedData = getCachedData()
-      if (cachedData && cachedData.stages && cachedData.leads && cachedData.stages.length > 0) {
+      const cacheResult = getCachedData()
+      if (cacheResult?.data?.stages?.length && cacheResult.data.leads) {
         console.log('📦 Aplicando caché al estado después del montaje...')
-        const byStage: Record<string, PipelineLead[]> = {}
-        cachedData.stages.forEach((s: PipelineStage) => {
-          byStage[s.id] = (cachedData.leads || []).filter((l: PipelineLead) => l.stageId === s.id)
-        })
-        setStages(cachedData.stages)
-        setLeadsByStage(byStage)
-        if (cachedData.metrics) setMetrics(cachedData.metrics)
+        setStages(cacheResult.data.stages)
+        setLeads(cacheResult.data.leads)
+        if (cacheResult.data.metrics) setMetrics(cacheResult.data.metrics)
         setIsLoading(false)
       }
     }
-  }, []) // Solo ejecutar una vez al montar
+  }, [])
+
+  // Mapeo entre stageId de leads y IDs de stages del API
+  const stageIdMapping: Record<string, string> = {
+    'nuevo': 'cliente-nuevo',
+    'contactado': 'consultando-credito',
+    'calificado': 'solicitando-docs',
+    'propuesta': 'listo-analisis',
+    'negociacion': 'preaprobado',
+    'cerrado-ganado': 'cerrado-ganado',
+    'cerrado-perdido': 'rechazado',
+    // Mapeos adicionales para compatibilidad
+    'cliente-nuevo': 'cliente-nuevo',
+    'consultando-credito': 'consultando-credito',
+    'solicitando-docs': 'solicitando-docs',
+    'listo-analisis': 'listo-analisis',
+    'preaprobado': 'preaprobado',
+    'rechazado': 'rechazado'
+  }
 
   const loadPipelineData = async (showLoading = true) => {
     try {
@@ -229,11 +198,18 @@ function PipelinePage() {
       }
       setError(null)
 
-      let stagesData = await pipelineService.getStages()
+      // Cargar etapas y leads en paralelo
+      const [stagesData, leadsData] = await Promise.all([
+        pipelineService.getStages(),
+        pipelineService.getLeads()
+      ])
 
+      // Validar que existan stages
       if (!stagesData || stagesData.length === 0) {
+        // Crear stages por defecto si no existen
         try {
           await pipelineService.createDefaultStages()
+          // Recargar después de crear stages
           return loadPipelineData(showLoading)
         } catch (createError) {
           console.error('Error creating default stages:', createError)
@@ -242,101 +218,56 @@ function PipelinePage() {
         }
       }
 
+      // Mapear stageId de leads a IDs de stages
+      const mappedLeads = leadsData.map(lead => {
+        const mappedStageId = stageIdMapping[lead.stageId] || lead.stageId
+        // Buscar el stage correspondiente
+        const matchingStage = stagesData.find(s => s.id === mappedStageId)
+        if (matchingStage) {
+          return { ...lead, stageId: matchingStage.id }
+        }
+        return lead
+      })
+
       setStages(stagesData)
-
-      // Cargar primera página de leads por cada etapa (paralelo)
-      const newLeadsByStage: Record<string, PipelineLead[]> = {}
-      const newTotalCountByStage: Record<string, number> = {}
-      const newPageByStage: Record<string, number> = {}
-      const newHasMoreByStage: Record<string, boolean> = {}
-
-      await Promise.all(
-        stagesData.map(async (stage) => {
-          const slug = stageNameToSlug(stage.name)
-          if (!slug) {
-            newLeadsByStage[stage.id] = []
-            newTotalCountByStage[stage.id] = 0
-            newPageByStage[stage.id] = 1
-            newHasMoreByStage[stage.id] = false
-            return
-          }
-          try {
-            const res = await fetch(`/api/pipeline/stages/${encodeURIComponent(slug)}/leads?page=1&limit=${LEADS_PAGE_SIZE}`)
-            if (!res.ok) {
-              newLeadsByStage[stage.id] = []
-              newTotalCountByStage[stage.id] = 0
-              newPageByStage[stage.id] = 1
-              newHasMoreByStage[stage.id] = false
-              return
-            }
-            const data: PipelineLead[] = await res.json()
-            const total = parseInt(res.headers.get('X-Total-Count') || '0', 10)
-            const hasMore = res.headers.get('X-Has-More') === 'true'
-            const list = (data || []).map((l) => ({ ...l, stageId: stage.id }))
-            newLeadsByStage[stage.id] = list
-            newTotalCountByStage[stage.id] = total
-            newPageByStage[stage.id] = 1
-            newHasMoreByStage[stage.id] = hasMore
-          } catch {
-            newLeadsByStage[stage.id] = []
-            newTotalCountByStage[stage.id] = 0
-            newPageByStage[stage.id] = 1
-            newHasMoreByStage[stage.id] = false
-          }
-        })
-      )
-
-      setLeadsByStage(newLeadsByStage)
-      setTotalCountByStage(newTotalCountByStage)
-      setPageByStage(newPageByStage)
-      setHasMoreByStage(newHasMoreByStage)
-      setLoadingMoreByStage({})
-
-      const flatLeads = stagesData.flatMap((s) => newLeadsByStage[s.id] || [])
-      saveToCache({ stages: stagesData, leads: flatLeads })
-
-      console.log('Pipeline data loaded by stage:', {
+      setLeads(mappedLeads)
+      
+      // Guardar en caché
+      const cacheData = {
+        stages: stagesData,
+        leads: mappedLeads
+      }
+      saveToCache(cacheData)
+      
+      console.log('Pipeline data loaded:', {
         stagesCount: stagesData.length,
-        leadsCount: flatLeads.length
+        leadsCount: mappedLeads.length,
+        stageMapping: Object.entries(stageIdMapping),
+        unmatchedLeads: mappedLeads.filter(l => !stagesData.some(s => s.id === l.stageId)).length
       })
 
       setTimeout(async () => {
         try {
           const metricsData = await pipelineService.getMetrics()
           setMetrics(metricsData)
-          const updatedCache = getCachedData()
-          if (updatedCache) saveToCache({ ...updatedCache, metrics: metricsData })
+          const cacheResult = getCachedData()
+          if (cacheResult?.data) {
+            saveToCache({ ...cacheResult.data, metrics: metricsData })
+          } else {
+            saveToCache({ ...cacheData, metrics: metricsData })
+          }
         } catch (metricsError) {
           console.error('Error loading metrics:', metricsError)
         }
       }, 100)
-    } catch (err) {
-      console.error('Error loading pipeline data:', err)
-      setError(err instanceof Error ? err.message : 'Error al cargar datos del pipeline')
-    } finally {
-      if (showLoading) setIsLoading(false)
-    }
-  }
 
-  const loadMoreLeadsForStage = async (stageId: string) => {
-    const stage = stages.find((s) => s.id === stageId)
-    if (!stage || loadingMoreByStage[stageId] || !hasMoreByStage[stageId]) return
-    const slug = stageNameToSlug(stage.name)
-    if (!slug) return
-
-    setLoadingMoreByStage((prev) => ({ ...prev, [stageId]: true }))
-    const nextPage = (pageByStage[stageId] ?? 1) + 1
-    try {
-      const res = await fetch(`/api/pipeline/stages/${encodeURIComponent(slug)}/leads?page=${nextPage}&limit=${LEADS_PAGE_SIZE}`)
-      if (!res.ok) return
-      const data: PipelineLead[] = await res.json()
-      const hasMore = res.headers.get('X-Has-More') === 'true'
-      const list = (data || []).map((l) => ({ ...l, stageId: stage.id }))
-      setLeadsByStage((prev) => ({ ...prev, [stageId]: [...(prev[stageId] || []), ...list] }))
-      setPageByStage((prev) => ({ ...prev, [stageId]: nextPage }))
-      setHasMoreByStage((prev) => ({ ...prev, [stageId]: hasMore }))
+    } catch (error) {
+      console.error('Error loading pipeline data:', error)
+      setError(error instanceof Error ? error.message : 'Error al cargar datos del pipeline')
     } finally {
-      setLoadingMoreByStage((prev) => ({ ...prev, [stageId]: false }))
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -350,29 +281,24 @@ function PipelinePage() {
     
     hasLoadedRef.current = true
 
-    // Verificar si hay datos en caché (verificar nuevamente en el cliente)
-    const cachedData = getCachedData()
-    const hasCachedData = cachedData && cachedData.stages && cachedData.leads && cachedData.stages.length > 0
+    const cacheResult = getCachedData()
+    const hasCachedData = cacheResult?.data?.stages?.length && cacheResult.data.leads
 
-    if (hasCachedData) {
-      const stagesFromCache = cachedData.stages
-      const leadsFromCache = cachedData.leads || []
-      const byStage: Record<string, PipelineLead[]> = {}
-      stagesFromCache.forEach((s: PipelineStage) => {
-        byStage[s.id] = leadsFromCache.filter((l: PipelineLead) => l.stageId === s.id)
-      })
-      if (stages.length === 0 || Object.keys(leadsByStage).length === 0) {
+    if (hasCachedData && cacheResult.data) {
+      if (stages.length === 0 || leads.length === 0) {
         console.log('📦 Aplicando caché al estado desde useEffect...')
-        setStages(stagesFromCache)
-        setLeadsByStage(byStage)
-        if (cachedData.metrics) setMetrics(cachedData.metrics)
+        setStages(cacheResult.data.stages)
+        setLeads(cacheResult.data.leads)
+        if (cacheResult.data.metrics) setMetrics(cacheResult.data.metrics)
         setIsLoading(false)
       }
-      
-      // Ya tenemos datos del caché, solo refrescar en segundo plano SIN mostrar loading
-      console.log('📦 Usando datos del caché, refrescando en segundo plano...')
+      // Stale-while-revalidate: mostrar datos (frescos o expirados) y refrescar en segundo plano
+      if (cacheResult.expired) {
+        console.log('📦 Caché expirado: mostrando datos en caché y revalidando en segundo plano...')
+      } else {
+        console.log('📦 Usando datos del caché, refrescando en segundo plano...')
+      }
       isRefreshing.current = true
-      // Asegurarse de que isLoading esté en false antes de refrescar
       setIsLoading(false)
       loadPipelineData(false).finally(() => {
         isRefreshing.current = false
@@ -381,7 +307,7 @@ function PipelinePage() {
       // No hay caché válido, cargar normalmente con loading
       console.log('🔄 No hay caché, cargando datos...')
       // Solo mostrar loading si realmente no hay datos
-      if (stages.length === 0 && Object.keys(leadsByStage).length === 0) {
+      if (stages.length === 0 && leads.length === 0) {
         loadPipelineData(true)
       } else {
         // Si hay datos pero no caché, solo refrescar sin loading
@@ -393,61 +319,80 @@ function PipelinePage() {
 
   // Manejar movimiento de leads desde dropdown (sin drag & drop)
   const handleLeadMoved = (leadId: string, newStageId: string) => {
-    setLeadsByStage((prev) => {
-      let movedLead: PipelineLead | null = null
-      const next: Record<string, PipelineLead[]> = {}
-      for (const [sid, list] of Object.entries(prev)) {
-        const idx = list.findIndex((l) => l.id === leadId)
-        if (idx >= 0) {
-          movedLead = { ...list[idx], stageId: newStageId, stageEntryDate: new Date() }
-          next[sid] = list.filter((_, i) => i !== idx)
-        } else {
-          next[sid] = [...list]
-        }
+    // Actualizar el lead localmente de forma optimista
+    setLeads(prevLeads => {
+      const updatedLeads = prevLeads.map(lead =>
+        lead.id === leadId
+          ? {
+              ...lead,
+              stageId: newStageId,
+              stageEntryDate: new Date()
+            }
+          : lead
+      )
+      
+      const cacheResult = getCachedData()
+      if (cacheResult?.data) {
+        saveToCache({ ...cacheResult.data, leads: updatedLeads })
+      } else {
+        saveToCache({ stages, leads: updatedLeads })
       }
-      if (movedLead) {
-        next[newStageId] = [movedLead, ...(next[newStageId] || [])]
-      }
-      const flat = stages.flatMap((s) => next[s.id] || [])
-      const cachedData = getCachedData()
-      saveToCache(cachedData ? { ...cachedData, leads: flat } : { stages, leads: flat })
-      return next
+      
+      return updatedLeads
     })
   }
 
   // Manejar movimiento de leads con actualización optimista
   const handleLeadMove = async (result: DragDropResult): Promise<boolean> => {
-    const previousLeadsByStage = { ...leadsByStage }
-    const leadToMove = leads.find((l) => l.id === result.leadId)
+    // Guardar el estado anterior para poder revertir si falla
+    const previousLeads = [...leads]
+    const leadToMove = leads.find(l => l.id === result.leadId)
+    
     if (!leadToMove) {
       console.error('Lead no encontrado para mover:', result.leadId)
       return false
     }
 
-    setLeadsByStage((prev) => {
-      const next = { ...prev }
-      const srcId = result.sourceStageId
-      const dstId = result.destinationStageId
-      const srcList = prev[srcId] || []
-      const idx = srcList.findIndex((l) => l.id === result.leadId)
-      if (idx >= 0) {
-        const moved = { ...srcList[idx], stageId: dstId, stageEntryDate: new Date() }
-        next[srcId] = srcList.filter((_, i) => i !== idx)
-        next[dstId] = [moved, ...(next[dstId] || [])]
+    // ACTUALIZACIÓN OPTIMISTA: Actualizar el estado ANTES de llamar a la API
+    setLeads(prevLeads => {
+      const updatedLeads = prevLeads.map(lead =>
+        lead.id === result.leadId
+          ? {
+              ...lead,
+              stageId: result.destinationStageId,
+              stageEntryDate: new Date()
+            }
+          : lead
+      )
+      
+      const cacheResult = getCachedData()
+      if (cacheResult?.data) {
+        saveToCache({ ...cacheResult.data, leads: updatedLeads })
+      } else {
+        saveToCache({ stages, leads: updatedLeads })
       }
-      const flat = stages.flatMap((s) => next[s.id] || [])
-      saveToCache(getCachedData() ? { ...getCachedData()!, leads: flat } : { stages, leads: flat })
-      return next
+      
+      return updatedLeads
     })
 
+    // Llamar a la API en segundo plano
     try {
       await pipelineService.moveLead(result)
+      // Si la API tiene éxito, el estado ya está actualizado (optimistic update)
       return true
     } catch (error) {
       console.error('Error moving lead:', error)
-      setLeadsByStage(previousLeadsByStage)
-      const flat = stages.flatMap((s) => previousLeadsByStage[s.id] || [])
-      saveToCache(getCachedData() ? { ...getCachedData()!, leads: flat } : { stages, leads: flat })
+      
+      // REVERTIR: Si la API falla, restaurar el estado anterior
+      setLeads(previousLeads)
+      
+      const cacheResult = getCachedData()
+      if (cacheResult?.data) {
+        saveToCache({ ...cacheResult.data, leads: previousLeads })
+      } else {
+        saveToCache({ stages, leads: previousLeads })
+      }
+      
       toast.error('Error al mover el lead. Los cambios se han revertido.')
       return false
     }
@@ -583,7 +528,7 @@ function PipelinePage() {
                 {realMetrics.totalLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
                 {realMetrics.totalLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
                 {realMetrics.totalLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChange(realMetrics.totalLeads.change)} desde el mes pasado</span>
+                <span>{formatChangeLabel(realMetrics.totalLeads.change)}</span>
               </div>
             )}
             {!realMetrics && (
@@ -608,7 +553,7 @@ function PipelinePage() {
                 {realMetrics.preapprovedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
                 {realMetrics.preapprovedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
                 {realMetrics.preapprovedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChange(realMetrics.preapprovedLeads.change)} desde el mes pasado</span>
+                <span>{formatChangeLabel(realMetrics.preapprovedLeads.change)}</span>
               </div>
             )}
             {!realMetrics && (
@@ -633,7 +578,7 @@ function PipelinePage() {
                 {realMetrics.rejectedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
                 {realMetrics.rejectedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
                 {realMetrics.rejectedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChange(realMetrics.rejectedLeads.change)} desde el mes pasado</span>
+                <span>{formatChangeLabel(realMetrics.rejectedLeads.change)}</span>
               </div>
             )}
             {!realMetrics && (
@@ -683,7 +628,7 @@ function PipelinePage() {
                 {realMetrics.stalledLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
                 {realMetrics.stalledLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
                 {realMetrics.stalledLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChange(realMetrics.stalledLeads.change)} desde el mes pasado</span>
+                <span>{formatChangeLabel(realMetrics.stalledLeads.change)}</span>
               </div>
             )}
             {!realMetrics && (
@@ -727,10 +672,6 @@ function PipelinePage() {
             onLeadClick={handleLeadClick}
             onStageClick={handleStageClick}
             onAddLead={handleAddLead}
-            onLoadMore={loadMoreLeadsForStage}
-            getHasMore={(stageId) => !!hasMoreByStage[stageId]}
-            getLoadingMore={(stageId) => !!loadingMoreByStage[stageId]}
-            getTotalCount={(stageId) => totalCountByStage[stageId] ?? 0}
             isLoading={isLoading}
           />
         </TabsContent>

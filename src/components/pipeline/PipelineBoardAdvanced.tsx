@@ -51,10 +51,6 @@ interface PipelineBoardAdvancedProps {
   onStageClick?: (stage: PipelineStage) => void
   onAddLead?: (stageId: string) => void
   onLeadMoved?: (leadId: string, newStageId: string) => void
-  onLoadMore?: (stageId: string) => void
-  getHasMore?: (stageId: string) => boolean
-  getLoadingMore?: (stageId: string) => boolean
-  getTotalCount?: (stageId: string) => number
   isLoading?: boolean
   className?: string
 }
@@ -67,10 +63,6 @@ export function PipelineBoardAdvanced({
   onStageClick,
   onAddLead,
   onLeadMoved,
-  onLoadMore,
-  getHasMore,
-  getLoadingMore,
-  getTotalCount,
   isLoading = false,
   className = ''
 }: PipelineBoardAdvancedProps) {
@@ -78,7 +70,11 @@ export function PipelineBoardAdvanced({
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [filters, setFilters] = useState<PipelineFilters>({})
+  const [visibleCountByStage, setVisibleCountByStage] = useState<Record<string, number>>({})
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  /** Chunk size para carga progresiva al hacer scroll en cada columna */
+  const CHUNK_SIZE = 40
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const isDraggingScrollRef = useRef(false)
   const dragStartXRef = useRef(0)
@@ -580,11 +576,17 @@ export function PipelineBoardAdvanced({
                   const stats = getStageStats(stage.id)
                   const canDrop = canDropInStage(stage.id, activeId || undefined)
 
+                  const visibleCount = visibleCountByStage[stage.id] ?? CHUNK_SIZE
+                  const visibleLeads = stageLeads.slice(0, visibleCount)
+                  const hasMore = stageLeads.length > visibleCount
                   return (
                     <div key={stage.id}>
                       <PipelineStageColumn
                         stage={stage}
-                        leads={stageLeads}
+                        leads={visibleLeads}
+                        totalCount={stageLeads.length}
+                        hasMore={hasMore}
+                        onLoadMore={() => setVisibleCountByStage(prev => ({ ...prev, [stage.id]: (prev[stage.id] ?? CHUNK_SIZE) + CHUNK_SIZE }))}
                         stats={stats}
                         canDrop={canDrop}
                         isDragOver={activeId !== null}
@@ -599,10 +601,6 @@ export function PipelineBoardAdvanced({
                         onLeadMove={handleLeadMoveToStage}
                         onLeadMoved={onLeadMoved}
                         scrollContainerRef={scrollContainerRef}
-                        onLoadMore={onLoadMore}
-                        getHasMore={getHasMore}
-                        getLoadingMore={getLoadingMore}
-                        getTotalCount={getTotalCount}
                       />
                     </div>
                   )
@@ -643,6 +641,9 @@ export function PipelineBoardAdvanced({
 interface PipelineStageColumnProps {
   stage: PipelineStage
   leads: PipelineLead[]
+  totalCount: number
+  hasMore: boolean
+  onLoadMore: () => void
   stats: any
   canDrop: boolean
   isDragOver: boolean
@@ -657,17 +658,14 @@ interface PipelineStageColumnProps {
   onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
   onLeadMoved?: (leadId: string, newStageId: string) => void
   scrollContainerRef: React.RefObject<HTMLDivElement>
-  onLoadMore?: (stageId: string) => void
-  getHasMore?: (stageId: string) => boolean
-  getLoadingMore?: (stageId: string) => boolean
-  getTotalCount?: (stageId: string) => number
 }
-
-const SCROLL_LOAD_THRESHOLD = 200
 
 function PipelineStageColumn({
   stage,
   leads,
+  totalCount,
+  hasMore,
+  onLoadMore,
   stats,
   canDrop,
   isDragOver,
@@ -681,20 +679,33 @@ function PipelineStageColumn({
   stages,
   onLeadMove,
   onLeadMoved,
-  scrollContainerRef,
-  onLoadMore,
-  getHasMore,
-  getLoadingMore,
-  getTotalCount
+  scrollContainerRef
 }: PipelineStageColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
   })
   const columnRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
   const isDraggingScrollRef = useRef(false)
   const dragStartXRef = useRef(0)
   const dragStartScrollLeftRef = useRef(0)
+
+  // Cargar más al hacer scroll hasta el sentinela
+  useEffect(() => {
+    if (!hasMore || !onLoadMore) return
+    const el = sentinelRef.current
+    if (!el) return
+    const scrollParent = contentRef.current
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) onLoadMore()
+      },
+      { root: scrollParent ?? null, rootMargin: '100px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, onLoadMore])
 
   // Función para hacer scroll a esta columna
   const scrollToColumn = useCallback(() => {
@@ -870,7 +881,7 @@ function PipelineStageColumn({
                 {stage.name}
               </CardTitle>
               <Badge variant="secondary" className="text-xs">
-                {getTotalCount && getTotalCount(stage.id) > 0 ? getTotalCount(stage.id) : stats.count}
+                {stats.count}
               </Badge>
             </div>
             
@@ -910,14 +921,6 @@ function PipelineStageColumn({
           onMouseMove={handleContentMouseMove}
           onMouseUp={handleContentMouseUp}
           onMouseLeave={handleContentMouseLeave}
-          onScroll={(e) => {
-            const el = e.currentTarget
-            if (!onLoadMore || !getHasMore?.(stage.id) || getLoadingMore?.(stage.id)) return
-            const { scrollTop, scrollHeight, clientHeight } = el
-            if (scrollTop + clientHeight >= scrollHeight - SCROLL_LOAD_THRESHOLD) {
-              onLoadMore(stage.id)
-            }
-          }}
         >
           {leads.map((lead) => (
             <LeadCard
@@ -933,11 +936,8 @@ function PipelineStageColumn({
               onLeadMoved={onLeadMoved}
             />
           ))}
-          {onLoadMore && getHasMore?.(stage.id) && getLoadingMore?.(stage.id) && (
-            <div className="flex justify-center py-3">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
+          {hasMore && <div ref={sentinelRef} className="h-4 flex-shrink-0" aria-hidden />}
+          
           {leads.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -998,8 +998,24 @@ const LeadCard = memo(function LeadCard({
       return Array.isArray(lead.tags) ? lead.tags : []
     }
   }
-  
+
   const parsedTags = parseTags()
+
+  // Tag que corresponde a la columna (etapa): si el lead está aquí por pipeline pero no tiene el tag, lo mostramos igual
+  const STAGE_TAG: Record<string, string> = {
+    'negociacion': 'credito-preaprobado',
+    'preaprobado': 'credito-preaprobado',
+    'cerrado-perdido': 'credito-rechazado',
+    'rechazado': 'credito-rechazado',
+    'cerrado-ganado': 'cerrado-ganado',
+    'propuesta': 'solicitud-en-proceso',
+    'listo-analisis': 'solicitud-en-proceso',
+    'nuevo': 'lead-nuevo',
+    'cliente-nuevo': 'lead-nuevo'
+  }
+  const columnTag = lead.stageId ? STAGE_TAG[lead.stageId] : null
+  const hasColumnTag = columnTag && parsedTags.some((t: string) => t.toLowerCase().trim() === columnTag.toLowerCase())
+  const displayTags = columnTag && !hasColumnTag ? [...parsedTags, columnTag] : parsedTags
 
   const [isMoving, setIsMoving] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -1843,9 +1859,9 @@ const LeadCard = memo(function LeadCard({
         )}
       </div>
 
-      {parsedTags && parsedTags.length > 0 && (
+      {displayTags && displayTags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {parsedTags.slice(0, 3).map((tag: string, index: number) => {
+          {displayTags.slice(0, 3).map((tag: string, index: number) => {
             const tagColor = getTagColor(tag)
             return (
               <Badge 
@@ -1863,13 +1879,13 @@ const LeadCard = memo(function LeadCard({
               </Badge>
             )
           })}
-          {parsedTags.length > 3 && (
+          {displayTags.length > 3 && (
             <Badge 
               variant="secondary" 
               className="text-xs"
-              title={`${parsedTags.slice(3).join(', ')}`}
+              title={`${displayTags.slice(3).join(', ')}`}
             >
-              +{parsedTags.length - 3}
+              +{displayTags.length - 3}
             </Badge>
           )}
         </div>

@@ -5,7 +5,6 @@ import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { PipelineLead } from '@/types/pipeline'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
-import { pipelineService } from '@/server/services/pipeline-service'
 import { calculateTimeBasedScore } from '@/server/services/pipeline-scoring-service'
 
 // Mapeo de pipeline_stage (enum de DB) a stageId (string usado en componente)
@@ -470,22 +469,30 @@ export async function GET(request: NextRequest) {
     const scoreMin = searchParams.get('scoreMin')
     const scoreMax = searchParams.get('scoreMax')
 
-    // Construir filtros para la consulta de leads
-    // Para el pipeline, necesitamos obtener todos los leads sin límite estricto
-    const filters: any = {
-      limit: 10000, // Límite aumentado para incluir todos los leads del pipeline
-      offset: 0
-    }
+    // Construir filtros base (sin search para la paginación inicial)
+    const baseFilters: any = { sortBy: 'createdAt', sortOrder: 'desc' as const }
+    if (search) baseFilters.search = search
 
-    if (search) {
-      filters.search = search
+    // Paginar para traer TODOS los leads (Supabase devuelve max ~1000 por request).
+    // Así las columnas del tablero (6 preaprobados, 62 rechazados) coinciden con las tarjetas (10, 160).
+    const PAGE_SIZE = 1000
+    const leads: any[] = []
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+      const { leads: page, total } = await supabaseLeadService.getLeads({
+        ...baseFilters,
+        limit: PAGE_SIZE,
+        offset,
+        forPipeline: true
+      })
+      leads.push(...page)
+      hasMore = page.length === PAGE_SIZE && leads.length < total
+      offset += PAGE_SIZE
     }
-
-    // Obtener leads reales de la base de datos
-    const { leads, total } = await supabaseLeadService.getLeads(filters)
+    const total = leads.length
 
     // Obtener el evento más reciente por cada lead para calcular lastActivity
-    // Filtrar undefined para cumplir con el tipo string[] requerido
     const leadIds = leads.map(l => l.id).filter((id): id is string => id !== undefined)
     
     // Optimización: Ejecutar todas las queries en paralelo en lugar de secuencialmente
@@ -498,35 +505,8 @@ export async function GET(request: NextRequest) {
       supabaseLeadService.getLeadAssignments(leadIds)
     ])
 
-    // Crear pipelines para leads que no los tienen
-    const leadsWithoutPipeline: string[] = []
-    leadIds.forEach(leadId => {
-      if (!pipelineMap.has(leadId)) {
-        leadsWithoutPipeline.push(leadId)
-      }
-    })
-
-    // Crear pipelines automáticamente para leads que no los tienen
-    if (leadsWithoutPipeline.length > 0 && session.user?.id) {
-      logger.info(`Creando pipelines automáticamente para ${leadsWithoutPipeline.length} leads sin pipeline`)
-      const createPipelinePromises = leadsWithoutPipeline.map(async (leadId) => {
-        try {
-          await pipelineService.createLeadPipeline(leadId, session.user.id)
-          // Obtener el pipeline recién creado
-          const newPipeline = await pipelineService.getLeadPipeline(leadId)
-          if (newPipeline) {
-            pipelineMap.set(leadId, {
-              current_stage: newPipeline.current_stage,
-              stage_entered_at: newPipeline.stage_entered_at
-            })
-          }
-        } catch (error) {
-          logger.error(`Error creando pipeline para lead ${leadId}:`, error)
-          // Continuar con otros leads aunque falle uno
-        }
-      })
-      await Promise.allSettled(createPipelinePromises)
-    }
+    // No crear pipelines aquí: los leads sin pipeline se muestran por tags/estado en mapLeadToPipelineLead.
+    // Crear pipelines en background o al mover/abrir lead si se necesita.
 
     // Mapear leads a PipelineLead usando current_stage del pipeline como fuente de verdad
     // Filtrar leads sin id para evitar errores de tipo

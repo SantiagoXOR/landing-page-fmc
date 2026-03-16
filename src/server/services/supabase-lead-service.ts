@@ -165,6 +165,9 @@ export class SupabaseLeadService {
     }
   }
 
+  /** Campos mínimos para pipeline (reduce payload con muchos leads) */
+  private static readonly PIPELINE_SELECT = 'id,nombre,telefono,email,createdAt,estado,tags,customFields,origen'
+
   async getLeads(filters: {
     estado?: string
     origen?: string
@@ -179,6 +182,8 @@ export class SupabaseLeadService {
     limit?: number
     offset?: number
     includePipeline?: boolean
+    /** Si true, solo devuelve campos necesarios para el tablero pipeline (menos bytes) */
+    forPipeline?: boolean
   } = {}): Promise<{ leads: Lead[], total: number }> {
     const startTime = Date.now()
 
@@ -223,8 +228,8 @@ export class SupabaseLeadService {
       // Construir query optimizada usando filtros de Supabase
       const queryParams = new URLSearchParams()
 
-      // Seleccionar campos necesarios
-      queryParams.append('select', '*')
+      const select = filters.forPipeline ? SupabaseLeadService.PIPELINE_SELECT : '*'
+      queryParams.append('select', select)
 
       // Aplicar filtros directamente en la query
       if (filters.estado) {
@@ -268,9 +273,8 @@ export class SupabaseLeadService {
       const sortOrder = filters.sortOrder || 'desc'
       queryParams.append('order', `${sortBy}.${sortOrder}`)
 
-      // Paginación
-      // Si el límite es mayor a 1000, probablemente viene del pipeline y necesitamos todos los leads
-      const maxLimit = filters.limit && filters.limit > 1000 ? filters.limit : 100
+      // Paginación: permitir hasta 10000 para pipeline/métricas; consultas normales max 100
+      const maxLimit = filters.limit && filters.limit >= 1000 ? Math.min(filters.limit, 10000) : 100
       const limit = Math.min(filters.limit || 10, maxLimit)
       const offset = filters.offset || 0
 
@@ -608,34 +612,17 @@ export class SupabaseLeadService {
     }
   }
 
-  /**
-   * Obtiene el evento más reciente para cada lead especificado
-   * Equivalente a DISTINCT ON en PostgreSQL pero usando Supabase REST API
-   */
-  async getLatestEventsByLeadIds(leadIds: string[]): Promise<Map<string, any>> {
-    const eventsMap = new Map<string, any>()
-    
-    if (leadIds.length === 0) {
-      return eventsMap
-    }
+  private static readonly EVENTS_BATCH_SIZE = 200
 
+  private async fetchEventsBatch(leadIds: string[]): Promise<Map<string, any>> {
+    const eventsByLead = new Map<string, any>()
+    if (leadIds.length === 0) return eventsByLead
     try {
-      // Construir filtro para obtener eventos de múltiples leads
-      // Usar operador 'in' de Supabase para múltiples valores
-      // Obtener todos los eventos para estos leads, ordenados por leadId y createdAt descendente
       const response = await this.makeRequest(
         `Event?leadId=in.(${leadIds.join(',')})&select=id,leadId,tipo,payload,createdAt&order=leadId.asc,createdAt.desc`
       )
-      
       const allEvents = await response.json()
-      
-      if (!Array.isArray(allEvents)) {
-        logger.warn('getLatestEventsByLeadIds: response is not an array', { response: allEvents })
-        return eventsMap
-      }
-
-      // Agrupar por leadId y tomar el primero de cada grupo (el más reciente debido al ordenamiento)
-      const eventsByLead = new Map<string, any>()
+      if (!Array.isArray(allEvents)) return eventsByLead
       allEvents.forEach((event: any) => {
         if (event.leadId && !eventsByLead.has(event.leadId)) {
           eventsByLead.set(event.leadId, {
@@ -647,100 +634,114 @@ export class SupabaseLeadService {
           })
         }
       })
-
-      return eventsByLead
-
     } catch (error: any) {
-      logger.error('Error getting latest events by lead IDs', {
-        error: error.message,
-        leadCount: leadIds.length
-      })
-      // Retornar mapa vacío en caso de error para que el código continúe funcionando
-      return eventsMap
+      logger.warn('Could not fetch events batch', { error: error.message, batchSize: leadIds.length })
     }
+    return eventsByLead
   }
 
   /**
-   * Obtiene asignaciones de leads desde la tabla lead_pipeline
-   * Maneja errores gracefully si la tabla no existe
+   * Obtiene el evento más reciente para cada lead especificado.
+   * Batches en paralelo para evitar URLs demasiado largas.
    */
-  async getLeadAssignments(leadIds: string[]): Promise<Map<string, string>> {
-    const assignmentMap = new Map<string, string>()
-    
-    if (leadIds.length === 0) {
-      return assignmentMap
+  async getLatestEventsByLeadIds(leadIds: string[]): Promise<Map<string, any>> {
+    const eventsMap = new Map<string, any>()
+    if (leadIds.length === 0) return eventsMap
+    const batchSize = SupabaseLeadService.EVENTS_BATCH_SIZE
+    const batches: string[][] = []
+    for (let i = 0; i < leadIds.length; i += batchSize) {
+      batches.push(leadIds.slice(i, i + batchSize))
     }
+    const results = await Promise.all(batches.map(batch => this.fetchEventsBatch(batch)))
+    results.forEach(map => {
+      map.forEach((value, key) => eventsMap.set(key, value))
+    })
+    return eventsMap
+  }
 
+  private static readonly ASSIGNMENTS_BATCH_SIZE = 200
+
+  private async fetchAssignmentsBatch(leadIds: string[]): Promise<Map<string, string>> {
+    const assignmentMap = new Map<string, string>()
+    if (leadIds.length === 0) return assignmentMap
     try {
-      // Construir filtro para obtener asignaciones de múltiples leads
       const response = await this.makeRequest(
         `lead_pipeline?lead_id=in.(${leadIds.join(',')})&select=lead_id,assigned_to&assigned_to=not.is.null`
       )
-      
       const assignments = await response.json()
-      
-      if (!Array.isArray(assignments)) {
-        logger.warn('getLeadAssignments: response is not an array', { response: assignments })
-        return assignmentMap
-      }
-
+      if (!Array.isArray(assignments)) return assignmentMap
       assignments.forEach((assignment: any) => {
         if (assignment.lead_id && assignment.assigned_to) {
           assignmentMap.set(assignment.lead_id, assignment.assigned_to)
         }
       })
-
-      return assignmentMap
-
     } catch (error: any) {
-      // Si la tabla no existe o hay un error, simplemente retornar mapa vacío
-      logger.warn('Could not fetch lead assignments from lead_pipeline', {
-        error: error.message,
-        leadCount: leadIds.length
-      })
-      return assignmentMap
+      logger.warn('Could not fetch lead assignments batch', { error: error.message, batchSize: leadIds.length })
     }
+    return assignmentMap
   }
 
-  /** Tamaño de lote para no exceder longitud de URL en filtro in.(...) */
-  private static readonly LEAD_PIPELINES_BATCH_SIZE = 150
+  /**
+   * Obtiene asignaciones de leads desde la tabla lead_pipeline.
+   * Batches en paralelo para evitar URLs demasiado largas.
+   */
+  async getLeadAssignments(leadIds: string[]): Promise<Map<string, string>> {
+    const assignmentMap = new Map<string, string>()
+    if (leadIds.length === 0) return assignmentMap
+    const batchSize = SupabaseLeadService.ASSIGNMENTS_BATCH_SIZE
+    const batches: string[][] = []
+    for (let i = 0; i < leadIds.length; i += batchSize) {
+      batches.push(leadIds.slice(i, i + batchSize))
+    }
+    const results = await Promise.all(batches.map(batch => this.fetchAssignmentsBatch(batch)))
+    results.forEach(map => {
+      map.forEach((value, key) => assignmentMap.set(key, value))
+    })
+    return assignmentMap
+  }
+
+  /** Tamaño de lote para getLeadPipelines (evita URLs demasiado largas con 1485+ IDs) */
+  private static readonly PIPELINE_BATCH_SIZE = 200
+
+  private async fetchPipelineBatch(leadIds: string[]): Promise<Map<string, { current_stage: string; stage_entered_at: string }>> {
+    const pipelineMap = new Map<string, { current_stage: string; stage_entered_at: string }>()
+    if (leadIds.length === 0) return pipelineMap
+    try {
+      const response = await this.makeRequest(
+        `lead_pipeline?lead_id=in.(${leadIds.join(',')})&select=lead_id,current_stage,stage_entered_at`
+      )
+      const pipelines = await response.json()
+      if (!Array.isArray(pipelines)) return pipelineMap
+      pipelines.forEach((pipeline: any) => {
+        if (pipeline.lead_id && pipeline.current_stage) {
+          pipelineMap.set(pipeline.lead_id, {
+            current_stage: pipeline.current_stage,
+            stage_entered_at: pipeline.stage_entered_at || new Date().toISOString()
+          })
+        }
+      })
+    } catch (error: any) {
+      logger.warn('Could not fetch lead pipelines batch', { error: error.message, batchSize: leadIds.length })
+    }
+    return pipelineMap
+  }
 
   /**
    * Obtiene información del pipeline (current_stage) para múltiples leads.
-   * Hace requests por lotes para no exceder el límite de longitud de URL.
+   * Hace peticiones por lotes en paralelo para no superar límites de URL (~1485 IDs).
    */
   async getLeadPipelines(leadIds: string[]): Promise<Map<string, { current_stage: string; stage_entered_at: string }>> {
     const pipelineMap = new Map<string, { current_stage: string; stage_entered_at: string }>()
     if (leadIds.length === 0) return pipelineMap
-
-    const batchSize = SupabaseLeadService.LEAD_PIPELINES_BATCH_SIZE
+    const batchSize = SupabaseLeadService.PIPELINE_BATCH_SIZE
+    const batches: string[][] = []
     for (let i = 0; i < leadIds.length; i += batchSize) {
-      const batch = leadIds.slice(i, i + batchSize)
-      try {
-        const response = await this.makeRequest(
-          `lead_pipeline?lead_id=in.(${batch.join(',')})&select=lead_id,current_stage,stage_entered_at`
-        )
-        const pipelines = await response.json()
-        if (!Array.isArray(pipelines)) {
-          logger.warn('getLeadPipelines: response is not an array', { batchIndex: i / batchSize })
-          continue
-        }
-        pipelines.forEach((pipeline: any) => {
-          if (pipeline.lead_id && pipeline.current_stage) {
-            pipelineMap.set(pipeline.lead_id, {
-              current_stage: pipeline.current_stage,
-              stage_entered_at: pipeline.stage_entered_at || new Date().toISOString()
-            })
-          }
-        })
-      } catch (error: any) {
-        logger.warn('Could not fetch lead pipelines batch', {
-          error: error.message,
-          batchIndex: Math.floor(i / batchSize),
-          batchSize: batch.length
-        })
-      }
+      batches.push(leadIds.slice(i, i + batchSize))
     }
+    const results = await Promise.all(batches.map(batch => this.fetchPipelineBatch(batch)))
+    results.forEach(map => {
+      map.forEach((value, key) => pipelineMap.set(key, value))
+    })
     return pipelineMap
   }
 }

@@ -31,7 +31,12 @@ import { LoadingSpinner } from '@/components/ui/loading-states'
 import { toast } from 'sonner'
 import { pipelineService } from '@/services/pipeline-service'
 import { PipelineStage, PipelineLead, DragDropResult } from '@/types/pipeline'
-import { usePipelineMetrics, formatChange, formatChangeLabel, getTrendColor, getTrendIcon } from '@/hooks/usePipelineMetrics'
+import { usePipelineMetrics, formatChange, getTrendColor, getTrendIcon } from '@/hooks/usePipelineMetrics'
+
+function formatChangeLabel(change: number): string {
+  if (change === 0) return 'Estado actual'
+  return `${formatChange(change)} desde el mes pasado`
+}
 
 // Constantes para el caché en sessionStorage
 const CACHE_KEY = 'pipeline_data_cache'

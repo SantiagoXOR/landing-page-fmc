@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { PermissionGuard } from '@/components/auth/PermissionGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -431,6 +431,34 @@ function PipelinePage() {
     leadsWithTasks: leads.filter(lead => lead.tasks && lead.tasks.length > 0).length
   }
 
+  /** Conteos por columna del tablero (mismos stageId que PipelineBoardAdvanced) para que coincidan con las tarjetas de arriba */
+  const boardColumnCounts = useMemo(() => {
+    const preIds = new Set(
+      stages
+        .filter(s => s.id === 'preaprobado' || /preaprob/i.test(s.name))
+        .map(s => s.id)
+    )
+    if (preIds.size === 0) {
+      ;['preaprobado', 'negociacion'].forEach(id => preIds.add(id))
+    }
+    const rejIds = new Set(
+      stages
+        .filter(s => s.id === 'rechazado' || (/rechaz/i.test(s.name) && !/aprobado|ganado/i.test(s.name)))
+        .map(s => s.id)
+    )
+    if (rejIds.size === 0) {
+      ;['rechazado', 'cerrado-perdido'].forEach(id => rejIds.add(id))
+    }
+    let preaprobados = 0
+    let rechazados = 0
+    for (const l of leads) {
+      const sid = l.stageId || ''
+      if (preIds.has(sid)) preaprobados++
+      if (rejIds.has(sid)) rechazados++
+    }
+    return { preaprobados, rechazados }
+  }, [leads, stages])
+
   // Formatear moneda
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-AR', {
@@ -551,19 +579,24 @@ function PipelinePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {realMetrics ? realMetrics.preapprovedLeads.current : 0}
+              {boardColumnCounts.preaprobados}
             </div>
             {realMetrics && (
-              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.preapprovedLeads.trend)}`}>
-                {realMetrics.preapprovedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
-                {realMetrics.preapprovedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
-                {realMetrics.preapprovedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChangeLabel(realMetrics.preapprovedLeads.change)}</span>
+              <div className={`flex flex-col gap-0.5 text-xs ${getTrendColor(realMetrics.preapprovedLeads.trend)}`}>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <span>En tablero (actualizado al instante)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {realMetrics.preapprovedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                  {realMetrics.preapprovedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                  {realMetrics.preapprovedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                  <span>{formatChangeLabel(realMetrics.preapprovedLeads.change)}</span>
+                </div>
               </div>
             )}
             {!realMetrics && (
               <p className="text-xs text-muted-foreground">
-                Cargando comparación...
+                Cargando comparación histórica...
               </p>
             )}
           </CardContent>
@@ -576,19 +609,24 @@ function PipelinePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {realMetrics ? realMetrics.rejectedLeads.current : 0}
+              {boardColumnCounts.rechazados}
             </div>
             {realMetrics && (
-              <div className={`flex items-center gap-1 text-xs ${getTrendColor(realMetrics.rejectedLeads.trend)}`}>
-                {realMetrics.rejectedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
-                {realMetrics.rejectedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
-                {realMetrics.rejectedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
-                <span>{formatChangeLabel(realMetrics.rejectedLeads.change)}</span>
+              <div className={`flex flex-col gap-0.5 text-xs ${getTrendColor(realMetrics.rejectedLeads.trend)}`}>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <span>En tablero (actualizado al instante)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {realMetrics.rejectedLeads.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                  {realMetrics.rejectedLeads.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                  {realMetrics.rejectedLeads.trend === 'stable' && <ArrowRight className="h-3 w-3" />}
+                  <span>{formatChangeLabel(realMetrics.rejectedLeads.change)}</span>
+                </div>
               </div>
             )}
             {!realMetrics && (
               <p className="text-xs text-muted-foreground">
-                Cargando comparación...
+                Cargando comparación histórica...
               </p>
             )}
           </CardContent>

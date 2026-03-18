@@ -518,4 +518,34 @@ export class ConversationService {
       throw new Error('Failed to fetch messages')
     }
   }
+
+  /**
+   * Último mensaje entrante del cliente en WhatsApp (para ventana de 24 h de Meta).
+   * Si el lead solo habló por Uchat y no hay filas en el CRM, devuelve null.
+   */
+  static async getLastInboundWhatsAppMessageAt(leadId: string): Promise<Date | null> {
+    try {
+      if (!supabase.client) return null
+      const { data: convs, error: cErr } = await supabase.client
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', leadId)
+        .eq('platform', 'whatsapp')
+      if (cErr || !convs?.length) return null
+      const ids = convs.map((c: { id: string }) => c.id)
+      const { data: row } = await supabase.client
+        .from('messages')
+        .select('sent_at')
+        .in('conversation_id', ids)
+        .eq('direction', 'inbound')
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!row?.sent_at) return null
+      const d = new Date(row.sent_at as string)
+      return Number.isNaN(d.getTime()) ? null : d
+    } catch {
+      return null
+    }
+  }
 }

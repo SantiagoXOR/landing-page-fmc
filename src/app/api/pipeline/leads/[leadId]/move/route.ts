@@ -8,6 +8,12 @@ import { automationService } from '@/services/automation-service'
 import { pipelineService } from '@/server/services/pipeline-service'
 import { supabase } from '@/lib/db'
 import { getTagForStage, getPipelineTags } from '@/lib/pipeline-stage-tags'
+import {
+  notifyPipelinePreaprobado,
+  notifyPipelineRechazado,
+  isPreaprobadoStageId,
+  isRechazadoStageId,
+} from '@/server/services/uchat-pipeline-notify'
 
 // Schema de validación para mover lead
 const MoveLeadSchema = z.object({
@@ -406,6 +412,44 @@ export async function POST(
         stageId: normalizedToStageId
       })
       // Continuar aunque falle la asignación de tags
+    }
+
+    // Preaprobado / Rechazado: webhook Uchat (etiqueta + flujo) y/o WhatsApp Meta con mensajes oficiales
+    if (isPreaprobadoStageId(normalizedToStageId)) {
+      const tagPre = await getTagForStage('PREAPROBADO').catch(() => null)
+      void notifyPipelinePreaprobado(
+        {
+          id: lead.id,
+          telefono: lead.telefono,
+          nombre: lead.nombre,
+          manychatId: lead.manychatId,
+        },
+        { tagApplied: tagPre || 'credito-preaprobado' }
+      ).catch((e) =>
+        logger.warn('notifyPipelinePreaprobado falló (no bloquea el movimiento)', {
+          leadId,
+          error: e instanceof Error ? e.message : String(e),
+        })
+      )
+    } else if (isRechazadoStageId(normalizedToStageId)) {
+      const tagRej = await getTagForStage('RECHAZADO').catch(() => null)
+      void notifyPipelineRechazado(
+        {
+          id: lead.id,
+          telefono: lead.telefono,
+          nombre: lead.nombre,
+          manychatId: lead.manychatId,
+        },
+        {
+          tagApplied: tagRej || 'credito-rechazado',
+          customRejectionMessage: rejectionMessage || null,
+        }
+      ).catch((e) =>
+        logger.warn('notifyPipelineRechazado falló (no bloquea el movimiento)', {
+          leadId,
+          error: e instanceof Error ? e.message : String(e),
+        })
+      )
     }
 
     // Ejecutar automatizaciones de la nueva etapa (no crítico si falla)

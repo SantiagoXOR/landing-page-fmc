@@ -33,6 +33,8 @@ export interface SendTemplateMessageParams {
     parameters: Array<{
       type: string;
       text?: string;
+      /** Plantillas nuevas (ej. Spanish ARG): {{nombre_variable}} — obligatorio en API */
+      parameter_name?: string;
       image?: { link: string };
       video?: { link: string };
       document?: { link: string };
@@ -319,6 +321,26 @@ export class WhatsAppAPIError extends Error {
    */
   isTemplateNotFoundError(): boolean {
     return this.errorData.error.code === 132000;
+  }
+
+  /**
+   * Fuera de la ventana de 24 h: solo permitido enviar plantillas aprobadas (Meta).
+   * Código 131047 = re-engagement / ventana de mensajes libres cerrada.
+   */
+  isOutsideMessagingWindow(): boolean {
+    const code = this.errorData.error.code;
+    const sub = this.errorData.error.error_subcode;
+    const msg = (this.message || '').toLowerCase();
+    if (code === 131047 || sub === 131047) return true;
+    if (
+      msg.includes('24 hour') ||
+      msg.includes('24-hour') ||
+      msg.includes('re-engagement') ||
+      msg.includes('outside the allowed window')
+    ) {
+      return true;
+    }
+    return false;
   }
 }
 

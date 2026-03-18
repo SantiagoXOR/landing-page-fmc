@@ -69,6 +69,15 @@ export function formatChange(change: number): string {
 }
 
 /**
+ * Texto para la comparación con el mes pasado.
+ * Si no hay cambio (0%), mostramos "Estado actual" para no sugerir una comparación histórica que no tenemos.
+ */
+export function formatChangeLabel(change: number): string {
+  if (change === 0) return 'Estado actual'
+  return `${formatChange(change)} desde el mes pasado`
+}
+
+/**
  * Obtener color según tendencia
  */
 export function getTrendColor(trend: 'up' | 'down' | 'stable'): string {

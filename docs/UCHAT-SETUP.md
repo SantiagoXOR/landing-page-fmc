@@ -81,6 +81,7 @@ Cuando el webhook de **Meta** apunta al CRM (modelo que usamos con Lead nuevo y 
    - `UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL` = URL del Inbound Webhook "Lead nuevo" de UChat.
    - `UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL` = URL del Inbound Webhook "Solicitud de Crédito" de UChat.
    - `UCHAT_INBOUND_WEBHOOK_CONSULTAS_CARLA_URL` = URL del Inbound Webhook "Consultas - Carla" de UChat (para que el AI Agent Carla responda consultas).
+   - `UCHAT_INBOUND_WEBHOOK_PREAPROBADO_URL` / `UCHAT_INBOUND_WEBHOOK_RECHAZADO_URL` = al mover tarjetas en el pipeline de ventas (ver **[UCHAT-PIPELINE-PREAPROBADO-RECHAZADO.md](./UCHAT-PIPELINE-PREAPROBADO-RECHAZADO.md)**).
    - Resto de variables WhatsApp/Supabase según [Variables de entorno del CRM](#4-variables-de-entorno-del-crm).
 
 3. **En Meta for Developers** → Tu app → **WhatsApp** → **Configuración** → **Webhook**:

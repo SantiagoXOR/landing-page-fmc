@@ -223,6 +223,55 @@ export class WhatsAppService {
     }
   }
 
+  /**
+   * Plantilla con una variable en el cuerpo: {{1}} (viejo) o {{nombre_snake}} (Meta Spanish ARG, etc.).
+   * Si WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME está definido, se envía parameter_name a la API.
+   */
+  static async sendTemplateBodySingleVariable(data: {
+    to: string
+    templateName: string
+    languageCode?: string
+    bodyText: string
+    /** Sin env: usa WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME o solo texto ({{1}}) */
+    bodyParameterName?: string
+  }): Promise<{ success: true; messageId?: string }> {
+    if (!this.whatsappClient) {
+      throw new Error('WhatsApp Business API not configured')
+    }
+    if (!isValidWhatsAppNumber(data.to)) {
+      throw new Error(`Invalid WhatsApp number: ${data.to}`)
+    }
+    const formattedPhone = formatWhatsAppNumber(data.to)
+    const text = (data.bodyText || '').slice(0, 1024)
+    const paramName =
+      (data.bodyParameterName || process.env.WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME || '').trim()
+    const param: { type: string; text: string; parameter_name?: string } = {
+      type: 'text',
+      text,
+    }
+    if (paramName) {
+      param.parameter_name = paramName
+    }
+    const response = await this.whatsappClient.sendTemplateMessage({
+      to: formattedPhone,
+      templateName: data.templateName,
+      languageCode: data.languageCode || 'es',
+      components: [
+        {
+          type: 'body',
+          parameters: [param],
+        },
+      ],
+    })
+    logger.info('WhatsApp template enviado', {
+      template: data.templateName,
+      to: formattedPhone.substring(0, 6) + '***',
+    })
+    return {
+      success: true,
+      messageId: response.messages?.[0]?.id,
+    }
+  }
 
   /**
    * Crear mensaje en la base de datos

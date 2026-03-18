@@ -4,8 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
-import { pipelineService } from '@/server/services/pipeline-service'
 import { calculateTimeBasedScore } from '@/server/services/pipeline-scoring-service'
+import { resolveDisplayStage } from '@/server/services/pipeline-stage-resolver'
 
 interface MetricsComparison {
   current: number
@@ -42,6 +42,28 @@ interface PipelineMetricsResponse {
   }
 }
 
+/** Tamaño de página: Supabase/PostgREST suele limitar a 1000 filas por request */
+const LEADS_PAGE_SIZE = 1000
+
+/**
+ * Obtener todos los leads paginando (para que Total Leads refleje el total real, ej. 1485)
+ */
+async function fetchAllLeads(): Promise<{ id?: string; tags?: unknown; estado?: string; createdAt?: string }[]> {
+  const allLeads: { id?: string; tags?: unknown; estado?: string; createdAt?: string }[] = []
+  let offset = 0
+  let hasMore = true
+  while (hasMore) {
+    const { leads, total } = await supabaseLeadService.getLeads({
+      limit: LEADS_PAGE_SIZE,
+      offset
+    })
+    allLeads.push(...leads)
+    hasMore = leads.length === LEADS_PAGE_SIZE && allLeads.length < total
+    offset += LEADS_PAGE_SIZE
+  }
+  return allLeads
+}
+
 /**
  * Calcular métricas para un período específico
  */
@@ -60,40 +82,8 @@ async function calculatePeriodMetrics(
   stalledLeads: number
 }> {
   try {
-    // Obtener leads con paginación para evitar límite 1000 de Supabase.
-    // MAX_LEADS limita el volumen para que getLeadPipelines y el loop terminen en tiempo razonable.
-    const PAGE_SIZE = 1000
-    const MAX_LEADS = 15000
-    let allLeads: any[] = []
-    let totalFromApi = 0
-
-    let offset = 0
-    do {
-      const { leads, total } = await supabaseLeadService.getLeads({
-        limit: PAGE_SIZE,
-        offset
-      })
-      totalFromApi = total
-      allLeads = allLeads.concat(leads || [])
-      if ((leads?.length ?? 0) < PAGE_SIZE || allLeads.length >= totalFromApi || allLeads.length >= MAX_LEADS) break
-      offset += PAGE_SIZE
-    } while (true)
-
-    // Deduplicar por id por si la paginación devolvió filas repetidas (límite de Supabase, etc.)
-    const seenIds = new Set<string>()
-    allLeads = allLeads.filter(l => {
-      const id = l.id as string | undefined
-      if (!id || seenIds.has(id)) return false
-      seenIds.add(id)
-      return true
-    })
-
-    // Filtrar leads por fecha de creación para métricas del período
-    const periodLeads = allLeads.filter(lead => {
-      if (!lead.createdAt) return false
-      const leadDate = new Date(lead.createdAt)
-      return leadDate >= dateFrom && leadDate <= dateTo
-    })
+    // Obtener TODOS los leads paginando (Supabase devuelve max ~1000 por request; así Total = 1485, etc.)
+    const allLeads = await fetchAllLeads()
 
     const allLeadIds = allLeads
       .map(l => l.id)
@@ -102,32 +92,8 @@ async function calculatePeriodMetrics(
     // Obtener información del pipeline para todos los leads
     const pipelineMap = await supabaseLeadService.getLeadPipelines(allLeadIds)
 
-    // Mapeo de stages
-    const pipelineStageToStageId: Record<string, string> = {
-      'LEAD_NUEVO': 'nuevo',
-      'CLIENTE_NUEVO': 'nuevo',
-      'CONTACTO_INICIAL': 'contactado',
-      'CONSULTANDO_CREDITO': 'contactado',
-      'CALIFICACION': 'calificado',
-      'SOLICITANDO_DOCS': 'calificado',
-      'PRESENTACION': 'calificado',
-      'LISTO_ANALISIS': 'propuesta',
-      'PROPUESTA': 'propuesta',
-      'PREAPROBADO': 'negociacion',
-      'NEGOCIACION': 'negociacion',
-      'APROBADO': 'negociacion',
-      'CIERRE_GANADO': 'cerrado-ganado',
-      'CERRADO_GANADO': 'cerrado-ganado',
-      'CIERRE_PERDIDO': 'cerrado-perdido',
-      'RECHAZADO': 'cerrado-perdido',
-      'SEGUIMIENTO': 'cerrado-ganado'
-    }
-
-    // Tags que indican aprobación
-    const approvedTags = ['aprobado', 'preaprobado', 'pre-aprobado', 'cerrado-ganado', 'venta-concretada']
-    // Tags que indican rechazo
-    const rejectedTags = ['rechazado', 'credito-rechazado', 'rechazado-credito', 'perdido', 'cerrado-perdido']
-
+    // Usar la misma lógica de etapa que el tablero (pipeline + tags + estado) para que
+    // las métricas coincidan con lo que ve el usuario: 863 Cliente Nuevo, 69 Listo Análisis, 6 Preaprobados, 62 Rechazados, etc.
     let preapprovedCount = 0
     let approvedCount = 0
     let rejectedCount = 0
@@ -138,98 +104,41 @@ async function calculatePeriodMetrics(
     let stalledCount = 0
     let leadsWithTimeData = 0
 
-    // Contar aprobados y rechazados de TODOS los leads
     for (const lead of allLeads) {
       const leadId = lead.id as string
-      const pipelineInfo = pipelineMap.get(leadId)
-      
-      // Parsear tags (los tags pueden venir como string JSON o array)
-      const leadWithTags = lead as any
-      const tags = leadWithTags.tags ? (typeof leadWithTags.tags === 'string' ? JSON.parse(leadWithTags.tags) : leadWithTags.tags) : []
-      const tagsArray = Array.isArray(tags) ? tags : []
-      const tagsLower = tagsArray.map(t => String(t).toLowerCase().trim())
+      const pipelineInfo = pipelineMap.get(leadId) ?? null
+      const { stageId: displayStageId, stageEntryDate } = resolveDisplayStage(lead, pipelineInfo)
 
-      // Determinar si está aprobado o rechazado
-      let isApproved = false
-      let isRejected = false
-
-      // Primero verificar por etapa del pipeline
-      if (pipelineInfo) {
-        const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || ''
-        // Preaprobados: etapa PREAPROBADO o tags preaprobado/pre-aprobado
-        if (pipelineInfo.current_stage === 'PREAPROBADO') {
-          preapprovedCount++
-        }
-        if (stageId === 'cerrado-ganado' || pipelineInfo.current_stage === 'APROBADO' || pipelineInfo.current_stage === 'PREAPROBADO' || pipelineInfo.current_stage === 'CERRADO_GANADO') {
-          isApproved = true
-        } else if (stageId === 'cerrado-perdido' || pipelineInfo.current_stage === 'RECHAZADO' || pipelineInfo.current_stage === 'CIERRE_PERDIDO') {
-          isRejected = true
-        }
-      }
-
-      // Preaprobados por tags (respaldo si no está en etapa PREAPROBADO)
-      if (tagsLower.some(t => t === 'preaprobado' || t === 'pre-aprobado') && pipelineMap.get(leadId)?.current_stage !== 'PREAPROBADO') {
+      // Preaprobados: misma columna que el tablero "Preaprobado" (stageId negociacion)
+      if (displayStageId === 'negociacion') {
         preapprovedCount++
       }
-
-      // Luego verificar por tags
-      if (!isApproved && !isRejected) {
-        for (const tag of tagsLower) {
-          if (approvedTags.includes(tag)) {
-            isApproved = true
-            break
-          }
-          if (rejectedTags.includes(tag)) {
-            isRejected = true
-            break
-          }
-        }
+      // Aprobados / cerrado ganado (para métrica approved)
+      if (displayStageId === 'cerrado-ganado') {
+        approvedCount++
+      }
+      // Rechazados: misma columna que el tablero "Rechazado" (stageId cerrado-perdido)
+      if (displayStageId === 'cerrado-perdido') {
+        rejectedCount++
       }
 
-      if (isApproved) approvedCount++
-      if (isRejected) rejectedCount++
-    }
-
-    // Calcular urgentes y estancados sobre TODOS los leads (no solo del período)
-    for (const lead of allLeads) {
-      const leadId = lead.id as string
-      const pipelineInfo = pipelineMap.get(leadId)
-
-      if (pipelineInfo) {
-        const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
-        const stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt || new Date())
-        const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
-
-        if (timeScore.urgency === 'high' || timeScore.urgency === 'critical') {
-          urgentCount++
-        }
-        if (timeScore.daysInStage >= 15) {
-          stalledCount++
-        }
-        if (timeScore.urgency === 'critical' || timeScore.urgency === 'high') {
-          highPriorityCount++
-        }
+      // Urgentes y estancados con la etapa mostrada en el tablero
+      const timeScore = calculateTimeBasedScore(stageEntryDate, displayStageId)
+      if (timeScore.urgency === 'high' || timeScore.urgency === 'critical') {
+        urgentCount++
+        highPriorityCount++
       }
-    }
-
-    // Promedio de tiempo en etapa: solo sobre leads del período
-    for (const lead of periodLeads) {
-      const leadId = lead.id as string
-      const pipelineInfo = pipelineMap.get(leadId)
-
-      if (pipelineInfo) {
-        const stageId = pipelineStageToStageId[pipelineInfo.current_stage] || 'nuevo'
-        const stageEntryDate = new Date(pipelineInfo.stage_entered_at || lead.createdAt || new Date())
-        const timeScore = calculateTimeBasedScore(stageEntryDate, stageId)
-        totalTimeInStage += timeScore.daysInStage
-        leadsWithTimeData++
+      if (timeScore.daysInStage >= 15) {
+        stalledCount++
       }
+      totalTimeInStage += timeScore.daysInStage
+      leadsWithTimeData++
     }
 
     const averageTimeInStage = leadsWithTimeData > 0 ? totalTimeInStage / leadsWithTimeData : 0
 
     return {
-      totalLeads: totalFromApi > 0 ? totalFromApi : allLeads.length, // Total real desde API (evita techo 1000)
+      totalLeads: allLeads.length, // Total de TODOS los leads
       preapprovedLeads: preapprovedCount,
       approvedLeads: approvedCount,
       rejectedLeads: rejectedCount,

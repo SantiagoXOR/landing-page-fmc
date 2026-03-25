@@ -20,13 +20,23 @@ export default function ChatsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | undefined>()
   const [loading, setLoading] = useState(true)
+  /** Término de búsqueda aplicado al API (sincronizado con ChatList vía debounce) */
+  const [apiSearch, setApiSearch] = useState('')
   const [mobileView, setMobileView] = useState<'list' | 'chat' | 'sidebar'>('list')
   const periodicRefreshInterval = useRef<NodeJS.Timeout | null>(null)
+  const hasLoadedOnceRef = useRef(false)
 
   const fetchConversations = useCallback(async () => {
     try {
-      setLoading(true)
-      const response = await fetch('/api/conversations')
+      if (!hasLoadedOnceRef.current) {
+        setLoading(true)
+      }
+      const params = new URLSearchParams()
+      if (apiSearch) {
+        params.set('search', apiSearch)
+      }
+      const qs = params.toString()
+      const response = await fetch(qs ? `/api/conversations?${qs}` : '/api/conversations')
       
       if (response.ok) {
         const data = await response.json()
@@ -103,6 +113,11 @@ export default function ChatsPage() {
         
         // Siempre usar las conversaciones ordenadas del API
         setConversations(sortedConversations)
+        setSelectedConversation(prev => {
+          if (!prev) return prev
+          const stillThere = sortedConversations.some(c => c.id === prev.id)
+          return stillThere ? prev : undefined
+        })
       } else {
         // Si el API falla, mostrar array vacío y mensaje de error
         setConversations([])
@@ -111,8 +126,9 @@ export default function ChatsPage() {
       setConversations([])
     } finally {
       setLoading(false)
+      hasLoadedOnceRef.current = true
     }
-  }, [])
+  }, [apiSearch])
 
   // Cargar conversaciones al montar el componente
   useEffect(() => {
@@ -429,6 +445,7 @@ export default function ChatsPage() {
             conversations={conversations}
             selectedConversationId={selectedConversation?.id}
             onSelectConversation={handleSelectConversation}
+            onDebouncedSearchChange={setApiSearch}
           />
         </div>
 

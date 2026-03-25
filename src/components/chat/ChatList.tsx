@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -13,6 +13,8 @@ interface ChatListProps {
   conversations: Conversation[]
   selectedConversationId?: string
   onSelectConversation: (conversation: Conversation) => void
+  /** Búsqueda en servidor (nombre, teléfono, mensajes); debounced desde el input local */
+  onDebouncedSearchChange?: (trimmedTerm: string) => void
   className?: string
 }
 
@@ -20,23 +22,27 @@ export function ChatList({
   conversations, 
   selectedConversationId, 
   onSelectConversation,
+  onDebouncedSearchChange,
   className 
 }: ChatListProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState<'all' | 'whatsapp' | 'instagram' | 'facebook'>('all')
 
-  const filteredConversations = conversations.filter(conversation => {
-    const matchesSearch = conversation.lead?.nombre
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase()) ||
-      conversation.lead?.telefono.includes(searchTerm) ||
-      conversation.messages[0]?.content.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    if (!onDebouncedSearchChange) return
+    const t = setTimeout(() => {
+      onDebouncedSearchChange(searchTerm.trim())
+    }, 350)
+    return () => clearTimeout(t)
+  }, [searchTerm, onDebouncedSearchChange])
 
+  // Filtro por plataforma en cliente; el texto de búsqueda lo resuelve el API
+  const filteredConversations = conversations.filter(conversation => {
     const matchesFilter = filter === 'all' || 
       conversation.platform === filter || 
       (filter === 'facebook' && (conversation.platform === 'facebook' || conversation.platform === 'messenger'))
 
-    return matchesSearch && matchesFilter
+    return matchesFilter
   })
   
   // #region agent log

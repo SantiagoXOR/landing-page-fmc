@@ -1,4 +1,9 @@
 import { supabase } from '@/lib/db'
+import {
+  buildLeadSearchOrParts,
+  buildMessageContentSearchPattern,
+  buildWhatsAppPlatformIdSearchPattern,
+} from '@/lib/chat-search-utils'
 
 export interface CreateConversationData {
   platform: string
@@ -35,6 +40,11 @@ export interface ConversationWithDetails {
     readAt?: string | Date
   }>
 }
+
+const MAX_SEARCH_CONVERSATION_IDS = 800
+const SEARCH_MESSAGES_ROW_CAP = 2500
+const SEARCH_LEADS_ROW_CAP = 500
+const SEARCH_WA_PLATFORM_ID_CAP = 500
 
 export class ConversationService {
   /**
@@ -214,6 +224,169 @@ export class ConversationService {
       const limit = filters.limit || 50
       const offset = (page - 1) * limit
 
+      const searchRaw = (filters.search || '').trim()
+      const hasSearch = searchRaw.length > 0
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const applyConversationFilters = (base: any) => {
+        let q = base
+        if (filters.status) {
+          if (filters.status === 'active') {
+            q = q.in('status', ['open', 'assigned'])
+          } else {
+            q = q.eq('status', filters.status)
+          }
+        }
+        if (filters.platform) {
+          q = q.eq('platform', filters.platform)
+        }
+        if (filters.assignedTo) {
+          q = q.eq('assigned_to', filters.assignedTo)
+        }
+        return q
+      }
+
+      /**
+       * Búsqueda: nombre de lead, teléfono (texto y solo dígitos) y contenido de mensajes.
+       * Se resuelve antes de paginar para no perder coincidencias fuera de la primera página.
+       */
+      if (hasSearch) {
+        const orParts = buildLeadSearchOrParts(searchRaw)
+        const idSet = new Set<string>()
+
+        // 1) Mensajes cuyo contenido coincide
+        const contentPattern = buildMessageContentSearchPattern(searchRaw)
+        if (contentPattern.length > 0) {
+          const { data: matchingMessages, error: msgErr } = await supabase.client
+            .from('messages')
+            .select('conversation_id')
+            .ilike('content', `%${contentPattern}%`)
+            .limit(SEARCH_MESSAGES_ROW_CAP)
+
+          if (msgErr) throw msgErr
+          for (const m of matchingMessages || []) {
+            if (m.conversation_id) idSet.add(m.conversation_id as string)
+          }
+        }
+
+        // 2) Leads por nombre y/o teléfono (incl. últimos dígitos sin prefijo)
+        if (orParts.length > 0) {
+          const { data: matchingLeads, error: leadErr } = await supabase.client
+            .from('Lead')
+            .select('id')
+            .or(orParts.join(','))
+            .limit(SEARCH_LEADS_ROW_CAP)
+
+          if (leadErr) throw leadErr
+
+          const leadIds = (matchingLeads || []).map((l: { id: string }) => l.id).filter(Boolean)
+          if (leadIds.length > 0) {
+            const chunkSize = 120
+            for (let i = 0; i < leadIds.length; i += chunkSize) {
+              const chunk = leadIds.slice(i, i + chunkSize)
+              const { data: convByLead, error: cErr } = await supabase.client
+                .from('conversations')
+                .select('id')
+                .in('lead_id', chunk)
+
+              if (cErr) throw cErr
+              for (const c of convByLead || []) {
+                if (c.id) idSet.add(c.id as string)
+              }
+            }
+          }
+        }
+
+        // 3) WhatsApp: conversaciones pueden existir sin lead_id; el teléfono suele ir en platform_id
+        const waPlatformPattern = buildWhatsAppPlatformIdSearchPattern(searchRaw)
+        if (waPlatformPattern) {
+          const { data: waByPlatform, error: waErr } = await supabase.client
+            .from('conversations')
+            .select('id')
+            .eq('platform', 'whatsapp')
+            .ilike('platform_id', `%${waPlatformPattern}%`)
+            .limit(SEARCH_WA_PLATFORM_ID_CAP)
+
+          if (waErr) throw waErr
+          for (const c of waByPlatform || []) {
+            if (c.id) idSet.add(c.id as string)
+          }
+        }
+
+        if (idSet.size === 0) {
+          return {
+            data: [],
+            total: 0,
+            page,
+            limit
+          }
+        }
+
+        let allIds = Array.from(idSet)
+        if (allIds.length > MAX_SEARCH_CONVERSATION_IDS) {
+          allIds = allIds.slice(0, MAX_SEARCH_CONVERSATION_IDS)
+        }
+
+        const chunkSize = 90
+        const chunks: string[][] = []
+        for (let i = 0; i < allIds.length; i += chunkSize) {
+          chunks.push(allIds.slice(i, i + chunkSize))
+        }
+
+        const merged: any[] = []
+        for (const chunk of chunks) {
+          let q = supabase.client
+            .from('conversations')
+            .select(`
+              *,
+              lead:Lead(id, nombre, telefono, email, zona, estado)
+            `)
+            .in('id', chunk)
+
+          q = applyConversationFilters(q)
+          const { data: rows, error: convErr } = await q
+          if (convErr) throw convErr
+          merged.push(...(rows || []))
+        }
+
+        const convMap = new Map<string, any>()
+        for (const row of merged) {
+          if (row?.id) convMap.set(row.id, row)
+        }
+
+        const sorted = Array.from(convMap.values()).sort((a, b) => {
+          const aT = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
+          const bT = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
+          if (aT !== bT) return bT - aT
+          const aC = a.created_at ? new Date(a.created_at).getTime() : 0
+          const bC = b.created_at ? new Date(b.created_at).getTime() : 0
+          return bC - aC
+        })
+
+        const total = sorted.length
+        const pageSlice = sorted.slice(offset, offset + limit)
+
+        // #region agent log
+        if (pageSlice.length > 0) {
+          const sample = pageSlice.slice(0, 5).map((c: { id: string; last_message_at?: string; created_at?: string }) => ({
+            id: c.id,
+            last_message_at: c.last_message_at,
+            created_at: c.created_at,
+            hasLastMessageAt: !!c.last_message_at
+          }))
+          fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'conversation-service.ts:getConversations:searchPath',message:'Conversations search path',data:{total,returned:pageSlice.length,firstFive:sample},timestamp:Date.now(),sessionId:'debug-session',runId:'search-fix',hypothesisId:'S1'})}).catch(()=>{});
+        }
+        // #endregion
+
+        return {
+          data: pageSlice,
+          total,
+          page,
+          limit
+        }
+      }
+
+      // Sin búsqueda: paginación en base de datos
       let query = supabase.client
         .from('conversations')
         .select(`
@@ -221,25 +394,8 @@ export class ConversationService {
           lead:Lead(id, nombre, telefono, email, zona, estado)
         `, { count: 'exact' })
 
-      // Aplicar filtros
-      if (filters.status) {
-        if (filters.status === 'active') {
-          query = query.in('status', ['open', 'assigned'])
-        } else {
-          query = query.eq('status', filters.status)
-        }
-      }
+      query = applyConversationFilters(query)
 
-      if (filters.platform) {
-        query = query.eq('platform', filters.platform)
-      }
-
-      if (filters.assignedTo) {
-        query = query.eq('assigned_to', filters.assignedTo)
-      }
-
-      // Orden y paginación
-      // Ordenar por last_message_at descendente, pero manejar NULLs al final
       query = query
         .order('last_message_at', { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1)
@@ -267,24 +423,8 @@ export class ConversationService {
       }
       // #endregion
 
-      // Si hay búsqueda, filtrar por contenido de mensajes
-      let filteredConversations = conversations || []
-      
-      if (filters.search && filteredConversations.length > 0) {
-        const conversationIds = filteredConversations.map(c => c.id)
-        
-        const { data: matchingMessages } = await supabase.client
-          .from('messages')
-          .select('conversation_id')
-          .in('conversation_id', conversationIds)
-          .ilike('content', `%${filters.search}%`)
-
-        const matchingIds = new Set(matchingMessages?.map(m => m.conversation_id) || [])
-        filteredConversations = filteredConversations.filter(c => matchingIds.has(c.id))
-      }
-
       return {
-        data: filteredConversations,
+        data: conversations || [],
         total: count || 0,
         page,
         limit

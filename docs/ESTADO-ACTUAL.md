@@ -1,409 +1,137 @@
-# 📊 Estado Actual del Proyecto - CRM Phorencial
+# Estado actual del proyecto — CRM Phorencial
 
-> **Última actualización:** 22 de Octubre, 2025  
-> **Versión:** 0.9.0 (Beta)  
-> **Estado General:** 🟡 En Desarrollo Activo - Migración en Proceso
+> **Última actualización:** 7 de abril de 2026  
+> **Versión declarada en `package.json`:** 0.1.0  
+> **Estado general:** Producto maduro en código; validación de entorno y CI debe hacerse por quien despliega.
 
----
-
-## 🎯 Resumen Ejecutivo
-
-El **CRM Phorencial** es un sistema de gestión de leads específicamente diseñado para Formosa, Argentina. El proyecto se encuentra en un **estado avanzado de desarrollo** (85-90% completado) y actualmente está en proceso de **migración de Prisma a Supabase**.
-
-### Estado Actual
-- ✅ **Funcionalidades Core:** Operativas
-- 🔄 **Migración a Supabase:** 80% completada
-- ⚠️ **Pipeline de Ventas:** Requiere configuración SQL
-- 🟢 **Testing:** 70+ tests implementados
-- 📊 **Datos:** 233+ leads reales de Formosa importados
+La foto **cuantitativa y verificable** del repositorio está en **[AUDITORIA-PROYECTO.md](./AUDITORIA-PROYECTO.md)** (inventario de rutas, tests ejecutados, brechas). Este documento resume **qué hay implementado** y **qué sigue mejorándose**.
 
 ---
 
-## 📈 Progreso por Módulo
+## Resumen ejecutivo
 
-### 🟢 Completados (90-100%)
+- **Stack:** Next.js 14 (App Router), TypeScript, Tailwind, Supabase (`@supabase/supabase-js`), NextAuth, tRPC, Prisma aún presente en tooling (`postinstall` y scripts `db:*`).
+- **APIs:** Más de **70** rutas `route.ts` bajo `src/app/api/` (no solo “CRUD básico”).
+- **UI:** Dashboard, leads, pipeline, chats, documentos, reportes, administración (usuarios y **permisos**), scoring, asistentes; rutas **Manychat** en el árbol como **legado** (desuso operativo).
+- **Integraciones (mensajería):** **UChat** como canal principal ([CANAL-PRINCIPAL-UCHAT.md](./CANAL-PRINCIPAL-UCHAT.md)), más WhatsApp/Meta (webhooks y envío). Manychat solo referencia histórica.
+- **Observabilidad:** Sentry (`@sentry/nextjs`) e instrumentación presentes; health check en `/api/health` es **mínimo** (no comprueba DB).
+- **Tests:** Playwright en `tests/` y `e2e/`; Vitest en `src/**/__tests__`. Última corrida documentada de Vitest: **62/62 OK** (abril 2026; ver auditoría).
 
-#### **Autenticación y Seguridad** - 95%
-- ✅ NextAuth.js implementado
-- ✅ JWT con roles (ADMIN, MANAGER, ANALISTA, VENDEDOR, VIEWER)
-- ✅ Middleware de protección de rutas
-- ✅ RBAC básico funcional
-- ⚠️ Sistema de permisos granulares (tablas creadas, UI pendiente)
-
-#### **Gestión de Leads** - 90%
-- ✅ CRUD completo funcional
-- ✅ Validaciones con Zod
-- ✅ Filtros y búsqueda
-- ✅ Exportación CSV
-- ✅ 233 leads reales importados
-- ⚠️ Filtros avanzados pendientes
-
-#### **Dashboard Principal** - 85%
-- ✅ Métricas KPI en tiempo real
-- ✅ Gráficos interactivos (Recharts)
-- ✅ Componentes UI modernos
-- ✅ Diseño responsive
-- ⚠️ Personalización de widgets pendiente
-
-#### **APIs REST** - 90%
-- ✅ 39 endpoints implementados
-- ✅ Validación robusta
-- ✅ Manejo de errores estructurado
-- ✅ Documentación Swagger básica
-- ⚠️ Rate limiting pendiente
-
-### 🟡 En Proceso (50-89%)
-
-#### **Migración a Supabase** - 80%
-- ✅ Cliente Supabase implementado (`src/lib/db.ts`)
-- ✅ Autenticación adaptada
-- ✅ Tablas principales migradas
-- ✅ 233 leads importados
-- 🔄 Validación completa de datos
-- 🔄 Políticas RLS en ajuste
-- ⚠️ Datos históricos pendientes
-
-#### **Pipeline de Ventas** - 70%
-- ✅ Modelo de datos definido
-- ✅ Tablas creadas en DB
-- ✅ APIs implementadas
-- ⚠️ **CRÍTICO:** Tabla `lead_pipeline` con errores RLS
-- ⚠️ Integración frontend-backend incompleta
-- ⚠️ Creación automática de pipelines pendiente
-
-#### **Sistema de Testing** - 75%
-- ✅ 70+ tests E2E (Playwright)
-- ✅ 70+ tests unitarios (Jest)
-- ✅ Configuración multi-browser
-- ✅ Tests de integración básicos
-- 🔄 Cobertura completa pendiente
-- ⚠️ Tests de pipeline pendientes
-
-### 🔴 Pendientes (0-49%)
-
-#### **Integración WhatsApp** - 30%
-- ✅ Componentes UI creados
-- ✅ Webhook configurado
-- ✅ Documentación escrita
-- ❌ Backend funcional no implementado
-- ❌ Asociación mensajes-leads pendiente
-- ❌ Panel de conversaciones pendiente
-
-#### **Sistema de Scoring** - 40%
-- ✅ Reglas básicas definidas
-- ✅ Estructura de datos
-- 🔄 Motor de evaluación básico
-- ❌ Scoring automático pendiente
-- ❌ Integración con pipeline pendiente
-
-#### **Gestión de Documentos** - 25%
-- ✅ UI completa
-- ✅ Diseño de componentes
-- ❌ Backend de storage no implementado
-- ❌ Upload real de archivos pendiente
-- ❌ Asociación con leads pendiente
-
-#### **Reportes Avanzados** - 20%
-- ✅ Métricas básicas
-- ⚠️ Exportación PDF pendiente
-- ❌ Reportes personalizados pendientes
-- ❌ Analytics detallados pendientes
+**Completitud funcional (estimación honesta):** el núcleo CRM + pipeline + mensajería + admin está **implementado en código**; el trabajo restante es sobre todo **endurecimiento** (health, cobertura, coherencia Prisma/Supabase, pulido UX, alinear docs históricos).
 
 ---
 
-## 🚨 Problemas Conocidos
+## Progreso por módulo (alineado al código)
 
-### 🔴 Críticos (Bloquean Funcionalidad Principal)
+### Autenticación y seguridad — ~95%
 
-#### **1. Pipeline de Ventas No Operativo**
-- **Descripción:** Error "No se pudo crear el pipeline" al crear leads
-- **Causa:** Tabla `lead_pipeline` con configuración RLS incorrecta
-- **Impacto:** ⚠️ Funcionalidad principal bloqueada
-- **Solución:** Ejecutar SQL en `SOLUCION-PIPELINE.md`
-- **Prioridad:** 🔴 URGENTE
-- **Estimación:** 30 minutos
+- NextAuth, middleware, roles (ADMIN, MANAGER, ANALISTA, VENDEDOR, VIEWER).
+- RBAC y APIs de permisos; **UI de permisos** en `/admin/permissions`.
 
-#### **2. Migración Incompleta a Supabase**
-- **Descripción:** Algunos datos y funciones no completamente migrados
-- **Causa:** Proceso de migración aún en curso
-- **Impacto:** Posibles inconsistencias en datos
-- **Solución:** Ejecutar `test-fmc-migration-complete.js` y corregir
-- **Prioridad:** 🔴 ALTA
-- **Estimación:** 4-6 horas
+### Gestión de leads — ~90%
 
-### 🟡 Importantes (Reducen Funcionalidad)
+- CRUD, validación Zod, filtros y búsqueda (incluye componentes de búsqueda avanzada en código).
+- Webhooks y rutas de eventos según integraciones.
 
-#### **3. Sistema de Permisos No Integrado**
-- **Descripción:** Tablas de permisos creadas pero sin UI
-- **Impacto:** Gestión manual de permisos
-- **Solución:** Crear página de administración de permisos
-- **Prioridad:** 🟡 MEDIA
-- **Estimación:** 8-10 horas
+### Pipeline — ~90%
 
-#### **4. WhatsApp Sin Implementación Real**
-- **Descripción:** Solo UI, no hay backend funcional
-- **Impacto:** Funcionalidad prometida no disponible
-- **Solución:** Implementar backend de WhatsApp
-- **Prioridad:** 🟡 MEDIA
-- **Estimación:** 12-16 horas
+- APIs de etapas, movimiento de leads, métricas, historial; UI avanzada (`PipelineBoardAdvanced`, etc.).  
+- Cualquier incidencia puntual de RLS o datos depende del **estado de la base Supabase** en cada entorno (no auditable solo desde el repo).
 
-### 🟢 Menores (No Críticos)
+### Dashboard y reportes — ~85%
 
-#### **5. Documentación Desactualizada**
-- **Descripción:** Algunos docs reflejan arquitectura antigua
-- **Impacto:** Confusión para nuevos desarrolladores
-- **Solución:** Actualizar documentación (en proceso)
-- **Prioridad:** 🟢 BAJA
-- **Estimación:** 2-3 horas
+- Métricas, gráficos, páginas bajo `reports/`, exportes vía API.
 
----
+### Documentos — ~80%
 
-## 📊 Métricas del Código
+- Upload con **Supabase Storage** y permisos granulares en `documents/upload`; límites de plataforma (p. ej. Vercel) documentados en el propio route.
 
-### **Líneas de Código**
-```
-TypeScript/JavaScript:  ~15,000 líneas
-Tests:                  ~5,000 líneas
-SQL Scripts:            ~2,000 líneas
-Documentación:          ~3,000 líneas
-```
+### Conversaciones y WhatsApp — ~75–85%
 
-### **Archivos**
-```
-Componentes React:      58 archivos
-APIs (Endpoints):       39 archivos
-Scripts:                51 archivos
-Tests E2E:              12 archivos
-Tests Unitarios:        15 archivos
-```
+- Rutas de conversaciones, mensajes, envío; UI de chats.  
+- La **experiencia end-to-end** (webhooks en producción, enlace automático mensaje–lead en todos los casos) debe validarse en el entorno real.
 
-### **Dependencias**
-```
-Producción:             47 paquetes
-Desarrollo:             18 paquetes
-Total:                  65 paquetes
-```
+### UChat + WhatsApp — ~85% (operativo objetivo)
 
-### **Base de Datos**
-```
-Tablas:                 13 tablas
-Leads:                  233 registros
-Usuarios:               4 usuarios demo
-Zonas Formosa:          20 zonas
-Etapas Pipeline:        9 etapas
-```
+- Webhook `POST /api/webhooks/uchat`, servicio `uchat-webhook-service`, variables `UCHAT_*` e integración con pipeline documentadas en **UCHAT-SETUP.md** y enlaces en **CANAL-PRINCIPAL-UCHAT.md**.
+
+### Manychat — legado (desuso operativo)
+
+- Páginas y APIs relacionadas pueden seguir en el repo; **no** es la integración a configurar en nuevos despliegues. Ver **CANAL-PRINCIPAL-UCHAT.md**.
+
+### Scoring y reglas — ~75%
+
+- APIs `scoring`, UI `settings/scoring`, constructores de reglas en componentes.
+
+### Automatización — ~70%
+
+- Rutas y UI relacionadas (`automation`); profundidad según reglas de negocio concretas.
+
+### Testing — en evolución
+
+- **Vitest:** 8 archivos de test; última corrida local **62/62** (abril 2026).  
+- **Playwright:** múltiples especificaciones; no se ejecutaron en esta actualización de documentación.
 
 ---
 
-## 🔧 Cambios No Commiteados
+## Problemas conocidos (actualizados)
 
-### Archivos Modificados
-```
-modified:   src/lib/auth.ts
-modified:   src/lib/db.ts
-modified:   scripts/check-supabase-tables.js
-modified:   scripts/setup-test-users.js
-```
+### Críticos (entorno / datos)
 
-### Archivos Nuevos (No Rastreados)
-```
-database-exports/                      # Backups de BD
-scripts/detailed-migration-review.js   # Script de revisión
-scripts/export-complete-database.js    # Exportador de BD
-test-current-credentials.js
-test-fmc-connection.js
-test-fmc-env-connection.js
-test-fmc-migration-complete.js        # Test integral
-```
+1. **Base de datos:** Sin conexión activa en la auditoría, no se puede afirmar que migraciones RLS o triggers estén aplicados en producción. Revisar panel Supabase y scripts de migración del proyecto.
+2. **Prisma + Supabase:** Riesgo de confusión para nuevos desarrolladores; documentar flujo recomendado (ver README).
 
-### Descripción de Cambios Principales
+### Importantes (producto / calidad)
 
-1. **src/lib/auth.ts**
-   - Adaptado para trabajar con Supabase
-   - Soporte para tablas User antigua y nueva
-   - Mejor logging y debug
-   - Manejo de contraseñas de prueba
+3. **Health check:** Solo confirma que la app responde; ampliar si se requiere monitoreo serio.
+4. **Rate limiting:** Existe en partes del sistema (tRPC, algunas rutas); no uniforme en toda la API.
 
-2. **src/lib/db.ts**
-   - Cliente Supabase completo implementado
-   - Reemplazo de Prisma
-   - 40+ métodos para operaciones CRUD
-   - Compatibilidad con código existente
+### Menores
 
-3. **scripts/***
-   - Scripts de migración y validación
-   - Exportadores de base de datos
-   - Tests de conexión
+5. **Badges del sidebar / design system:** Algunos ejemplos y el sidebar usan contadores estáticos o TODOs de “conectar a API”.
+6. **Documentación histórica en la raíz:** Archivos como `ESTADO-FINAL-CRM.md` pueden contradecir el estado real; priorizar `docs/ESTADO-ACTUAL.md` y `docs/AUDITORIA-PROYECTO.md`.
 
 ---
 
-## 🧪 Estado del Testing
+## Métricas aproximadas del repositorio
 
-### Tests E2E (Playwright)
-```
-Total:              70+ tests
-Pasando:            ~65 tests
-Fallando:           ~5 tests (pipeline)
-Browsers:           Chrome, Firefox, Safari
-Mobile:             Chrome Mobile, Safari Mobile
-Cobertura:          ~75%
-```
+| Concepto | Orden de magnitud (abr 2026) |
+|----------|-------------------------------|
+| Rutas API (`route.ts`) | ~74 |
+| Páginas (`page.tsx` en `src/app`) | ~33 |
+| Componentes `.tsx` en `src/components` | ~104 |
+| Archivos E2E `*.spec.ts` | ~19 |
+| Archivos de test Vitest bajo `src/` | ~8 |
 
-### Tests Unitarios (Jest)
-```
-Total:              70+ tests
-Pasando:            ~68 tests
-Fallando:           ~2 tests
-Cobertura:          ~60%
-```
-
-### Áreas con Mejor Cobertura
-- ✅ Autenticación (95%)
-- ✅ APIs de Leads (90%)
-- ✅ Dashboard (85%)
-- ✅ Validaciones (90%)
-
-### Áreas con Cobertura Baja
-- ⚠️ Pipeline (40%)
-- ⚠️ WhatsApp (30%)
-- ⚠️ Documentos (20%)
-- ⚠️ Scoring (35%)
+Los números exactos pueden cambiar con cada commit; la auditoría detalla cómo se contaron.
 
 ---
 
-## 🗺️ Próximos Hitos
+## Próximos hitos sugeridos
 
-### Sprint Actual (Semana 1-2)
-- [ ] Solucionar pipeline de ventas
-- [ ] Completar migración Supabase
-- [ ] Commit de cambios pendientes
-- [ ] Actualizar tests
-
-### Sprint 2 (Semana 3-4)
-- [ ] Implementar WhatsApp backend
-- [ ] Sistema de permisos UI
-- [ ] Mejorar cobertura de tests
-- [ ] Optimizaciones de performance
-
-### Mes 2
-- [ ] Reportes avanzados
-- [ ] Sistema de scoring automático
-- [ ] Gestión de documentos completa
-- [ ] Monitoreo con Sentry
+1. Añadir Vitest (y E2E) a CI si aún no están en el pipeline.
+2. Ejecutar suite Playwright contra un entorno de staging con variables reales.
+3. Extender `/api/health` (opcional: Supabase ping, Redis).
+4. Unificar narrativa: archivar o actualizar markdowns de la raíz que declaran “100%” sin criterios.
+5. Definir guía “fuente de verdad” para esquema de datos (Prisma vs migraciones SQL Supabase).
 
 ---
 
-## 📦 Stack Tecnológico Actual
+## Stack tecnológico (referencia rápida)
 
-### Frontend
-- **Framework:** Next.js 14.2.15 (App Router)
-- **UI Library:** React 18
-- **Lenguaje:** TypeScript 5
-- **Estilos:** Tailwind CSS 3.3
-- **Componentes:** shadcn/ui + Radix UI
-- **Gráficos:** Recharts 3.1
-- **State:** React Query (TanStack Query)
-- **Formularios:** React Hook Form + Zod
-
-### Backend
-- **Runtime:** Node.js 20+
-- **Framework:** Next.js API Routes
-- **Base de Datos:** Supabase (PostgreSQL)
-- **ORM:** Supabase Client (antes Prisma)
-- **Autenticación:** NextAuth.js 4.24
-- **Validación:** Zod 3.25
-
-### Testing
-- **E2E:** Playwright 1.55
-- **Unit:** Jest 30 + Vitest 3.2
-- **Coverage:** Jest Coverage
-
-### DevOps
-- **Deployment:** Vercel
-- **Database:** Supabase Cloud
-- **Version Control:** Git + GitHub
-- **CI/CD:** GitHub Actions (por configurar)
+- **Frontend:** Next.js 14, React 18, Tailwind, shadcn/Radix, Recharts, TanStack Query, tRPC.
+- **Backend:** Route Handlers, servicios en `src/server`, validación Zod.
+- **Datos:** Supabase cliente; Prisma en proyecto para generación/migraciones según scripts.
+- **Auth:** NextAuth.js.
+- **Tests:** Vitest, Jest (scripts), Playwright.
+- **Observabilidad:** Sentry, componentes de performance.
 
 ---
 
-## 🎯 Indicadores de Progreso
+## Enlaces
 
-### Funcionalidad General
-```
-████████████████░░░░  85%
-```
-
-### Por Componente
-```
-Autenticación     ███████████████████░ 95%
-Gestión Leads     ██████████████████░░ 90%
-Dashboard         █████████████████░░░ 85%
-APIs              ██████████████████░░ 90%
-Migración DB      ████████████████░░░░ 80%
-Pipeline          ██████████████░░░░░░ 70%
-Testing           ███████████████░░░░░ 75%
-WhatsApp          ██████░░░░░░░░░░░░░░ 30%
-Documentos        █████░░░░░░░░░░░░░░░ 25%
-Scoring           ████████░░░░░░░░░░░░ 40%
-```
-
----
-
-## 👥 Usuarios Demo Disponibles
-
-| Email | Contraseña | Rol | Estado |
-|-------|-----------|-----|--------|
-| admin@phorencial.com | admin123 | ADMIN | ✅ Activo |
-| ludmila@phorencial.com | ludmila123 | ANALISTA | ✅ Activo |
-| facundo@phorencial.com | facundo123 | ANALISTA | ✅ Activo |
-| vendedor@phorencial.com | vendedor123 | VENDEDOR | ✅ Activo |
-
----
-
-## 📞 Información de Contacto y Recursos
-
-### Desarrollador Principal
-- **Nombre:** Santiago Martinez
-- **GitHub:** [@SantiagoXOR](https://github.com/SantiagoXOR)
-
-### Recursos del Proyecto
-- **Repositorio:** [phorencial-bot-crm](https://github.com/SantiagoXOR/phorencial-bot-crm)
-- **Documentación:** `/docs`
-- **Supabase:** Panel de administración
-- **Vercel:** Dashboard de deployment
-
-### Enlaces Útiles
-- [Setup de Desarrollo](./SETUP-DESARROLLO.md)
-- [Arquitectura del Sistema](./ARQUITECTURA.md)
-- [Migración Supabase](./MIGRACION-SUPABASE.md)
-- [Próximos Pasos](./PROXIMOS-PASOS.md)
+- [Auditoría detallada](./AUDITORIA-PROYECTO.md)
+- [Canal mensajería: UChat vs Manychat](./CANAL-PRINCIPAL-UCHAT.md)
+- [Índice de documentación](./README.md)
+- [Setup de desarrollo](./SETUP-DESARROLLO.md)
 - [Troubleshooting](./TROUBLESHOOTING.md)
-
----
-
-## 🔄 Historial de Cambios Recientes
-
-### Octubre 2025
-- ✅ Inicio de migración a Supabase
-- ✅ Implementación de cliente Supabase
-- ✅ Importación de 233 leads reales
-- ✅ Adaptación del sistema de autenticación
-- 🔄 Validación de tablas en proceso
-- 📝 Generación de documentación técnica
-
-### Septiembre 2025
-- ✅ Implementación de testing E2E
-- ✅ 70+ tests de Playwright
-- ✅ Configuración multi-browser
-- ✅ UI moderna completada
-
-### Agosto 2025
-- ✅ Sistema base de CRM implementado
-- ✅ Dashboard con métricas
-- ✅ CRUD de leads funcional
-- ✅ Deployment en Vercel
-
----
-
-**📌 Nota:** Este documento se actualiza regularmente. Para información más detallada sobre tareas específicas, consulta [PROXIMOS-PASOS.md](./PROXIMOS-PASOS.md).
-

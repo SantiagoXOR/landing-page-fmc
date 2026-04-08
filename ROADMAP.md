@@ -1,264 +1,56 @@
-# 🗺️ ROADMAP - Phorencial CRM
+# Roadmap — CRM Phorencial
 
-## 📊 **ESTADO ACTUAL DEL PROYECTO**
-
-### ✅ **COMPLETADO (90%)**
-
-#### **🏗️ Infraestructura Base**
-- ✅ Next.js 14 + TypeScript + Tailwind CSS
-- ✅ Supabase como base de datos
-- ✅ NextAuth.js para autenticación
-- ✅ Deployment en Vercel
-- ✅ Variables de entorno configuradas
-
-#### **📊 Dashboard Principal**
-- ✅ Métricas KPI (Total leads, nuevos hoy, tasa conversión)
-- ✅ Gráficos interactivos con Recharts
-- ✅ Lista de leads recientes
-- ✅ Navegación responsive
-- ✅ Diseño profesional
-
-#### **📝 Sistema CRUD de Leads**
-- ✅ Formulario de creación (4 secciones)
-- ✅ Lista con filtros y búsqueda
-- ✅ Vista detallada de leads
-- ✅ Validaciones con Zod
-- ✅ Exportación CSV
-
-#### **📱 Integración WhatsApp**
-- ✅ Webhook configurado
-- ✅ Envío de mensajes (texto y templates)
-- ✅ Componentes UI integrados
-- ✅ Historial de conversaciones
-- ✅ API endpoints funcionales
-
-#### **🧪 Testing Automatizado**
-- ✅ Tests unitarios con Jest (70+ tests)
-- ✅ Tests E2E con Playwright
-- ✅ Cobertura multi-browser
-- ✅ Scripts automatizados
-- ✅ Documentación completa
-
-### ⚠️ **PROBLEMAS IDENTIFICADOS**
-
-#### **🔴 Crítico - Requiere Acción Inmediata**
-1. **API de Leads**: Error en creación por configuración de Supabase
-   - **Problema**: Campo `id` no se genera automáticamente
-   - **Solución**: Ejecutar script SQL `supabase-setup.sql`
-   - **Impacto**: Funcionalidad principal bloqueada
-
-#### **🟡 Importante - Completar Pronto**
-2. **Sincronización WhatsApp-Leads**: No implementado
-   - **Faltante**: Asociar mensajes con leads existentes
-   - **Impacto**: Conversaciones no se vinculan automáticamente
-
-3. **Panel de Conversaciones**: Interfaz incompleta
-   - **Faltante**: Vista centralizada de todas las conversaciones
-   - **Impacto**: Gestión manual de conversaciones
-
-### 🚧 **PENDIENTE DE IMPLEMENTAR**
-
-#### **📈 Monitoreo y Observabilidad**
-- [ ] Integración con Sentry para error tracking
-- [ ] Logs estructurados con Winston
-- [ ] Health checks robustos
-- [ ] Métricas de performance
-- [ ] Alertas automáticas
-
-#### **⚙️ Configuraciones Avanzadas**
-- [ ] Dominio personalizado (`crm.phorencial.com`)
-- [ ] Backup automatizado de base de datos
-- [ ] Reportes avanzados (PDF/Excel)
-- [ ] Configuración de roles granular
-- [ ] API rate limiting
-
-## 🎯 **PRÓXIMOS PASOS PRIORIZADOS**
-
-### **🔥 PASO 1: Solucionar API de Leads (CRÍTICO)**
-**Tiempo estimado**: 30 minutos
-**Prioridad**: MÁXIMA
-
-**Acciones requeridas**:
-1. Ejecutar script SQL en Supabase dashboard
-2. Verificar creación de leads funciona
-3. Probar formulario completo
-4. Ejecutar tests E2E
-
-### **🚀 PASO 2: Completar WhatsApp Integration**
-**Tiempo estimado**: 4-6 horas
-**Prioridad**: ALTA
-
-**Tareas**:
-- Sincronización automática mensajes-leads
-- Panel centralizado de conversaciones
-- Notificaciones en tiempo real
-- Búsqueda en conversaciones
-
-### **📊 PASO 3: Monitoreo y Observabilidad**
-**Tiempo estimado**: 6-8 horas
-**Prioridad**: MEDIA-ALTA
-
-**Tareas**:
-- Setup Sentry para error tracking
-- Implementar health checks
-- Logs estructurados
-- Dashboard de métricas
-
-### **⚙️ PASO 4: Configuraciones Avanzadas**
-**Tiempo estimado**: 8-12 horas
-**Prioridad**: MEDIA
-
-**Tareas**:
-- Dominio personalizado
-- Backup automatizado
-- Reportes avanzados
-- Optimizaciones de performance
-
-## 📋 **DETALLES DE IMPLEMENTACIÓN PENDIENTE**
-
-### **🔧 Sincronización WhatsApp-Leads**
-
-#### **Funcionalidades faltantes**:
-```typescript
-// Auto-crear leads desde mensajes WhatsApp
-async function createLeadFromWhatsApp(phoneNumber: string, message: string) {
-  // Buscar lead existente por teléfono
-  // Si no existe, crear nuevo lead
-  // Asociar mensaje con lead
-  // Actualizar estado del lead
-}
-
-// Asociar mensajes con leads existentes
-async function linkMessageToLead(messageId: string, leadId: string) {
-  // Crear registro en tabla de conversaciones
-  // Actualizar última actividad del lead
-  // Notificar a usuarios relevantes
-}
-```
-
-#### **Base de datos requerida**:
-```sql
--- Tabla de conversaciones WhatsApp
-CREATE TABLE whatsapp_conversations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  lead_id UUID REFERENCES Lead(id),
-  phone_number VARCHAR NOT NULL,
-  message_id VARCHAR UNIQUE,
-  message_type VARCHAR, -- 'incoming' | 'outgoing'
-  content TEXT,
-  template_name VARCHAR,
-  status VARCHAR, -- 'sent' | 'delivered' | 'read' | 'failed'
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### **📊 Panel de Conversaciones**
-
-#### **Componentes a crear**:
-```
-src/app/conversations/
-├── page.tsx                 # Lista de conversaciones
-├── [id]/page.tsx           # Vista de conversación individual
-└── components/
-    ├── ConversationList.tsx
-    ├── ConversationItem.tsx
-    ├── MessageBubble.tsx
-    └── ConversationFilters.tsx
-```
-
-#### **Funcionalidades**:
-- Lista de todas las conversaciones activas
-- Filtros por estado, fecha, lead
-- Búsqueda en contenido de mensajes
-- Vista de conversación individual
-- Respuesta rápida desde el panel
-- Notificaciones de nuevos mensajes
-
-### **📈 Monitoreo y Observabilidad**
-
-#### **Sentry Integration**:
-```bash
-npm install @sentry/nextjs
-```
-
-```typescript
-// sentry.client.config.ts
-import * as Sentry from "@sentry/nextjs";
-
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  tracesSampleRate: 1.0,
-  environment: process.env.NODE_ENV,
-});
-```
-
-#### **Health Checks**:
-```typescript
-// src/app/api/health/route.ts
-export async function GET() {
-  const checks = {
-    database: await checkSupabaseConnection(),
-    whatsapp: await checkWhatsAppAPI(),
-    auth: await checkAuthService(),
-    timestamp: new Date().toISOString()
-  };
-  
-  return NextResponse.json(checks);
-}
-```
-
-#### **Structured Logging**:
-```typescript
-// Enhanced logger with structured data
-logger.info('Lead created', {
-  leadId: lead.id,
-  userId: session.user.id,
-  source: 'web_form',
-  timestamp: new Date().toISOString()
-});
-```
-
-## 🎯 **MÉTRICAS DE ÉXITO**
-
-### **Funcionalidad**
-- ✅ **95%** de funcionalidades core implementadas
-- ⚠️ **5%** pendiente (sincronización WhatsApp)
-
-### **Calidad**
-- ✅ **70+ tests** implementados
-- ✅ **Multi-browser** testing
-- ✅ **Responsive** design validado
-
-### **Performance**
-- 🎯 **<2s** tiempo de carga inicial
-- 🎯 **<500ms** navegación entre páginas
-- 🎯 **99.9%** uptime objetivo
-
-### **Experiencia de Usuario**
-- ✅ **Interfaz intuitiva** implementada
-- ✅ **Validaciones robustas** en formularios
-- ✅ **Error handling** completo
-
-## 🚀 **RECOMENDACIÓN INMEDIATA**
-
-### **ACCIÓN PRIORITARIA**: 
-**Ejecutar script SQL en Supabase para solucionar la creación de leads**
-
-### **PASOS**:
-1. Ir a https://supabase.com/dashboard
-2. Seleccionar proyecto phorencial-bot-crm
-3. Ir a SQL Editor
-4. Ejecutar el contenido de `supabase-setup.sql`
-5. Verificar que la creación de leads funcione
-
-### **DESPUÉS**:
-Una vez solucionado el problema crítico, continuar con la implementación de:
-1. Sincronización WhatsApp-Leads
-2. Panel de conversaciones
-3. Monitoreo y observabilidad
+> **Última revisión:** 7 de abril de 2026  
+> Este archivo resume **prioridades** y enlaza el estado verificado del código. Los números exactos de rutas y tests están en [docs/AUDITORIA-PROYECTO.md](docs/AUDITORIA-PROYECTO.md).
 
 ---
 
-**📅 Última actualización**: Agosto 2025  
-**🎯 Progreso general**: 90% completado  
-**⏱️ Tiempo estimado para completar**: 20-30 horas adicionales
+## Estado resumido
+
+El repositorio incluye, entre otras cosas: **Next.js 14**, **Supabase** (cliente y storage), **NextAuth**, **tRPC**, **Sentry**, rutas de **pipeline**, **documentos**, **conversaciones**, **WhatsApp**, **UChat** (mensajería operativa), código **Manychat** en **legado**, **scoring**, **automatización**, **reportes** y **administración de permisos**. Parte de la documentación histórica en la raíz del repo puede **sobreestimar o subestimar** el avance; usar siempre `docs/ESTADO-ACTUAL.md`, `docs/AUDITORIA-PROYECTO.md` y `docs/CANAL-PRINCIPAL-UCHAT.md` para mensajería.
+
+---
+
+## Prioridades recomendadas
+
+### 1. Calidad y CI (alta)
+
+- Ejecutar **Playwright** contra un entorno con variables reales y documentar el resultado.
+- Integrar **Vitest** (y opcionalmente E2E) en pipeline de CI si aún no está.
+
+### 2. Operaciones (alta)
+
+- Ampliar **`GET /api/health`** si se requiere monitoreo serio (p. ej. ping a Supabase).
+- Revisar **RLS y migraciones** en el proyecto Supabase activo (no comprobable solo desde git).
+
+### 3. Producto y UX (media)
+
+- Sustituir **badges estáticos** del sidebar por datos de API donde aplique.
+- Profundizar **vinculación mensaje–lead** y flujos WhatsApp según reglas de negocio (validar en producción).
+
+### 4. Arquitectura de datos (media)
+
+- Documentar el flujo **canónico** para esquema y migraciones (**Prisma** vs SQL **Supabase**) para evitar doble fuente de verdad.
+
+### 5. Infraestructura (baja a media, según negocio)
+
+- Dominio personalizado, backups automatizados de BD, alertas (Sentry ya está en dependencias; revisar DSN y entornos).
+
+---
+
+## Obsoleto respecto a versiones anteriores de este ROADMAP
+
+Las siguientes afirmaciones de ediciones antiguas **ya no son fiel reflejo del repo** y se archivan conceptualmente aquí:
+
+- “Sentry pendiente de integrar” — el paquete y archivos de configuración existen.
+- “API rate limiting pendiente en general” — hay rate limiting en **partes** del sistema (tRPC, rutas concretas).
+- “Solo UI de documentos sin backend” — existe upload con Supabase Storage en `api/documents/upload`.
+- “Permisos sin UI” — existe `/admin/permissions`.
+
+---
+
+## Enlaces
+
+- [Estado por módulo](docs/ESTADO-ACTUAL.md)  
+- [Auditoría con métricas](docs/AUDITORIA-PROYECTO.md)  
+- [Próximos pasos detallados](docs/PROXIMOS-PASOS.md) (puede requerir revisión manual frente al código)

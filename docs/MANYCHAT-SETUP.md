@@ -1,6 +1,6 @@
 # Guía de Configuración de Manychat
 
-> **Legacy.** La integración con ManyChat fue eliminada del código. Esta guía se mantiene solo como referencia histórica. Para mensajería y flujos usa [Uchat Setup](./UCHAT-SETUP.md) y la API de WhatsApp (Meta).
+> **Legacy / desuso operativo.** Manychat **no** se usa en operación actual; el CRM trabaja con **UChat** (ver [CANAL-PRINCIPAL-UCHAT.md](./CANAL-PRINCIPAL-UCHAT.md) y [UCHAT-SETUP.md](./UCHAT-SETUP.md)). Puede quedar código o pantallas Manychat en el repo; esta guía es **referencia histórica**, no pasos para nuevas instalaciones.
 
 Esta guía te ayudará a configurar la integración híbrida de Manychat con el CRM, permitiendo aprovechar los flujos automáticos y chatbots de Manychat mientras los agentes pueden ver y responder conversaciones desde el CRM.
 

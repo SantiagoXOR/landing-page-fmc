@@ -4,14 +4,12 @@
 
 **CRM Phorencial** es un sistema de gestión de leads específicamente diseñado para la provincia de Formosa, Argentina.
 
-**🚧 ESTADO ACTUAL:** Sistema en desarrollo avanzado con migración a Supabase en proceso. Ver [Estado Actual](docs/ESTADO-ACTUAL.md) para detalles completos.
+**Estado actual:** código muy completo (CRM, pipeline, mensajería vía **UChat** + WhatsApp, documentos, admin, scoring, reportes). La integración **Manychat está en desuso** operativo; ver [docs/CANAL-PRINCIPAL-UCHAT.md](docs/CANAL-PRINCIPAL-UCHAT.md). La **validación en tu entorno** (Supabase, webhooks, CI) sigue siendo obligatoria antes de producción.
 
-**📊 COMPLETITUD:** ~85-90% implementado
+- Ver **[docs/ESTADO-ACTUAL.md](docs/ESTADO-ACTUAL.md)** para el resumen por módulos.
+- Ver **[docs/AUDITORIA-PROYECTO.md](docs/AUDITORIA-PROYECTO.md)** para inventario objetivo (rutas API, páginas, tests ejecutados en abril 2026).
 
-- ✅ Funcionalidades core operativas
-- 🔄 Migración a Supabase (80% completada)
-- ✅ 70+ tests E2E implementados
-- ⚠️ Pipeline de ventas requiere configuración
+**Nota:** El proyecto combina **Supabase** (cliente y storage) con **Prisma** aún presente en `package.json` (scripts y `postinstall`). Conviene leer la sección de arquitectura en la documentación antes de tocar el esquema de datos.
 
 ### ✨ Características Implementadas
 
@@ -19,44 +17,25 @@
 
 - 🏗️ **Arquitectura Moderna**: Next.js 14 + TypeScript + Supabase
 - 🔐 **Autenticación**: Sistema de login con NextAuth.js
-- 📊 **APIs Básicas**: CRUD de leads, dashboard, pipeline
+- 📊 **APIs**: CRUD de leads, dashboard, pipeline, documentos, conversaciones, reportes, admin y más (`src/app/api/`)
 - 🎨 **Componentes UI**: shadcn/ui + componentes personalizados
 - 📱 **Responsive Design**: Layout adaptativo básico
 
-#### **🔄 En Desarrollo**
+#### **Mejoras continuas (no “faltante de base”)**
 
-- 👥 **Gestión de Leads**: CRUD básico implementado, filtros avanzados pendientes
-- 📊 **Dashboard**: Estructura creada, métricas en desarrollo
-- 📁 **Gestión de Documentos**: UI creada, funcionalidad backend pendiente
-- ⚙️ **Configuración**: Páginas creadas, integración pendiente
+- Filtros y widgets de dashboard más avanzados
+- Health check y observabilidad más profundos (más allá de Sentry y `/api/health` básico)
+- Cobertura de tests y CI alineados con el volumen de código
 
-#### **🆕 Integración Manychat (Nuevo - COMPLETO)**
+#### **Mensajería: UChat (activo)**
 
-**Backend (API y Servicios):**
-- ✅ **Integración Híbrida Manychat-CRM**: Completamente implementado
-- ✅ **Sincronización Bidireccional**: Leads, tags y custom fields
-- ✅ **Webhooks**: 5 eventos procesados automáticamente
-- ✅ **API Completa**: 6 endpoints funcionando
-- ✅ **Rate Limiting**: 100 req/s automático
+- **UChat + WhatsApp (Meta):** flujos en UChat, webhook CRM `POST /api/webhooks/uchat`, integración con pipeline e inbound webhooks (lead nuevo, solicitud de crédito, Carla, preaprobado/rechazado, etc.).
+- **Documentación:** [docs/CANAL-PRINCIPAL-UCHAT.md](docs/CANAL-PRINCIPAL-UCHAT.md) (qué usar hoy) y [docs/UCHAT-SETUP.md](docs/UCHAT-SETUP.md) (setup completo).
 
-**Frontend (UI Completa):**
-- ✅ **12 Componentes UI**: Tags, sync, broadcasts, flujos
-- ✅ **4 Páginas Nuevas**: Dashboard, Broadcasts, Flujos, Configuración
-- ✅ **3 Hooks Personalizados**: Sync, tags, métricas
-- ✅ **Integración en Chat**: Indicadores bot/agente, flujos activos
-- ✅ **Integración en Leads**: Tags visibles, sincronización manual
+#### **Manychat (legado — desuso operativo)**
 
-📖 **Documentación:**
-- [Guía de Setup](docs/MANYCHAT-SETUP.md) - Configuración paso a paso
-- [Documentación Técnica](docs/MANYCHAT-INTEGRATION.md) - Arquitectura y API
-- [Resumen UI](MANYCHAT-UI-FINAL-SUMMARY.md) - Componentes implementados
-
-#### **❌ Pendientes de Implementar**
-
-- 🎯 **Sistema de Scoring**: Planificado
-- 📈 **Reportes Avanzados**: En roadmap
-- 🔍 **Filtros Inteligentes**: Básicos implementados
-- 📝 **Audit Trail**: Estructura básica
+- El código y las pantallas bajo `manychat/` o docs `MANYCHAT-*` **no** deben tomarse como guía para nuevas instalaciones.
+- Referencia histórica y migración: [docs/UCHAT-MIGRACION-MANYCHAT.md](docs/UCHAT-MIGRACION-MANYCHAT.md).
 
 ## 🎨 Design System
 
@@ -83,7 +62,7 @@ El CRM implementa un sistema de diseño moderno inspirado en Prometheo con una p
 
 - **Framework**: Next.js 14.2.15 + App Router + TypeScript 5
 - **UI Library**: shadcn/ui + Tailwind CSS + Radix UI
-- **Base de Datos**: Supabase (PostgreSQL) - Migrado desde Prisma
+- **Base de Datos**: Supabase (PostgreSQL); Prisma sigue en el repo para tooling/migraciones según scripts
 - **Autenticación**: NextAuth.js 4.24 con JWT
 - **Gráficos**: Recharts 3.1
 - **Testing**: Playwright + Jest + Vitest
@@ -182,24 +161,22 @@ NODE_ENV="development"
 
 **📚 Ver configuración completa en [SETUP-DESARROLLO.md](docs/SETUP-DESARROLLO.md)**
 
-### **Configuración de Manychat (Opcional)**
+### **Configuración de UChat + WhatsApp (recomendado)**
 
-Para habilitar la integración híbrida con Manychat:
+Variables típicas (lista completa y checklist en [docs/UCHAT-SETUP.md](docs/UCHAT-SETUP.md)):
 
 ```env
-# Manychat Configuration
-MANYCHAT_API_KEY=MCAPIKey-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-MANYCHAT_BASE_URL=https://api.manychat.com
-MANYCHAT_WEBHOOK_SECRET=your-webhook-secret-here
+WHATSAPP_PHONE_NUMBER_ID=...
+WHATSAPP_ACCESS_TOKEN=...
+WHATSAPP_VERIFY_TOKEN=...
+UCHAT_WEBHOOK_SECRET=...
+# Inbound webhooks de UChat (flujos):
+UCHAT_INBOUND_WEBHOOK_LEAD_NUEVO_URL=...
+UCHAT_INBOUND_WEBHOOK_SOLICITUD_CREDITO_URL=...
+# ... ver UCHAT-SETUP.md para el resto
 ```
 
-**📖 Guía completa:** [MANYCHAT-SETUP.md](docs/MANYCHAT-SETUP.md)
-
-**Características de la integración:**
-- ✅ Flujos automáticos y chatbots en Manychat
-- ✅ Agentes pueden ver y responder desde el CRM
-- ✅ Sincronización bidireccional de leads, tags y custom fields
-- ✅ Broadcasts masivos desde el CRM
+**Manychat:** en desuso; no añadir `MANYCHAT_*` en proyectos nuevos salvo mantenimiento legacy (ver [docs/CANAL-PRINCIPAL-UCHAT.md](docs/CANAL-PRINCIPAL-UCHAT.md)).
 
 ### 3. Configurar la base de datos
 
@@ -268,30 +245,24 @@ Después del seed, puedes usar estos usuarios:
 
 ## 📡 API Endpoints
 
+Hay **decenas** de rutas bajo `src/app/api/` (pipeline, documentos, conversaciones, **webhooks/uchat**, WhatsApp, admin, reportes, tRPC, etc.). Ejemplos:
+
 ### Leads
 
-- `POST /api/leads` - Crear/actualizar lead (upsert)
-- `GET /api/leads` - Listar leads con filtros
-- `GET /api/leads/[id]` - Obtener lead específico
-- `PATCH /api/leads/[id]` - Actualizar lead
+- `POST /api/leads` — Crear/actualizar lead (upsert)
+- `GET /api/leads` — Listar leads con filtros
+- `GET /api/leads/[id]` — Obtener lead
+- `PATCH /api/leads/[id]` — Actualizar lead
 
-### Eventos WhatsApp
+### Otros (muestra)
 
-- `POST /api/events/whatsapp` - Recibir evento de WhatsApp (webhook)
+- `POST /api/events/whatsapp` — Eventos WhatsApp
+- `POST /api/scoring/eval` — Evaluación de scoring
+- `GET/POST /api/rules` — Reglas
+- `GET /api/health` — Estado mínimo de la app
+- `GET /api/docs/swagger.json` — Spec Swagger cuando esté configurado
 
-### Scoring
-
-- `POST /api/scoring/eval` - Evaluar lead con sistema de scoring
-
-### Configuración
-
-- `GET /api/rules` - Obtener reglas de scoring
-- `POST /api/rules` - Crear/actualizar regla
-- `DELETE /api/rules/[key]` - Eliminar regla
-
-### Monitoreo
-
-- `GET /api/health` - Estado del sistema
+Referencia ampliada: [docs/API-REFERENCE.md](docs/API-REFERENCE.md) (puede estar desactualizada respecto al conteo total; la lista canónica es el árbol `src/app/api/`).
 
 ## 🔗 Integración con Activepieces
 
@@ -326,17 +297,16 @@ Ver documentación completa en [`docs/activepieces.md`](docs/activepieces.md)
 
 - **Autenticación**: JWT con NextAuth.js
 - **Autorización**: RBAC con permisos granulares
-- **Rate Limiting**: Protección en endpoints públicos
+- **Rate Limiting**: Presente en partes del sistema (p. ej. tRPC, rutas seleccionadas); no asumir en todos los endpoints
 - **Validación**: Zod en todos los inputs
 - **Sanitización**: Logs sin datos sensibles
 - **Webhook Security**: Token compartido para Activepieces
 
 ## 📈 Monitoreo
 
-- **Health Check**: `/api/health` para UptimeRobot
-- **Logs estructurados**: JSON con contexto
-- **Audit Trail**: Todos los cambios en tabla `Event`
-- **Métricas**: Dashboard de reportes integrado
+- **Health Check**: `GET /api/health` (respuesta básica; ampliar si se requiere chequeo de DB)
+- **Sentry**: `@sentry/nextjs` configurado en el proyecto
+- **Métricas**: Dashboard y rutas de reportes en la app
 
 ## 🧪 Testing
 
@@ -453,16 +423,7 @@ Para problemas técnicos:
 
 ## 📈 Datos del Sistema
 
-### **Estadísticas Actuales**
-
-- **1000+ leads reales** importados desde Excel
-- **Nombres argentinos** realistas y locales
-- **Teléfonos con códigos de área** de Formosa
-- **Distribución realista** por estados:
-  - RECHAZADO: 35 leads
-  - PREAPROBADO: 7 leads
-  - NUEVO: Mayoría de leads
-- **Ingresos**: Entre $69.400.000 y $215.400.000 ARS
+Los volúmenes y distribuciones dependen del **entorno** (seed, importaciones CSV, producción). Use los scripts en `scripts/` y el panel de Supabase para números actuales.
 
 ## 🤝 Contribución
 
@@ -501,12 +462,14 @@ Este proyecto es el resultado de una **migración selectiva exitosa** que combin
 
 | Documento | Descripción |
 |-----------|-------------|
-| [📊 Estado Actual](docs/ESTADO-ACTUAL.md) | Estado detallado del proyecto (85-90% completo) |
+| [📊 Estado Actual](docs/ESTADO-ACTUAL.md) | Estado del proyecto y módulos (actualizado abr. 2026) |
+| [🔍 Auditoría del repo](docs/AUDITORIA-PROYECTO.md) | Inventario de rutas, tests y brechas conocidas |
+| [💬 UChat activo / Manychat legado](docs/CANAL-PRINCIPAL-UCHAT.md) | Qué integración usar hoy y enlaces a setup UChat |
 | [🚀 Setup de Desarrollo](docs/SETUP-DESARROLLO.md) | Guía completa de instalación y configuración |
 | [🏗️ Arquitectura](docs/ARQUITECTURA.md) | Arquitectura del sistema y decisiones técnicas |
-| [🔄 Migración Supabase](docs/MIGRACION-SUPABASE.md) | Guía de migración Prisma → Supabase (80%) |
+| [🔄 Migración Supabase](docs/MIGRACION-SUPABASE.md) | Historial/guía Prisma ↔ Supabase (convivencia actual: ver nota en README arriba) |
 | [🎯 Próximos Pasos](docs/PROXIMOS-PASOS.md) | Roadmap priorizado y tareas pendientes |
-| [📡 API Reference](docs/API-REFERENCE.md) | Documentación completa de 39 endpoints |
+| [📡 API Reference](docs/API-REFERENCE.md) | Referencia de APIs (verificar contra `src/app/api/`) |
 | [🔧 Troubleshooting](docs/TROUBLESHOOTING.md) | Solución de problemas comunes |
 | [🤝 Contribuir](docs/CONTRIBUTING.md) | Guía para nuevos contribuyentes |
 
@@ -516,16 +479,11 @@ Este proyecto es el resultado de una **migración selectiva exitosa** que combin
 
 ### **🧪 Testing**
 
-- [`TESTING.md`](TESTING.md) - Guía de testing (70+ tests E2E + Unitarios)
+- [`TESTING.md`](TESTING.md) - Guía de testing (Playwright + Vitest/Jest según scripts)
 - [`tests/README.md`](tests/README.md) - Tests de Playwright
 - [`playwright.config.ts`](playwright.config.ts) - Configuración de tests
 
-### **📊 Estado del Proyecto**
+### **Estado del proyecto**
 
-- ✅ **Funcionalidades Core:** Operativas (90%)
-- 🔄 **Migración Supabase:** En proceso (80%)
-- ✅ **233+ leads reales** importados de Formosa
-- ✅ **70+ tests** implementados y pasando
-- ⚠️ **Pipeline de ventas:** Requiere configuración SQL (ver docs)
-
-**Ver detalles completos en [ESTADO-ACTUAL.md](docs/ESTADO-ACTUAL.md)** 🎯
+- Funcionalidades principales implementadas en código (ver [ESTADO-ACTUAL.md](docs/ESTADO-ACTUAL.md)).
+- Inventario numérico y última corrida Vitest en [AUDITORIA-PROYECTO.md](docs/AUDITORIA-PROYECTO.md).

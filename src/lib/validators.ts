@@ -356,7 +356,11 @@ export const LeadQuerySchema = z.object({
     .transform(val => Math.max(parseInt(val) || 1, 1))
     .optional(),
   limit: z.string()
-    .transform(val => Math.min(Math.max(parseInt(val) || 10, 1), 100))
+    .transform((val) => {
+      const n = parseInt(val, 10)
+      if (!Number.isFinite(n)) return 10
+      return Math.max(n, 1)
+    })
     .optional(),
   sortBy: z.enum(['created_at', 'updated_at', 'nombre', 'ingresos', 'estado']).optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),

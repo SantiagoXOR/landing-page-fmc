@@ -114,7 +114,9 @@ WEBHOOK_TOKEN=tu-webhook-token-seguro
 ALLOWED_WEBHOOK_TOKEN=tu-webhook-token-seguro
 ```
 
-### 4.2 Compatibilidad con Manychat (durante migración)
+### 4.2 Compatibilidad con Manychat (legado — desuso en producción)
+
+En la operación actual el equipo usa **UChat**; las variables Manychat solo aplican si mantienes código o datos antiguos. Si el proyecto ya migró, **omite** esta sección.
 
 Mientras exista lógica que aún use Manychat:
 

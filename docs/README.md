@@ -11,8 +11,9 @@
 
 **Sigue este orden:**
 
-1. 📊 Lee [ESTADO-ACTUAL.md](./ESTADO-ACTUAL.md) para entender dónde estamos
-2. 🚀 Sigue [SETUP-DESARROLLO.md](./SETUP-DESARROLLO.md) para configurar tu entorno
+0. 💬 Mensajería: **[CANAL-PRINCIPAL-UCHAT.md](./CANAL-PRINCIPAL-UCHAT.md)** — hoy se usa **UChat**; Manychat está en desuso (legado en código/docs).
+1. 📊 Lee [ESTADO-ACTUAL.md](./ESTADO-ACTUAL.md) y [AUDITORIA-PROYECTO.md](./AUDITORIA-PROYECTO.md) para entender dónde estamos (resumen + números del repo).
+2. 🚀 Sigue [SETUP-DESARROLLO.md](./SETUP-DESARROLLO.md) para configurar tu entorno.
 3. 🏗️ Revisa [ARQUITECTURA.md](./ARQUITECTURA.md) para comprender el sistema
 4. 🎯 Consulta [PROXIMOS-PASOS.md](./PROXIMOS-PASOS.md) para saber qué trabajar
 
@@ -24,7 +25,9 @@
 
 | Documento | ⏱️ Lectura | Descripción |
 |-----------|-----------|-------------|
-| [📊 Estado Actual](./ESTADO-ACTUAL.md) | 10 min | Estado detallado del proyecto, progreso, métricas y problemas conocidos |
+| [💬 Canal UChat / legado Manychat](./CANAL-PRINCIPAL-UCHAT.md) | 5 min | Qué integración usar hoy; índice de docs UChat |
+| [📊 Estado Actual](./ESTADO-ACTUAL.md) | 10 min | Estado por módulo y problemas conocidos (actualizado periódicamente) |
+| [🔍 Auditoría del proyecto](./AUDITORIA-PROYECTO.md) | 10 min | Inventario de rutas API, páginas, tests y brechas verificables |
 | [🚀 Setup de Desarrollo](./SETUP-DESARROLLO.md) | 30 min | Guía paso a paso para configurar el entorno de desarrollo |
 | [🏗️ Arquitectura](./ARQUITECTURA.md) | 20 min | Arquitectura del sistema, stack tecnológico y decisiones de diseño |
 | [🎯 Próximos Pasos](./PROXIMOS-PASOS.md) | 15 min | Roadmap priorizado, tareas pendientes y estimaciones |
@@ -33,8 +36,8 @@
 
 | Documento | ⏱️ Lectura | Descripción |
 |-----------|-----------|-------------|
-| [🔄 Migración Supabase](./MIGRACION-SUPABASE.md) | 20 min | Guía de migración Prisma → Supabase (80% completada) |
-| [📡 API Reference](./API-REFERENCE.md) | Referencia | Documentación completa de todos los endpoints (39 APIs) |
+| [🔄 Migración Supabase](./MIGRACION-SUPABASE.md) | 20 min | Guía Prisma ↔ Supabase (el repo puede usar ambos; contrastar con código) |
+| [📡 API Reference](./API-REFERENCE.md) | Referencia | Documentación de APIs; el listado completo está en `src/app/api/` (decenas de rutas) |
 | [🔧 Troubleshooting](./TROUBLESHOOTING.md) | Referencia | Solución de problemas comunes y debugging |
 
 ### 🤝 Contribución
@@ -94,8 +97,8 @@
 - [Arquitectura Uchat + CRM](./ARQUITECTURA-UCHAT-CRM.md) - Diagramas y flujos de la integración
 - [Webhook WhatsApp – Casos de uso CRM](./WEBHOOK-WHATSAPP-CASOS-DE-USO-CRM.md) - Eventos del webhook y cómo cubren los casos de uso del CRM
 
-**Documentación legacy (ManyChat eliminado):** MANYCHAT-SETUP.md, GUIA-WEBHOOKS-MANYCHAT.md, PIPELINE-MANYCHAT-SYNC.md y otros en docs/ hacen referencia a la integración ManyChat, ya no utilizada. Solo referencia histórica; usar UChat y Meta.
-- **[Legacy]** [ManyChat Setup](./MANYCHAT-SETUP.md) - Referencia histórica; la integración ManyChat fue eliminada. Usar [Uchat Setup](./UCHAT-SETUP.md) y Meta/WhatsApp.
+**Documentación legacy (Manychat en desuso):** `MANYCHAT-SETUP.md`, `GUIA-WEBHOOKS-MANYCHAT.md`, `PIPELINE-MANYCHAT-SYNC.md` y similares son **solo referencia histórica** o migración. Para operación actual usar **[CANAL-PRINCIPAL-UCHAT.md](./CANAL-PRINCIPAL-UCHAT.md)** y **[UCHAT-SETUP.md](./UCHAT-SETUP.md)**.
+- **[Legacy]** [ManyChat Setup](./MANYCHAT-SETUP.md) — no usar para nuevas instalaciones; ver UChat arriba.
 
 ### 🔧 Solución de Problemas
 

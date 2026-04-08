@@ -3,26 +3,40 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Download, TrendingUp, Users, CheckCircle, XCircle } from 'lucide-react'
+import { Download, Users, CalendarDays, Layers, Trophy } from 'lucide-react'
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker'
 import { LeadsByOriginChart } from '@/components/reports/LeadsByOriginChart'
 import { LeadsByStatusChart } from '@/components/reports/LeadsByStatusChart'
 import { LeadsByDayChart } from '@/components/reports/LeadsByDayChart'
-import { PreapprovalRateChart } from '@/components/reports/PreapprovalRateChart'
+import { EmbudoResumenChart } from '@/components/reports/EmbudoResumenChart'
 import { Skeleton } from '@/components/ui/skeleton'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+
+const ESTADO_GANADO = 'CERRADO_GANADO'
+const ESTADOS_NO_CONCRETADOS = new Set(['CERRADO_PERDIDO', 'RECHAZADO'])
+const ESTADO_NUEVO = 'NUEVO'
+
+function diasEnRangoInclusive(from: Date, to: Date): number {
+  const a = new Date(from)
+  const b = new Date(to)
+  a.setHours(0, 0, 0, 0)
+  b.setHours(0, 0, 0, 0)
+  const diff = Math.ceil((b.getTime() - a.getTime()) / 86400000)
+  return Math.max(1, diff + 1)
+}
 
 interface ReportData {
   totalLeads: number
   leadsPorOrigen: Record<string, number>
   leadsPorEstado: Record<string, number>
-  tasaPreaprobacion: number
   leadsPorDia: Array<{ fecha: string; cantidad: number }>
-  promedioRespuesta: number // en horas
-  preaprobados: number
-  rechazados: number
-  evaluados: number
+  promedioDiario: number
+  activosEnEmbudo: number
+  cerradosGanados: number
+  noConcretados: number
+  embudoNuevos: number
+  embudoSeguimiento: number
 }
 
 export default function ReportsPage() {
@@ -71,12 +85,13 @@ export default function ReportsPage() {
         totalLeads: leads.length,
         leadsPorOrigen: {},
         leadsPorEstado: {},
-        tasaPreaprobacion: 0,
         leadsPorDia: [],
-        promedioRespuesta: 0,
-        preaprobados: 0,
-        rechazados: 0,
-        evaluados: 0,
+        promedioDiario: 0,
+        activosEnEmbudo: 0,
+        cerradosGanados: 0,
+        noConcretados: 0,
+        embudoNuevos: 0,
+        embudoSeguimiento: 0,
       }
 
       // Contar por origen
@@ -90,14 +105,24 @@ export default function ReportsPage() {
         reportData.leadsPorEstado[lead.estado] = (reportData.leadsPorEstado[lead.estado] || 0) + 1
       })
 
-      // Calcular tasa de preaprobación
-      reportData.preaprobados = reportData.leadsPorEstado['PREAPROBADO'] || 0
-      reportData.rechazados = reportData.leadsPorEstado['RECHAZADO'] || 0
-      reportData.evaluados = reportData.preaprobados + reportData.rechazados
-      reportData.tasaPreaprobacion =
-        reportData.evaluados > 0
-          ? (reportData.preaprobados / reportData.evaluados) * 100
-          : 0
+      const days = diasEnRangoInclusive(dateRange.from!, dateRange.to!)
+      reportData.promedioDiario =
+        leads.length > 0 ? Math.round((leads.length / days) * 10) / 10 : 0
+
+      leads.forEach((lead: any) => {
+        const e = lead.estado as string
+        if (e === ESTADO_GANADO) {
+          reportData.cerradosGanados += 1
+        } else if (ESTADOS_NO_CONCRETADOS.has(e)) {
+          reportData.noConcretados += 1
+        } else if (e === ESTADO_NUEVO) {
+          reportData.embudoNuevos += 1
+        } else {
+          reportData.embudoSeguimiento += 1
+        }
+      })
+
+      reportData.activosEnEmbudo = reportData.embudoNuevos + reportData.embudoSeguimiento
 
       // Leads por día
       const leadsPorDiaMap: Record<string, number> = {}
@@ -139,9 +164,10 @@ export default function ReportsPage() {
       '',
       'RESUMEN GENERAL',
       `Total de leads: ${data.totalLeads}`,
-      `Tasa de preaprobación: ${data.tasaPreaprobacion.toFixed(1)}%`,
-      `Preaprobados: ${data.preaprobados}`,
-      `Rechazados: ${data.rechazados}`,
+      `Promedio diario: ${data.promedioDiario}`,
+      `Activos en embudo: ${data.activosEnEmbudo}`,
+      `Cerrados ganados: ${data.cerradosGanados}`,
+      `No concretados (perdido/rechazado): ${data.noConcretados}`,
       '',
       'LEADS POR ORIGEN',
       ...Object.entries(data.leadsPorOrigen)
@@ -244,50 +270,50 @@ export default function ReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasa Preaprobación</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Promedio diario</CardTitle>
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.tasaPreaprobacion.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{data.promedioDiario}</div>
             <p className="text-xs text-muted-foreground">
-              De {data.evaluados} leads evaluados
+              Leads por día en el rango
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Preaprobados</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">En embudo</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.preaprobados}</div>
+            <div className="text-2xl font-bold">{data.activosEnEmbudo}</div>
             <p className="text-xs text-muted-foreground">
-              Leads preaprobados
+              Sin cierre ganado ni perdido/rechazado
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rechazados</CardTitle>
-            <XCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Cerrados ganados</CardTitle>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.rechazados}</div>
+            <div className="text-2xl font-bold">{data.cerradosGanados}</div>
             <p className="text-xs text-muted-foreground">
-              Leads rechazados
+              Estado {ESTADO_GANADO.replace(/_/g, ' ')}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráfico de tasa de preaprobación */}
-      <PreapprovalRateChart
-        tasaPreaprobacion={data.tasaPreaprobacion}
-        preaprobados={data.preaprobados}
-        rechazados={data.rechazados}
-        evaluados={data.evaluados}
+      <EmbudoResumenChart
+        nuevos={data.embudoNuevos}
+        enSeguimiento={data.embudoSeguimiento}
+        ganados={data.cerradosGanados}
+        noConcretados={data.noConcretados}
+        totalLeads={data.totalLeads}
       />
 
       {/* Gráficos de distribución */}

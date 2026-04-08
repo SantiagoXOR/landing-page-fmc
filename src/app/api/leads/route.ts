@@ -399,7 +399,24 @@ async function getHandler(
 
     // Obtener leads usando el servicio de Supabase
     const page = validatedQuery.page || 1
-    const limit = validatedQuery.limit || 10
+    const requestedLimit = validatedQuery.limit || 10
+    const hasIsoRange = !!(validatedQuery.from && validatedQuery.to)
+    const maxLimit = hasIsoRange ? 10_000 : 100
+    const limit = Math.min(requestedLimit, maxLimit)
+
+    // Rango por createdAt: reportes usan `from`/`to` ISO; listados pueden usar fechaDesde/fechaHasta
+    let createdAtFrom: string | undefined
+    let createdAtTo: string | undefined
+    if (validatedQuery.from) {
+      createdAtFrom = validatedQuery.from
+    } else if (validatedQuery.fechaDesde) {
+      createdAtFrom = `${validatedQuery.fechaDesde}T00:00:00`
+    }
+    if (validatedQuery.to) {
+      createdAtTo = validatedQuery.to
+    } else if (validatedQuery.fechaHasta) {
+      createdAtTo = `${validatedQuery.fechaHasta}T23:59:59`
+    }
 
     const filters: any = {
       estado: validatedQuery.estado,
@@ -408,8 +425,8 @@ async function getHandler(
       search: validatedQuery.q,
       ingresoMin: validatedQuery.ingresoMin,
       ingresoMax: validatedQuery.ingresoMax,
-      fechaDesde: validatedQuery.fechaDesde,
-      fechaHasta: validatedQuery.fechaHasta,
+      createdAtFrom,
+      createdAtTo,
       tag: validatedQuery.tag,
       sortBy: validatedQuery.sortBy,
       sortOrder: validatedQuery.sortOrder,
@@ -426,7 +443,7 @@ async function getHandler(
     })
 
     // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:510',message:'Filtros después de limpieza',data:{filters:Object.keys(filters),tag:filters.tag,ingresoMin:filters.ingresoMin,ingresoMax:filters.ingresoMax,fechaDesde:filters.fechaDesde,fechaHasta:filters.fechaHasta},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:510',message:'Filtros después de limpieza',data:{filters:Object.keys(filters),tag:filters.tag,ingresoMin:filters.ingresoMin,ingresoMax:filters.ingresoMax,createdAtFrom:filters.createdAtFrom,createdAtTo:filters.createdAtTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
     // #endregion
 
     logger.info('GET /api/leads - Using Supabase client directly', {
@@ -490,17 +507,17 @@ async function getHandler(
         // #endregion
         query = query.lte('ingresos', Number(filters.ingresoMax))
       }
-      if (filters.fechaDesde) {
+      if (filters.createdAtFrom) {
         // #region agent log
-        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:566',message:'Aplicando filtro fechaDesde',data:{fechaDesde:filters.fechaDesde},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:566',message:'Aplicando filtro createdAtFrom',data:{createdAtFrom:filters.createdAtFrom},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
-        query = query.gte('createdAt', `${filters.fechaDesde}T00:00:00`)
+        query = query.gte('createdAt', filters.createdAtFrom)
       }
-      if (filters.fechaHasta) {
+      if (filters.createdAtTo) {
         // #region agent log
-        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:571',message:'Aplicando filtro fechaHasta',data:{fechaHasta:filters.fechaHasta},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7244/ingest/cc4e9eec-246d-49a2-8638-d6c7244aef83',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:571',message:'Aplicando filtro createdAtTo',data:{createdAtTo:filters.createdAtTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
-        query = query.lte('createdAt', `${filters.fechaHasta}T23:59:59`)
+        query = query.lte('createdAt', filters.createdAtTo)
       }
       if (filters.search) {
         // #region agent log

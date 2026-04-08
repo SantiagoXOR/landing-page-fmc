@@ -300,7 +300,7 @@ describe('/api/conversations/[id]/messages', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain('vacío')
+      expect(data.error).toMatch(/mensaje|adjunta/i)
     })
 
     it('debe validar longitud máxima del mensaje', async () => {

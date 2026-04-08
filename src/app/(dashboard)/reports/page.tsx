@@ -1,189 +1,190 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Download, Users, CalendarDays, Layers, Trophy } from 'lucide-react'
+import {
+  Download,
+  Users,
+  CalendarDays,
+  Layers,
+  Trophy,
+  Clock,
+  AlertTriangle,
+  MessageCircle,
+  MessageSquareOff,
+  GitBranch,
+  Banknote,
+  Percent,
+  Timer,
+} from 'lucide-react'
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker'
 import { LeadsByOriginChart } from '@/components/reports/LeadsByOriginChart'
 import { LeadsByStatusChart } from '@/components/reports/LeadsByStatusChart'
 import { LeadsByDayChart } from '@/components/reports/LeadsByDayChart'
 import { EmbudoResumenChart } from '@/components/reports/EmbudoResumenChart'
+import { ReportFiltersBar, type ReportFiltersState } from '@/components/reports/ReportFiltersBar'
+import { ReportInsights } from '@/components/reports/ReportInsights'
 import { Skeleton } from '@/components/ui/skeleton'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const ESTADO_GANADO = 'CERRADO_GANADO'
-const ESTADOS_NO_CONCRETADOS = new Set(['CERRADO_PERDIDO', 'RECHAZADO'])
-const ESTADO_NUEVO = 'NUEVO'
 
-function diasEnRangoInclusive(from: Date, to: Date): number {
-  const a = new Date(from)
-  const b = new Date(to)
-  a.setHours(0, 0, 0, 0)
-  b.setHours(0, 0, 0, 0)
-  const diff = Math.ceil((b.getTime() - a.getTime()) / 86400000)
-  return Math.max(1, diff + 1)
+function defaultFilters(): ReportFiltersState {
+  return {
+    origen: '',
+    estado: '',
+    zona: '',
+    agencia: '',
+    tag: '',
+    q: '',
+    dailyGoal: '',
+  }
 }
 
-interface ReportData {
-  totalLeads: number
-  leadsPorOrigen: Record<string, number>
-  leadsPorEstado: Record<string, number>
-  leadsPorDia: Array<{ fecha: string; cantidad: number }>
-  promedioDiario: number
-  activosEnEmbudo: number
-  cerradosGanados: number
-  noConcretados: number
-  embudoNuevos: number
-  embudoSeguimiento: number
+function buildAnalyticsParams(
+  dateRange: DateRange,
+  filters: ReportFiltersState
+): URLSearchParams {
+  const params = new URLSearchParams()
+  if (!dateRange.from || !dateRange.to) return params
+  params.set('from', dateRange.from.toISOString())
+  params.set('to', dateRange.to.toISOString())
+  if (filters.origen) params.set('origen', filters.origen)
+  if (filters.estado) params.set('estado', filters.estado)
+  if (filters.zona) params.set('zona', filters.zona)
+  if (filters.agencia.trim()) params.set('agencia', filters.agencia.trim())
+  if (filters.tag.trim()) params.set('tag', filters.tag.trim())
+  if (filters.q.trim()) params.set('q', filters.q.trim())
+  const g = parseFloat(filters.dailyGoal)
+  if (Number.isFinite(g) && g > 0) params.set('dailyGoal', String(g))
+  return params
+}
+
+function escapeCsvCell(v: unknown): string {
+  const s = v == null ? '' : String(v)
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
 }
 
 export default function ReportsPage() {
-  const [data, setData] = useState<ReportData | null>(null)
+  const [payload, setPayload] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<ReportFiltersState>(defaultFilters)
+  const [debouncedText, setDebouncedText] = useState({ q: '', tag: '', agencia: '' })
+
   const [dateRange, setDateRange] = useState<DateRange>(() => {
-    // Inicializar con "Esta semana"
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const startOfWeek = new Date(today)
     const day = startOfWeek.getDay()
     const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
     startOfWeek.setDate(diff)
-    return {
-      from: startOfWeek,
-      to: today,
-    }
+    return { from: startOfWeek, to: today }
   })
 
-  const fetchReportData = async () => {
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedText({
+        q: filters.q.trim(),
+        tag: filters.tag.trim(),
+        agencia: filters.agencia.trim(),
+      })
+    }, 400)
+    return () => clearTimeout(t)
+  }, [filters.q, filters.tag, filters.agencia])
+
+  const filtersForQuery = useMemo(
+    () => ({
+      origen: filters.origen,
+      estado: filters.estado,
+      zona: filters.zona,
+      dailyGoal: filters.dailyGoal,
+      q: debouncedText.q,
+      tag: debouncedText.tag,
+      agencia: debouncedText.agencia,
+    }),
+    [
+      filters.origen,
+      filters.estado,
+      filters.zona,
+      filters.dailyGoal,
+      debouncedText.q,
+      debouncedText.tag,
+      debouncedText.agencia,
+    ]
+  )
+
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-
-      if (!dateRange.from || !dateRange.to) {
-        return
-      }
-
-      // Obtener leads del período
-      const params = new URLSearchParams({
-        from: dateRange.from.toISOString(),
-        to: dateRange.to.toISOString(),
-        limit: '1000',
-      })
-
-      const response = await fetch(`/api/leads?${params}`)
+      if (!dateRange.from || !dateRange.to) return
+      const params = buildAnalyticsParams(dateRange, filtersForQuery)
+      const response = await fetch(`/api/reports/leads-analytics?${params}`)
       if (!response.ok) {
-        throw new Error('Error al cargar los datos')
+        const j = await response.json().catch(() => ({}))
+        throw new Error(j.message || 'Error al cargar analíticas')
       }
-
-      const { leads } = await response.json()
-
-      // Procesar datos para reportes
-      const reportData: ReportData = {
-        totalLeads: leads.length,
-        leadsPorOrigen: {},
-        leadsPorEstado: {},
-        leadsPorDia: [],
-        promedioDiario: 0,
-        activosEnEmbudo: 0,
-        cerradosGanados: 0,
-        noConcretados: 0,
-        embudoNuevos: 0,
-        embudoSeguimiento: 0,
-      }
-
-      // Contar por origen
-      leads.forEach((lead: any) => {
-        const origen = lead.origen || 'Sin origen'
-        reportData.leadsPorOrigen[origen] = (reportData.leadsPorOrigen[origen] || 0) + 1
-      })
-
-      // Contar por estado
-      leads.forEach((lead: any) => {
-        reportData.leadsPorEstado[lead.estado] = (reportData.leadsPorEstado[lead.estado] || 0) + 1
-      })
-
-      const days = diasEnRangoInclusive(dateRange.from!, dateRange.to!)
-      reportData.promedioDiario =
-        leads.length > 0 ? Math.round((leads.length / days) * 10) / 10 : 0
-
-      leads.forEach((lead: any) => {
-        const e = lead.estado as string
-        if (e === ESTADO_GANADO) {
-          reportData.cerradosGanados += 1
-        } else if (ESTADOS_NO_CONCRETADOS.has(e)) {
-          reportData.noConcretados += 1
-        } else if (e === ESTADO_NUEVO) {
-          reportData.embudoNuevos += 1
-        } else {
-          reportData.embudoSeguimiento += 1
-        }
-      })
-
-      reportData.activosEnEmbudo = reportData.embudoNuevos + reportData.embudoSeguimiento
-
-      // Leads por día
-      const leadsPorDiaMap: Record<string, number> = {}
-      leads.forEach((lead: any) => {
-        const fecha = new Date(lead.createdAt).toISOString().split('T')[0]
-        leadsPorDiaMap[fecha] = (leadsPorDiaMap[fecha] || 0) + 1
-      })
-
-      reportData.leadsPorDia = Object.entries(leadsPorDiaMap)
-        .map(([fecha, cantidad]) => ({ fecha, cantidad }))
-        .sort((a, b) => a.fecha.localeCompare(b.fecha))
-
-      setData(reportData)
-    } catch (error: any) {
-      console.error('Error fetching report data:', error)
-      setError(error.message || 'Error al cargar los datos')
+      const data = await response.json()
+      setPayload(data)
+    } catch (e: any) {
+      console.error(e)
+      setError(e.message || 'Error al cargar los datos')
+      setPayload(null)
     } finally {
       setLoading(false)
     }
-  }
+  }, [dateRange, filtersForQuery])
 
   useEffect(() => {
-    if (dateRange.from && dateRange.to) {
-      fetchReportData()
-    }
-  }, [dateRange])
+    if (dateRange.from && dateRange.to) fetchAnalytics()
+  }, [dateRange, filtersForQuery, fetchAnalytics])
 
-  const exportReport = async () => {
-    if (!data || !dateRange.from || !dateRange.to) return
+  const exportTxt = () => {
+    if (!payload || !dateRange.from || !dateRange.to) return
+    const s = payload.summary
+    const dateRangeStr =
+      dateRange.from.getTime() === dateRange.to.getTime()
+        ? format(dateRange.from, 'dd/MM/yyyy', { locale: es })
+        : `${format(dateRange.from, 'dd/MM/yyyy', { locale: es })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: es })}`
 
-    const dateRangeStr = dateRange.from.getTime() === dateRange.to.getTime()
-      ? format(dateRange.from, 'dd/MM/yyyy', { locale: es })
-      : `${format(dateRange.from, 'dd/MM/yyyy', { locale: es })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: es })}`
-
-    const reportContent = [
-      'REPORTE DE LEADS',
+    const lines = [
+      'REPORTE DE LEADS (analíticas)',
       `Período: ${dateRangeStr}`,
+      `Filtros: ${JSON.stringify(filtersForQuery)}`,
       `Generado: ${new Date().toLocaleString('es-AR')}`,
       '',
-      'RESUMEN GENERAL',
-      `Total de leads: ${data.totalLeads}`,
-      `Promedio diario: ${data.promedioDiario}`,
-      `Activos en embudo: ${data.activosEnEmbudo}`,
-      `Cerrados ganados: ${data.cerradosGanados}`,
-      `No concretados (perdido/rechazado): ${data.noConcretados}`,
+      'RESUMEN',
+      `Total leads período: ${s.totalLeads}`,
+      `Promedio diario: ${s.promedioDiario}`,
+      `Backlog inicio / fin (embudo): ${s.backlogInicio} / ${s.backlogFin}`,
+      `NUEVO >24h / >72h (ref. fin rango): ${s.nuevoMas24h} / ${s.nuevoMas72h}`,
+      `Tasa salida de NUEVO (en período): ${s.tasaSalidaNuevo}%`,
+      `Con conversación / sin: ${s.leadsConConversacion} / ${s.leadsSinConversacion}`,
+      `Pipeline avanzado pero CRM NUEVO: ${s.pipelineEstadoNuevoPeroAvanzado}`,
+      `Operaciones cerradas: ${s.operacionesCerradas}; tasa éxito: ${s.tasaExitoCierres ?? '—'}%`,
+      `Leads en trabajo calificado (snapshot): ${s.qualifiedActivos}`,
+      `Valor total (monto): ${s.valorTotal}; con monto: ${s.valorConMonto}`,
+      `Días prom. hasta cierre (aprox.): ${s.diasPromedioHastaCierre ?? '—'}`,
+      `Horas prom. 1ª respuesta saliente: ${s.horasPromedioPrimeraRespuesta ?? '—'}`,
+      '',
+      'INSIGHTS',
+      ...((payload.insights as string[]) || []).map((x) => `- ${x}`),
       '',
       'LEADS POR ORIGEN',
-      ...Object.entries(data.leadsPorOrigen)
-        .sort(([, a], [, b]) => b - a)
-        .map(([origen, cantidad]) => `${origen}: ${cantidad} (${((cantidad / data.totalLeads) * 100).toFixed(1)}%)`),
+      ...Object.entries(payload.leadsPorOrigen || {})
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .map(([k, v]) => `${k}: ${v}`),
       '',
-      'LEADS POR ESTADO',
-      ...Object.entries(data.leadsPorEstado)
-        .sort(([, a], [, b]) => b - a)
-        .map(([estado, cantidad]) => `${estado}: ${cantidad} (${((cantidad / data.totalLeads) * 100).toFixed(1)}%)`),
-      '',
-      'LEADS POR DÍA',
-      ...data.leadsPorDia.map(({ fecha, cantidad }) => `${fecha}: ${cantidad}`),
-    ].join('\n')
-
-    const blob = new Blob([reportContent], { type: 'text/plain' })
+      'VALOR POR ORIGEN',
+      ...Object.entries(s.valorPorOrigen || {})
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .map(([k, v]) => `${k}: $${v}`),
+    ]
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -192,7 +193,33 @@ export default function ReportsPage() {
     window.URL.revokeObjectURL(url)
   }
 
-  if (loading) {
+  const exportCsv = async () => {
+    if (!dateRange.from || !dateRange.to) return
+    const params = buildAnalyticsParams(dateRange, filtersForQuery)
+    params.set('includeLeads', 'true')
+    const response = await fetch(`/api/reports/leads-analytics?${params}`)
+    if (!response.ok) return
+    const data = await response.json()
+    const rows = (data.leads || []) as Record<string, unknown>[]
+    if (!rows.length) {
+      window.alert('No hay filas para exportar con los filtros actuales.')
+      return
+    }
+    const keys = Object.keys(rows[0])
+    const body = [
+      keys.map(escapeCsvCell).join(','),
+      ...rows.map((r) => keys.map((k) => escapeCsvCell(r[k])).join(',')),
+    ].join('\r\n')
+    const blob = new Blob(['\ufeff' + body], { type: 'text/csv;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `leads-detalle-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  if (loading && !payload) {
     return (
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
@@ -202,16 +229,13 @@ export default function ReportsPage() {
             <Skeleton className="h-10 w-40" />
           </div>
         </div>
+        <Skeleton className="h-40 w-full" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-96" />
-          <Skeleton className="h-96" />
-        </div>
-        <Skeleton className="h-96" />
+        <Skeleton className="h-96 w-full" />
       </div>
     )
   }
@@ -219,117 +243,330 @@ export default function ReportsPage() {
   if (error) {
     return (
       <div className="space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Reportes</h1>
-        </div>
+        <h1 className="text-3xl font-bold">Reportes</h1>
         <div className="text-center py-8 text-destructive">{error}</div>
       </div>
     )
   }
 
-  if (!data) {
+  if (!payload) {
     return (
       <div className="space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Reportes</h1>
-        </div>
-        <div className="text-center py-8 text-muted-foreground">
-          No hay datos disponibles para el período seleccionado
-        </div>
+        <h1 className="text-3xl font-bold">Reportes</h1>
+        <div className="text-center py-8 text-muted-foreground">Seleccioná un rango de fechas</div>
       </div>
     )
   }
 
+  const s = payload.summary
+  const meta = payload.meta
+  const insights = (payload.insights as string[]) || []
+  const dailyGoal = meta?.dailyGoal as number | undefined
+  const leadsPorDia = payload.leadsPorDia || []
+  const leadsPorDiaPrev = payload.leadsPorDiaSemanaAnterior || []
+
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold">Reportes</h1>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
-          <DateRangePicker value={dateRange} onChange={setDateRange} />
-          <Button onClick={exportReport} variant="outline" className="w-full sm:w-auto">
-            <Download className="w-4 h-4 mr-2" />
-            Exportar Reporte
-          </Button>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold">Reportes</h1>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-wrap">
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+            <Button onClick={exportTxt} variant="outline" className="w-full sm:w-auto">
+              <Download className="w-4 h-4 mr-2" />
+              Exportar TXT
+            </Button>
+            <Button onClick={exportCsv} variant="outline" className="w-full sm:w-auto">
+              <Download className="w-4 h-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </div>
         </div>
+
+        <ReportFiltersBar value={filters} onChange={setFilters} />
       </div>
 
-      {/* KPIs principales */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {insights.length > 0 && <ReportInsights lines={insights} />}
+
+      {meta?.truncated && (
+        <p className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Resultado truncado a 10.000 filas; ajustá el rango o los filtros para mayor precisión.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.totalLeads}</div>
-            <p className="text-xs text-muted-foreground">
-              En el período seleccionado
-            </p>
+            <div className="text-2xl font-bold">{s.totalLeads}</div>
+            <p className="text-xs text-muted-foreground">Creados en el período (filtros aplicados)</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Promedio diario</CardTitle>
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.promedioDiario}</div>
-            <p className="text-xs text-muted-foreground">
-              Leads por día en el rango
-            </p>
+            <div className="text-2xl font-bold">{s.promedioDiario}</div>
+            <p className="text-xs text-muted-foreground">Alta en el rango</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">En embudo</CardTitle>
             <Layers className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.activosEnEmbudo}</div>
-            <p className="text-xs text-muted-foreground">
-              Sin cierre ganado ni perdido/rechazado
-            </p>
+            <div className="text-2xl font-bold">{s.activosEnEmbudo}</div>
+            <p className="text-xs text-muted-foreground">Sin cierre ganado / perdido / rechazado</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cerrados ganados</CardTitle>
             <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.cerradosGanados}</div>
+            <div className="text-2xl font-bold">{s.cerradosGanados}</div>
+            <p className="text-xs text-muted-foreground">{ESTADO_GANADO.replace(/_/g, ' ')}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Backlog embudo</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {s.backlogInicio} → {s.backlogFin}
+            </div>
+            <p className="text-xs text-muted-foreground">Inicio vs fin de rango (estimación)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">NUEVO &gt;24h / &gt;72h</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {s.nuevoMas24h} / {s.nuevoMas72h}
+            </div>
+            <p className="text-xs text-muted-foreground">SLA primer contacto (ref. fin de rango)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Salida de NUEVO</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{s.tasaSalidaNuevo}%</div>
+            <p className="text-xs text-muted-foreground">Leads del período que ya no están NUEVO</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Éxito en cierres</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {s.tasaExitoCierres != null ? `${s.tasaExitoCierres}%` : '—'}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Estado {ESTADO_GANADO.replace(/_/g, ' ')}
+              Ganados / (ganados + perdidos + rechazados) en el período
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <EmbudoResumenChart
-        nuevos={data.embudoNuevos}
-        enSeguimiento={data.embudoSeguimiento}
-        ganados={data.cerradosGanados}
-        noConcretados={data.noConcretados}
-        totalLeads={data.totalLeads}
-      />
-
-      {/* Gráficos de distribución */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <LeadsByOriginChart
-          data={data.leadsPorOrigen}
-          totalLeads={data.totalLeads}
-        />
-        <LeadsByStatusChart
-          data={data.leadsPorEstado}
-          totalLeads={data.totalLeads}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Con conversación</CardTitle>
+            <MessageCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{s.leadsConConversacion}</div>
+            <p className="text-xs text-muted-foreground">Lead vinculado a conversación</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sin conversación</CardTitle>
+            <MessageSquareOff className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{s.leadsSinConversacion}</div>
+            <p className="text-xs text-muted-foreground">En el período filtrado</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">CRM vs pipeline</CardTitle>
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{s.pipelineEstadoNuevoPeroAvanzado}</div>
+            <p className="text-xs text-muted-foreground">NUEVO en CRM pero etapa avanzada en tablero</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">En calificación / trabajo</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{s.qualifiedActivos}</div>
+            <p className="text-xs text-muted-foreground">Estados tipo CALIFICADO, PROPUESTA, etc.</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Gráfico de leads por día */}
-      <LeadsByDayChart data={data.leadsPorDia} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Valor total</CardTitle>
+            <Banknote className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {s.valorTotal > 0
+                ? `$${s.valorTotal.toLocaleString('es-AR')}`
+                : '—'}
+            </div>
+            <p className="text-xs text-muted-foreground">Suma de montos declarados en el período</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monto promedio</CardTitle>
+            <Banknote className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {s.valorPromedioConMonto != null
+                ? `$${s.valorPromedioConMonto.toLocaleString('es-AR')}`
+                : '—'}
+            </div>
+            <p className="text-xs text-muted-foreground">Solo leads con monto &gt; 0</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Días hasta cierre</CardTitle>
+            <Timer className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{s.diasPromedioHastaCierre ?? '—'}</div>
+            <p className="text-xs text-muted-foreground">Promedio createdAt→updatedAt (cierres)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">1ª respuesta</CardTitle>
+            <Timer className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {s.horasPromedioPrimeraRespuesta != null
+                ? `${s.horasPromedioPrimeraRespuesta} h`
+                : '—'}
+            </div>
+            <p className="text-xs text-muted-foreground">1er mensaje saliente tras alta (aprox.)</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <EmbudoResumenChart
+        nuevos={s.embudoNuevos}
+        enSeguimiento={s.embudoSeguimiento}
+        ganados={s.cerradosGanados}
+        noConcretados={s.noConcretados}
+        totalLeads={s.totalLeads}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LeadsByOriginChart data={payload.leadsPorOrigen || {}} totalLeads={s.totalLeads} />
+        <LeadsByStatusChart data={payload.leadsPorEstado || {}} totalLeads={s.totalLeads} />
+      </div>
+
+      {(Object.keys(s.valorPorOrigen || {}).length > 0 ||
+        Object.keys(s.productoPorOrigen || {}).length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {Object.keys(s.valorPorOrigen || {}).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Valor por origen</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  {Object.entries(s.valorPorOrigen as Record<string, number>)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([origen, val]) => (
+                      <div
+                        key={origen}
+                        className="flex justify-between border-b border-border/60 pb-2"
+                      >
+                        <span className="text-muted-foreground">{origen}</span>
+                        <span className="font-medium">${val.toLocaleString('es-AR')}</span>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {Object.keys(s.productoPorOrigen || {}).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Producto (frecuencia en el período)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  {(() => {
+                    const flat: Record<string, number> = {}
+                    for (const inner of Object.values(
+                      s.productoPorOrigen as Record<string, Record<string, number>>
+                    )) {
+                      for (const [p, c] of Object.entries(inner)) {
+                        flat[p] = (flat[p] || 0) + c
+                      }
+                    }
+                    return Object.entries(flat)
+                      .sort(([, a], [, b]) => b - a)
+                      .slice(0, 24)
+                      .map(([producto, cnt]) => (
+                        <div
+                          key={producto}
+                          className="flex justify-between border-b border-border/60 pb-2"
+                        >
+                          <span className="text-muted-foreground truncate pr-2">{producto}</span>
+                          <span className="font-medium shrink-0">{cnt}</span>
+                        </div>
+                      ))
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      <LeadsByDayChart
+        data={leadsPorDia}
+        comparisonData={leadsPorDiaPrev}
+        comparisonLabel="Ventana previa (misma duración)"
+        dailyGoal={dailyGoal}
+      />
     </div>
   )
 }

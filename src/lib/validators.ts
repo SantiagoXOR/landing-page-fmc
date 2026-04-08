@@ -366,6 +366,20 @@ export const LeadQuerySchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 })
 
+/** Query params para GET /api/reports/leads-analytics */
+export const ReportAnalyticsQuerySchema = z.object({
+  from: z.string().datetime('Fecha desde debe ser válida'),
+  to: z.string().datetime('Fecha hasta debe ser válida'),
+  estado: z.enum(LEAD_ESTADOS).optional(),
+  origen: z.enum(LEAD_ORIGENES).optional(),
+  zona: z.string().max(100).optional(),
+  agencia: z.string().max(100).optional(),
+  q: z.string().max(100).optional(),
+  tag: z.string().max(100).optional(),
+  includeLeads: z.enum(['true', 'false', '1', '0']).optional(),
+  dailyGoal: z.string().optional(),
+})
+
 // Tipos exportados
 export type LeadCreate = z.infer<typeof LeadCreateSchema>
 export type LeadUpdate = z.infer<typeof LeadUpdateSchema>
@@ -374,5 +388,6 @@ export type UserParams = z.infer<typeof UserParamsSchema>
 export type WhatsAppEvent = z.infer<typeof WhatsAppEventSchema>
 export type ScoringRequest = z.infer<typeof ScoringRequestSchema>
 export type LeadQuery = z.infer<typeof LeadQuerySchema>
+export type ReportAnalyticsQuery = z.infer<typeof ReportAnalyticsQuerySchema>
 export type Auth = z.infer<typeof AuthSchema>
 export type UserCreate = z.infer<typeof UserCreateSchema>

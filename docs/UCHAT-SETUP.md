@@ -137,6 +137,16 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 node -e "console.log(require('crypto').randomBytes(24).toString('base64'))"
 ```
 
+### 4.4 Pantalla Chats y ventana de 24 h (WhatsApp)
+
+En **Chats**, si pasaron más de 24 horas desde el último mensaje **del cliente** registrado en el CRM (WhatsApp), el CRM **no permite** enviar mensajes de sesión (texto libre ni adjuntos) y ofrece **Enviar plantilla** con el texto que complete el vendedor en la variable de cuerpo de la plantilla aprobada en Meta (misma mecánica que el pipeline).
+
+Variables relevantes:
+
+- `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY` — usada si no definís una plantilla solo para Chats.
+- Opcional: `WHATSAPP_TEMPLATE_CHAT_REENGAGEMENT` — nombre de plantilla dedicada al reengagement desde Chats; si está vacía, se usa `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY`.
+- `WHATSAPP_TEMPLATE_PIPELINE_LANG` y `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME` — igual que en [UCHAT-PIPELINE-PREAPROBADO-RECHAZADO.md](./UCHAT-PIPELINE-PREAPROBADO-RECHAZADO.md).
+
 ---
 
 ## 5. Webhook Uchat → CRM

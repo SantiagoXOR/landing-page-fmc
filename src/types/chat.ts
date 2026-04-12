@@ -44,6 +44,12 @@ export interface ManychatData {
   botActive?: boolean
 }
 
+/** Meta WhatsApp: ventana de 24 h para mensajes de sesión (texto/media) desde el último inbound en el CRM */
+export interface WhatsAppSessionMeta {
+  windowOpen: boolean
+  lastInboundAt: string | null
+}
+
 export interface Conversation {
   id: string
   platform: string
@@ -57,6 +63,8 @@ export interface Conversation {
   manychatData?: ManychatData
   unreadCount?: number
   botAlert?: boolean
+  /** Solo conversaciones WhatsApp con lead; ausente en otras plataformas */
+  whatsappSession?: WhatsAppSessionMeta
 }
 
 

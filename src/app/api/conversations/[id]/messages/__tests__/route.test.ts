@@ -21,6 +21,7 @@ vi.mock('@/server/services/conversation-service', () => ({
   ConversationService: {
     getConversationById: vi.fn(),
     updateLastActivity: vi.fn(),
+    getLastInboundWhatsAppMessageAt: vi.fn(),
   },
 }))
 
@@ -28,6 +29,8 @@ vi.mock('@/server/services/whatsapp-service', () => ({
   WhatsAppService: {
     sendMessage: vi.fn(),
     createMessage: vi.fn(),
+    isConfigured: vi.fn(),
+    sendTemplateBodySingleVariable: vi.fn(),
   },
 }))
 
@@ -223,6 +226,10 @@ describe('/api/conversations/[id]/messages', () => {
 
       mockConversationService.getConversationById.mockResolvedValueOnce(
         mockConversation as any
+      )
+
+      mockConversationService.getLastInboundWhatsAppMessageAt.mockResolvedValueOnce(
+        new Date()
       )
 
       mockMessagingService.sendMessage.mockResolvedValueOnce({
@@ -441,6 +448,113 @@ describe('/api/conversations/[id]/messages', () => {
           channel: 'instagram',
         })
       )
+    })
+
+    it('debe rechazar mensaje de sesión en WhatsApp si la ventana de 24 h está cerrada', async () => {
+      const mockSession = createMockSession()
+      mockGetServerSession.mockResolvedValue(mockSession as any)
+      mockCheckPermission.mockImplementation(() => {})
+
+      const mockConversation = {
+        id: conversationId,
+        platform: 'whatsapp',
+        messages: [],
+        lead: {
+          id: 'lead-123',
+          telefono: '+5491155556789',
+          email: 'test@example.com',
+        },
+        platformId: '+5491155556789',
+      }
+
+      mockConversationService.getConversationById.mockResolvedValueOnce(
+        mockConversation as any
+      )
+
+      const past = new Date(Date.now() - 25 * 60 * 60 * 1000)
+      mockConversationService.getLastInboundWhatsAppMessageAt.mockResolvedValueOnce(past)
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/conversations/${conversationId}/messages`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'Hola' }),
+        }
+      )
+
+      const response = await POST(request, { params: { id: conversationId } })
+      const data = await response.json()
+
+      expect(response.status).toBe(422)
+      expect(data.code).toBe('WHATSAPP_SESSION_WINDOW_CLOSED')
+      expect(mockMessagingService.sendMessage).not.toHaveBeenCalled()
+    })
+
+    it('debe enviar plantilla cuando delivery es template', async () => {
+      const mockSession = createMockSession()
+      mockGetServerSession.mockResolvedValue(mockSession as any)
+      mockCheckPermission.mockImplementation(() => {})
+
+      const prevTpl = process.env.WHATSAPP_TEMPLATE_PIPELINE_NOTIFY
+      process.env.WHATSAPP_TEMPLATE_PIPELINE_NOTIFY = 'notif_test_tpl'
+
+      const mockConversation = {
+        id: conversationId,
+        platform: 'whatsapp',
+        messages: [],
+        lead: {
+          id: 'lead-123',
+          telefono: '+5491155556789',
+          email: 'test@example.com',
+        },
+        platformId: '+5491155556789',
+      }
+
+      mockConversationService.getConversationById.mockResolvedValueOnce(
+        mockConversation as any
+      )
+
+      mockWhatsAppService.isConfigured.mockReturnValue(true)
+      mockWhatsAppService.sendTemplateBodySingleVariable.mockResolvedValueOnce({
+        success: true,
+        messageId: 'wamid.tpl123',
+      })
+      mockWhatsAppService.createMessage.mockResolvedValueOnce({
+        id: 'msg-tpl',
+        conversation_id: conversationId,
+        direction: 'outbound',
+        content: 'Texto plantilla',
+        message_type: 'template',
+        sent_at: new Date().toISOString(),
+      } as any)
+      mockConversationService.updateLastActivity.mockResolvedValueOnce(undefined)
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/conversations/${conversationId}/messages`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: 'Texto plantilla',
+            delivery: 'template',
+          }),
+        }
+      )
+
+      const response = await POST(request, { params: { id: conversationId } })
+      const data = await response.json()
+
+      if (prevTpl === undefined) {
+        delete process.env.WHATSAPP_TEMPLATE_PIPELINE_NOTIFY
+      } else {
+        process.env.WHATSAPP_TEMPLATE_PIPELINE_NOTIFY = prevTpl
+      }
+
+      expect(response.status).toBe(201)
+      expect(data.whatsappResult?.delivery).toBe('template')
+      expect(mockWhatsAppService.sendTemplateBodySingleVariable).toHaveBeenCalled()
+      expect(mockMessagingService.sendMessage).not.toHaveBeenCalled()
     })
   })
 })

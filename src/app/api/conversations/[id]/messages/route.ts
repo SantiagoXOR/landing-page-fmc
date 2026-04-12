@@ -7,11 +7,33 @@ import { WhatsAppService } from '@/server/services/whatsapp-service'
 import { MessagingService } from '@/server/services/messaging-service'
 import { logger } from '@/lib/logger'
 import { toSafeISOString } from '@/lib/safe-date-utils'
+import {
+  isOutsideCustomerCareWindow,
+  resolveChatReengagementTemplateName,
+} from '@/lib/whatsapp-customer-care-window'
 
 interface RouteParams {
   params: {
     id: string
   }
+}
+
+const TEMPLATE_BODY_MAX = 1024
+
+/** Último inbound del cliente para regla de 24 h: por lead (todas las conv. WA) o solo esta conversación si no hay lead */
+async function getLastInboundForCareWindow(
+  leadId: string | undefined,
+  messages: { direction?: string; sentAt?: string | Date }[]
+): Promise<Date | null> {
+  if (leadId) {
+    return ConversationService.getLastInboundWhatsAppMessageAt(leadId)
+  }
+  const inbound = (messages || [])
+    .filter((m) => (m.direction || '') === 'inbound')
+    .map((m) => new Date(m.sentAt || 0))
+    .filter((d) => !Number.isNaN(d.getTime()))
+  if (inbound.length === 0) return null
+  return new Date(Math.max(...inbound.map((d) => d.getTime())))
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -146,11 +168,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { message = '', messageType = 'text', mediaUrl } = body || {}
     const messageStr = typeof message === 'string' ? message : ''
+    const delivery: 'session' | 'template' =
+      body?.delivery === 'template' ? 'template' : 'session'
 
-    // Debe haber texto o archivo adjunto (mediaUrl)
+    if (delivery === 'template' && mediaUrl) {
+      return NextResponse.json(
+        { error: 'La plantilla solo admite texto en el cuerpo; no uses adjuntos.' },
+        { status: 400 }
+      )
+    }
+
+    // Debe haber texto o archivo adjunto (mediaUrl) — salvo que sea plantilla solo texto
     if (!messageStr.trim() && !mediaUrl) {
       return NextResponse.json(
         { error: 'Escribe un mensaje o adjunta un archivo (imagen, audio o documento)' },
+        { status: 400 }
+      )
+    }
+
+    if (delivery === 'template' && messageStr.length > TEMPLATE_BODY_MAX) {
+      return NextResponse.json(
+        {
+          error: `El texto para la plantilla no puede superar ${TEMPLATE_BODY_MAX} caracteres.`,
+        },
         { status: 400 }
       )
     }
@@ -234,7 +274,141 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Mapear document -> file (MessagingService usa 'file')
     const effectiveMessageType = messageType === 'document' ? 'file' : messageType
 
-    // Envío solo vía MessagingService (internamente usa Meta/WhatsApp)
+    // --- WhatsApp: plantilla (reengagement; no exige ventana de 24 h)
+    if (delivery === 'template') {
+      if (platform !== 'whatsapp') {
+        return NextResponse.json(
+          { error: 'El envío por plantilla solo está disponible para WhatsApp.' },
+          { status: 400 }
+        )
+      }
+      if (!phoneNumber) {
+        return NextResponse.json(
+          { error: 'Falta teléfono del destinatario para enviar la plantilla.' },
+          { status: 400 }
+        )
+      }
+      if (!WhatsAppService.isConfigured()) {
+        return NextResponse.json(
+          { error: 'WhatsApp no está configurado.' },
+          { status: 503 }
+        )
+      }
+      const templateName = resolveChatReengagementTemplateName()
+      if (!templateName) {
+        return NextResponse.json(
+          {
+            error:
+              'No hay plantilla configurada. Definí WHATSAPP_TEMPLATE_CHAT_REENGAGEMENT o WHATSAPP_TEMPLATE_PIPELINE_NOTIFY.',
+            code: 'WHATSAPP_TEMPLATE_NOT_CONFIGURED',
+          },
+          { status: 503 }
+        )
+      }
+      const lang = (process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es').trim()
+      const bodyText = messageStr.trim().slice(0, TEMPLATE_BODY_MAX)
+
+      let tplResult: { success: true; messageId?: string }
+      try {
+        tplResult = await WhatsAppService.sendTemplateBodySingleVariable({
+          to: phoneNumber,
+          templateName,
+          languageCode: lang,
+          bodyText,
+        })
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        logger.error('Error enviando plantilla desde Chats', {
+          conversationId: params.id,
+          error: msg,
+        })
+        return NextResponse.json(
+          { error: msg || 'No se pudo enviar la plantilla.' },
+          { status: 500 }
+        )
+      }
+
+      if (!tplResult.messageId) {
+        return NextResponse.json(
+          { error: 'No se pudo enviar la plantilla (sin ID de mensaje).' },
+          { status: 500 }
+        )
+      }
+
+      let messageRecord
+      try {
+        messageRecord = await WhatsAppService.createMessage({
+          conversationId: params.id,
+          direction: 'outbound',
+          content: bodyText,
+          messageType: 'template',
+          platformMsgId: tplResult.messageId,
+        })
+      } catch (createError: unknown) {
+        const errMsg = createError instanceof Error ? createError.message : String(createError)
+        logger.error('Error creando mensaje plantilla en base de datos', {
+          error: errMsg,
+          conversationId: params.id,
+          messageId: tplResult.messageId,
+          userId: session.user.id,
+        })
+        return NextResponse.json(
+          {
+            success: true,
+            warning: 'La plantilla se envió pero no se pudo guardar en el historial del CRM',
+            messageId: tplResult.messageId,
+            delivery: 'template',
+          },
+          { status: 201 }
+        )
+      }
+
+      await ConversationService.updateLastActivity(params.id)
+
+      const formattedMessage = {
+        id: messageRecord.id,
+        direction: 'outbound' as const,
+        content: messageRecord.content,
+        messageType: messageRecord.message_type || 'template',
+        sentAt: toSafeISOString(messageRecord.sent_at || new Date()),
+        readAt: undefined,
+        isFromBot: false,
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: formattedMessage,
+          whatsappResult: {
+            messageId: tplResult.messageId,
+            channel: 'whatsapp',
+            provider: 'meta',
+            delivery: 'template',
+          },
+        },
+        { status: 201 }
+      )
+    }
+
+    // --- WhatsApp sesión: mensaje libre solo dentro de ventana de 24 h
+    if (delivery === 'session' && channel === 'whatsapp') {
+      const lastInbound = await getLastInboundForCareWindow(
+        conversation.lead?.id,
+        conversation.messages || []
+      )
+      if (isOutsideCustomerCareWindow(lastInbound)) {
+        return NextResponse.json(
+          {
+            error:
+              'Pasaron más de 24 horas desde el último mensaje del cliente en esta cuenta. No se puede enviar un mensaje libre; usá el envío por plantilla aprobada o esperá a que el cliente escriba de nuevo.',
+            code: 'WHATSAPP_SESSION_WINDOW_CLOSED',
+          },
+          { status: 422 }
+        )
+      }
+    }
+
+    // Envío de sesión vía MessagingService (Meta / canales soportados)
     const sendResult = await MessagingService.sendMessage({
       to,
       message: messageStr.trim() || (mediaUrl ? '(archivo adjunto)' : ''),

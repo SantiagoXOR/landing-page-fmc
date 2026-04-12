@@ -172,7 +172,8 @@ export default function ChatsPage() {
                 ...prev,
                 messages: data.conversation.messages,
                 lastMessageAt: data.conversation.lastMessageAt ?? prev.lastMessageAt,
-                createdAt: data.conversation.createdAt ?? prev.createdAt
+                createdAt: data.conversation.createdAt ?? prev.createdAt,
+                whatsappSession: data.conversation.whatsappSession ?? prev.whatsappSession,
               } : prev)
             }
           })
@@ -207,7 +208,9 @@ export default function ChatsPage() {
         const updatedConversation = {
           ...data.conversation,
           createdAt: data.conversation?.createdAt || conversation.createdAt,
-          lastMessageAt: data.conversation?.lastMessageAt || conversation.lastMessageAt
+          lastMessageAt: data.conversation?.lastMessageAt || conversation.lastMessageAt,
+          whatsappSession:
+            data.conversation?.whatsappSession ?? conversation.whatsappSession,
         }
         setSelectedConversation(updatedConversation)
       })
@@ -216,72 +219,91 @@ export default function ChatsPage() {
       })
   }
 
-  const handleSendMessage = async (message: string, messageType: string = 'text', mediaUrl?: string) => {
+  const handleSendMessage = async (
+    message: string,
+    messageType: string = 'text',
+    mediaUrl?: string,
+    opts?: { delivery?: 'session' | 'template' }
+  ) => {
     if (!selectedConversation) return
 
-    try {
-      const response = await fetch(`/api/conversations/${selectedConversation.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          messageType,
-          mediaUrl
-        })
-      })
+    const response = await fetch(`/api/conversations/${selectedConversation.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        messageType,
+        mediaUrl,
+        ...(opts?.delivery === 'template' ? { delivery: 'template' } : {}),
+      }),
+    })
 
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}))
-        const serverMessage = data.message
-        // Usar el mensaje devuelto por la API (con id real) o optimista
-        const newMessage = serverMessage
-          ? {
-              id: serverMessage.id,
-              direction: 'outbound' as const,
-              content: serverMessage.content ?? message,
-              messageType: serverMessage.messageType ?? messageType,
-              sentAt: serverMessage.sentAt ?? new Date().toISOString(),
-              readAt: serverMessage.readAt
-            }
-          : {
-              id: Date.now().toString(),
-              direction: 'outbound' as const,
-              content: message,
-              messageType,
-              sentAt: new Date().toISOString(),
-              readAt: undefined
-            }
-        setSelectedConversation(prev => prev ? {
-          ...prev,
-          messages: [...prev.messages, newMessage]
-        } : prev)
-        setConversations(prev =>
-          prev.map(conv =>
-            conv.id === selectedConversation.id
-              ? { ...conv, lastMessageAt: new Date().toISOString() }
-              : conv
-          )
-        )
-        // Refrescar conversación desde el servidor para mantener historial al día (por si se envió desde otro lugar)
-        fetch(`/api/conversations/${selectedConversation.id}`)
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data?.conversation?.messages) {
-              setSelectedConversation(prev => prev ? {
-                ...prev,
-                messages: data.conversation.messages,
-                lastMessageAt: data.conversation.lastMessageAt ?? prev.lastMessageAt,
-                createdAt: data.conversation.createdAt ?? prev.createdAt
-              } : prev)
-            }
-          })
-          .catch(() => {})
-      }
-    } catch {
-      // Error silencioso
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      const msg =
+        typeof data?.error === 'string'
+          ? data.error
+          : 'No se pudo enviar el mensaje. Intenta nuevamente.'
+      throw new Error(msg)
     }
+
+    const serverMessage = data.message
+    const newMessage = serverMessage
+      ? {
+          id: serverMessage.id,
+          direction: 'outbound' as const,
+          content: serverMessage.content ?? message,
+          messageType: serverMessage.messageType ?? messageType,
+          sentAt: serverMessage.sentAt ?? new Date().toISOString(),
+          readAt: serverMessage.readAt,
+        }
+      : {
+          id: Date.now().toString(),
+          direction: 'outbound' as const,
+          content: message,
+          messageType,
+          sentAt: new Date().toISOString(),
+          readAt: undefined,
+        }
+    setSelectedConversation((prev) =>
+      prev
+        ? {
+            ...prev,
+            messages: [...prev.messages, newMessage],
+          }
+        : prev
+    )
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === selectedConversation.id
+          ? { ...conv, lastMessageAt: new Date().toISOString() }
+          : conv
+      )
+    )
+
+    fetch(`/api/conversations/${selectedConversation.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((refreshed) => {
+        if (refreshed?.conversation) {
+          setSelectedConversation((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  messages: refreshed.conversation.messages ?? prev.messages,
+                  lastMessageAt:
+                    refreshed.conversation.lastMessageAt ?? prev.lastMessageAt,
+                  createdAt: refreshed.conversation.createdAt ?? prev.createdAt,
+                  whatsappSession:
+                    refreshed.conversation.whatsappSession ?? prev.whatsappSession,
+                }
+              : prev
+          )
+        }
+      })
+      .catch(() => {})
   }
 
   const handleAssignUser = async (userId: string) => {
@@ -346,7 +368,8 @@ export default function ChatsPage() {
             ...prev,
             messages: data.conversation.messages,
             lastMessageAt: data.conversation.lastMessageAt ?? prev.lastMessageAt,
-            createdAt: data.conversation.createdAt ?? prev.createdAt
+            createdAt: data.conversation.createdAt ?? prev.createdAt,
+            whatsappSession: data.conversation.whatsappSession ?? prev.whatsappSession,
           } : prev)
         }
       })

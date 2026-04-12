@@ -14,9 +14,7 @@ import {
 import { logger } from '@/lib/logger'
 import { WhatsAppService } from '@/server/services/whatsapp-service'
 import { ConversationService } from '@/server/services/conversation-service'
-
-/** Ventana de mensajes libres de Meta (desde último mensaje del cliente registrado en el CRM) */
-const META_CUSTOMER_CARE_WINDOW_MS = 24 * 60 * 60 * 1000
+import { isOutsideCustomerCareWindow } from '@/lib/whatsapp-customer-care-window'
 
 const RETRIES = 3
 const DELAY_MS = 800
@@ -114,8 +112,7 @@ async function deliverPipelineWhatsApp(
   const lang = (process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es').trim()
 
   const lastInbound = await ConversationService.getLastInboundWhatsAppMessageAt(leadId)
-  const outsideWindow =
-    !lastInbound || Date.now() - lastInbound.getTime() >= META_CUSTOMER_CARE_WINDOW_MS
+  const outsideWindow = isOutsideCustomerCareWindow(lastInbound)
 
   const sendTemplate = () =>
     WhatsAppService.sendTemplateBodySingleVariable({

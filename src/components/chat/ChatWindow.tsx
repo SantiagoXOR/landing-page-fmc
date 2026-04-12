@@ -10,14 +10,23 @@ import { FlowIndicator } from './FlowIndicator'
 import { TagPill } from './TagPill'
 import { Send, Paperclip, Smile, MoreVertical, Tag, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Conversation, Message } from '@/types/chat'
+import type { Conversation } from '@/types/chat'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const ACCEPT_ATTACHMENTS = 'image/jpeg,image/png,image/webp,image/gif,audio/mpeg,audio/ogg,audio/webm,audio/mp4,audio/aac,audio/mp3,.mp3,.pdf,.doc,.docx,.xls,.xlsx,.txt'
 const MAX_FILE_SIZE_MB = 16
 
+export type SendMessageOptions = { delivery?: 'session' | 'template' }
+
 interface ChatWindowProps {
   conversation?: Conversation
-  onSendMessage: (message: string, messageType?: string, mediaUrl?: string) => void
+  onSendMessage: (
+    message: string,
+    messageType?: string,
+    mediaUrl?: string,
+    opts?: SendMessageOptions
+  ) => Promise<void>
   onTakeControl?: () => void
   onReleaseControl?: () => void
   className?: string
@@ -28,6 +37,8 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
   const [isTyping, setIsTyping] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -40,16 +51,38 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
     scrollToBottom()
   }, [conversation?.messages])
 
-  const handleSendMessage = (overrideMessage?: string, overrideType?: string, overrideMediaUrl?: string) => {
+  useEffect(() => {
+    setSendError(null)
+  }, [conversation?.id])
+
+  const handleSendMessage = async (
+    overrideMessage?: string,
+    overrideType?: string,
+    overrideMediaUrl?: string,
+    opts?: SendMessageOptions
+  ) => {
     const text = overrideMessage !== undefined ? overrideMessage : message.trim()
     const type = overrideType ?? 'text'
     const media = overrideMediaUrl
     if (!conversation) return
     if (!text && !media) return
 
-    onSendMessage(text || (media ? '(archivo adjunto)' : ''), type, media)
-    setMessage('')
-    setIsTyping(false)
+    setSendError(null)
+    setSending(true)
+    try {
+      await onSendMessage(
+        text || (media ? '(archivo adjunto)' : ''),
+        type,
+        media,
+        opts
+      )
+      setMessage('')
+      setIsTyping(false)
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'No se pudo enviar el mensaje')
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,7 +109,7 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
         return
       }
       const caption = message.trim()
-      handleSendMessage(caption, data.messageType, data.url)
+      await handleSendMessage(caption, data.messageType, data.url)
     } catch (err) {
       setUploadError('Error de conexión al subir el archivo')
     } finally {
@@ -84,10 +117,10 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSendMessage()
+      void handleSendMessage()
     }
   }
 
@@ -109,6 +142,12 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
       </div>
     )
   }
+
+  const platform = (conversation.platform || '').toLowerCase()
+  const waSessionClosed =
+    platform === 'whatsapp' &&
+    conversation.whatsappSession &&
+    !conversation.whatsappSession.windowOpen
 
   return (
     <div className={cn('flex flex-col h-full bg-white overflow-hidden', className)}>
@@ -202,59 +241,116 @@ export function ChatWindow({ conversation, onSendMessage, onTakeControl, onRelea
       </ScrollArea>
 
       {/* Input de mensaje - Responsive */}
-      <div className="p-2 sm:p-3 md:p-4 border-t border-gray-200 flex-shrink-0">
+      <div className="p-2 sm:p-3 md:p-4 border-t border-gray-200 flex-shrink-0 space-y-2">
         {uploadError && (
           <p className="text-xs text-red-600 mb-1.5">{uploadError}</p>
         )}
-        <div className="flex items-center space-x-1.5 sm:space-x-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPT_ATTACHMENTS}
-            className="hidden"
-            onChange={handleAttachmentChange}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 sm:h-9 sm:w-9 p-0 flex-shrink-0"
-            title="Imagen, audio o documento (máx. 16 MB)"
-            disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {uploading ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> : <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-          </Button>
-          
-          <div className="flex-1 relative">
-            <Input
-              ref={inputRef}
+        {sendError && (
+          <p className="text-xs text-red-600" role="alert">
+            {sendError}
+          </p>
+        )}
+
+        {waSessionClosed ? (
+          <>
+            <Alert className="border-amber-200 bg-amber-50/80">
+              <AlertTitle className="text-sm text-amber-950">
+                Ventana de 24 h cerrada
+              </AlertTitle>
+              <AlertDescription className="text-xs text-amber-900">
+                WhatsApp no permite mensajes libres hasta que el cliente vuelva a escribir. Podés
+                enviar el texto dentro de la plantilla aprobada por Meta (mismo formato que las
+                notificaciones del pipeline).
+              </AlertDescription>
+            </Alert>
+            <Textarea
               value={message}
-              onChange={handleInputChange}
-              onKeyPress={handleKeyPress}
-              placeholder="Escribe un mensaje..."
-              className="pr-8 sm:pr-10 h-8 sm:h-9 md:h-10 text-sm"
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Texto que irá en la variable de la plantilla (máx. 1024 caracteres)..."
+              className="min-h-[88px] text-sm resize-y"
+              maxLength={1024}
+              disabled={sending}
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() =>
+                  void handleSendMessage(message.trim(), 'text', undefined, {
+                    delivery: 'template',
+                  })
+                }
+                disabled={!message.trim() || sending}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                    Enviar plantilla
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPT_ATTACHMENTS}
+              className="hidden"
+              onChange={handleAttachmentChange}
             />
             <Button
+              type="button"
               variant="ghost"
               size="sm"
-              className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 sm:h-7 sm:w-7 p-0"
-              title="Emojis (próximamente)"
-              disabled
+              className="h-8 w-8 sm:h-9 sm:w-9 p-0 flex-shrink-0"
+              title="Imagen, audio o documento (máx. 16 MB)"
+              disabled={uploading || sending}
+              onClick={() => fileInputRef.current?.click()}
             >
-              <Smile className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {uploading ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> : <Paperclip className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+            </Button>
+
+            <div className="flex-1 relative">
+              <Input
+                ref={inputRef}
+                value={message}
+                onChange={handleInputChange}
+                onKeyPress={handleKeyPress}
+                placeholder="Escribe un mensaje..."
+                className="pr-8 sm:pr-10 h-8 sm:h-9 md:h-10 text-sm"
+                disabled={sending}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 sm:h-7 sm:w-7 p-0"
+                title="Emojis (próximamente)"
+                disabled
+              >
+                <Smile className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
+
+            <Button
+              onClick={() => void handleSendMessage()}
+              disabled={!message.trim() || sending}
+              className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-auto md:px-3 p-0 md:p-2 flex-shrink-0"
+            >
+              {sending ? (
+                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden md:inline ml-1.5">Enviar</span>
+                </>
+              )}
             </Button>
           </div>
-          
-          <Button
-            onClick={() => handleSendMessage()}
-            disabled={!message.trim()}
-            className="bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-auto md:px-3 p-0 md:p-2 flex-shrink-0"
-          >
-            <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden md:inline ml-1.5">Enviar</span>
-          </Button>
-        </div>
+        )}
       </div>
     </div>
   )

@@ -86,7 +86,15 @@ BASE DE CONOCIMIENTO (RESPUESTAS APROBADAS):
 
 • ¿Requisitos?: "Principalmente evaluamos tu perfil crediticio. Si calificás, la documentación formal se presenta directamente en la concesionaria."
 
-• Ventajas vs Crédito Personal: "El prendario tiene tasas más bajas, mayor probabilidad de aprobación (el vehículo es garantía) y plazos de hasta 48 meses."
+• Ventajas vs Crédito Personal: "El prendario tiene tasas más bajas, mayor probabilidad de aprobación (el vehículo es garantía) y plazos de hasta 48 meses en autos y hasta 24 meses en motos."
+
+• ¿Quién puede acceder?: "Las tasas promocionales vigentes aplican solo a clientes bancarizados, es decir, que cobren su sueldo por el Banco Formosa."
+
+• Tasas autos (bancarizados): "En autos: 0km 45%, de 1 a 4 años de antigüedad 48%, de 5 a 11 años 52%. Plazo máximo 48 meses."
+
+• Tasas motos (bancarizados): "En motos 0km: 49%. Plazo máximo 24 meses."
+
+• Financiación 100% motos: "En motos se puede financiar el 100% siempre que el sueldo sea mayor a $1.500.000."
 ```
 
 ### Constraints – Reglas de Oro (máx. 2000 caracteres)

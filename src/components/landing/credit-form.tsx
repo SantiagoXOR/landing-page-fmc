@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import { Loader2, Send, Phone, Car, Bike, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn, getWhatsAppUrl } from '@/lib/landing-utils'
+import { getInstallmentOptions } from '@/lib/credit-rates'
 
 // Zonas de Formosa (principales localidades)
 const zonasFormosa = [
@@ -68,8 +69,6 @@ const marcasAutos = [
   'Peugeot', 'Nissan', 'Hyundai', 'Citroën', 'Jeep', 'Kia'
 ]
 
-const cuotasOptions = ['12', '18', '24', '36', '48', '60']
-
 export function CreditForm() {
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -114,6 +113,16 @@ export function CreditForm() {
   const zonaSeleccionada = form.watch('zona')
   const marcaSeleccionada = form.watch('marca')
   const marcasDisponibles = tipoVehiculo === 'moto' ? marcasMotos : marcasAutos
+  const cuotasOptions = tipoVehiculo ? getInstallmentOptions(tipoVehiculo) : []
+
+  useEffect(() => {
+    if (!tipoVehiculo) return
+    const options = getInstallmentOptions(tipoVehiculo)
+    const current = form.getValues('cuotas')
+    if (current && !options.includes(current)) {
+      form.setValue('cuotas', '')
+    }
+  }, [tipoVehiculo, form])
 
   // Verificar si se puede proceder al siguiente paso
   const canProceed = () => {
@@ -693,7 +702,11 @@ export function CreditForm() {
                               </SelectContent>
                             </Select>
                             <FormDescription className="text-xs text-fmc-purple/70">
-                              Elige el plazo que prefieras
+                              {tipoVehiculo === 'moto'
+                                ? 'Plazo máximo 24 meses (solo bancarizados)'
+                                : tipoVehiculo === 'auto'
+                                  ? 'Plazo máximo 48 meses (solo bancarizados)'
+                                  : 'Elegí primero el tipo de vehículo'}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>

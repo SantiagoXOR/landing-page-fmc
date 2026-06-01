@@ -21,8 +21,9 @@ Este directorio contiene las imágenes utilizadas para SEO y redes sociales.
 Las imágenes deben incluir:
 - Logo de Formosa FMC
 - Texto: "Créditos para Motos"
-- Texto: "Financiá hasta 36 meses"
-- Texto: "Tasa fija o UVA • Aprobación en minutos"
+- Texto: "Motos hasta 24 meses · Autos hasta 48 meses"
+- Texto: "Solo bancarizados · Tasas desde 45%"
+- Texto: "Motos 0km 49% · Aprobación en minutos"
 - Colores de marca: Púrpura (#5b00ea), Azul (#3b82f6), Verde (#10b981)
 
 ## Generación de imágenes

@@ -13,6 +13,9 @@ import Image from "next/image"
 import Footer from "@/components/landing/footer"
 import Link from "next/link"
 import { getWhatsAppUrl } from "@/lib/landing-utils"
+import { getLandingRateHighlights } from "@/lib/credit-rates"
+
+const rateHighlights = getLandingRateHighlights()
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
@@ -225,31 +228,37 @@ export default function Home() {
               {/* Bento Grid con información de financiación - Optimizado */}
               <div className="absolute inset-3 xs:inset-4 flex flex-col gap-2 xs:gap-3">
                 <div className="grid grid-cols-2 gap-2 xs:gap-3 h-full">
-                  {/* Tasa fija */}
+                  {/* Motos 0km */}
                   <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300">
                     <CardContent className="p-2 xs:p-3 md:p-4 flex flex-col justify-center items-center text-center h-full">
                       <Percent className="w-4 h-4 xs:w-5 xs:h-5 md:w-6 md:h-6 text-white mb-1 xs:mb-2" />
-                      <h3 className="text-white font-acto-bold text-xs xs:text-sm">Tasa fija</h3>
-                      <p className="text-white/90 font-acto-semibold text-sm xs:text-base md:text-lg">75%</p>
+                      <h3 className="text-white font-acto-bold text-xs xs:text-sm">Motos 0km</h3>
+                      <p className="text-white/90 font-acto-semibold text-sm xs:text-base md:text-lg">{rateHighlights.motoRatePercent}%</p>
+                      <p className="text-white/70 font-acto-regular text-[10px] xs:text-xs mt-1">hasta {rateHighlights.motoMaxMonths} meses</p>
                     </CardContent>
                   </Card>
                   
-                  {/* Tasa UVA */}
+                  {/* Autos por antigüedad */}
                   <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300">
                     <CardContent className="p-2 xs:p-3 md:p-4 flex flex-col justify-center items-center text-center h-full">
                       <TrendingUp className="w-4 h-4 xs:w-5 xs:h-5 md:w-6 md:h-6 text-white mb-1 xs:mb-2" />
-                      <h3 className="text-white font-acto-bold text-xs xs:text-sm">Tasa UVA:</h3>
-                      <p className="text-white/90 font-acto-semibold text-xs xs:text-sm">20% + UVAs</p>
+                      <h3 className="text-white font-acto-bold text-xs xs:text-sm">Autos</h3>
+                      <p className="text-white/90 font-acto-semibold text-[10px] xs:text-xs leading-snug">
+                        0km {rateHighlights.autoRates['0km']}% · 1-4 años {rateHighlights.autoRates['1-4']}% · 5-11 años {rateHighlights.autoRates['5-11']}%
+                      </p>
+                      <p className="text-white/70 font-acto-regular text-[10px] xs:text-xs mt-1">hasta {rateHighlights.autoMaxMonths} meses</p>
                     </CardContent>
                   </Card>
                   
-                  {/* Financiación */}
+                  {/* Condiciones bancarizados */}
                   <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300 col-span-2">
                     <CardContent className="p-2 xs:p-3 md:p-4 flex items-center justify-center text-center h-full">
-                      <Wallet className="w-4 h-4 xs:w-5 xs:h-5 md:w-6 md:h-6 text-white mr-2 xs:mr-3" />
+                      <Wallet className="w-4 h-4 xs:w-5 xs:h-5 md:w-6 md:h-6 text-white mr-2 xs:mr-3 shrink-0" />
                       <div>
-                        <h3 className="text-white font-acto-bold text-xs xs:text-sm">Financiación</h3>
-                        <p className="text-white/90 font-acto-semibold text-sm xs:text-base">hasta $12.000.000</p>
+                        <h3 className="text-white font-acto-bold text-xs xs:text-sm">Solo bancarizados</h3>
+                        <p className="text-white/90 font-acto-semibold text-[10px] xs:text-sm">
+                          Sueldo por Banco Formosa. Motos 100% si sueldo &gt; ${rateHighlights.motoFullFinancingMinSalary.toLocaleString('es-AR')}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -273,7 +282,7 @@ export default function Home() {
                       <CalendarClock className="w-4 h-4" />
                     </Badge>
                     <p className="text-gray-300 font-acto-regular">
-                      Financiá en hasta 36 meses (UVA o tasa fija)
+                      Motos hasta {rateHighlights.motoMaxMonths} meses · Autos hasta {rateHighlights.autoMaxMonths} meses (bancarizados)
                     </p>
                   </div>
                   {/* Ítem 2 */}

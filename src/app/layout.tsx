@@ -3,30 +3,30 @@ import Providers from '@/components/providers'
 import { SentryErrorBoundary } from '@/components/monitoring/PerformanceWrapper'
 import Analytics from '@/components/analytics'
 import './globals.css'
+import { getSeoFinancingDescription } from '@/lib/credit-rates'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.formosafmc.com.ar'
+const seoDescription = getSeoFinancingDescription()
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Créditos para Motos | Formosa FMC - Financiá hasta 36 meses',
+    default: 'Créditos Prendarios | Formosa FMC - Motos y Autos',
     template: '%s | Formosa FMC'
   },
-  description: 'Con los mejores créditos, la moto de tus sueños está a solo un paso. Financiá en hasta 36 meses (UVA o tasa fija). Obtené la aprobación en minutos.',
+  description: seoDescription,
   keywords: [
     'créditos motos',
+    'créditos autos',
     'financiación motos',
+    'financiación autos',
     'Banco Formosa',
     'crédito prendario',
+    'bancarizados',
     'motos Formosa',
-    'crédito motocicleta',
-    'financiación vehículos',
-    'préstamo prendario',
-    'crédito inmediato',
-    'motos en cuotas',
-    'financiación hasta 36 meses',
-    'tasa fija motos',
-    'UVA motos',
+    'financiación hasta 24 meses',
+    'financiación hasta 48 meses',
+    'tasas competitivas',
     'Formosa FMC'
   ],
   authors: [{ name: 'Formosa FMC' }],
@@ -42,8 +42,8 @@ export const metadata: Metadata = {
     locale: 'es_AR',
     url: siteUrl,
     siteName: 'Formosa FMC',
-    title: 'Créditos para Motos | Formosa FMC - Financiá hasta 36 meses',
-    description: 'Con los mejores créditos, la moto de tus sueños está a solo un paso. Financiá en hasta 36 meses (UVA o tasa fija). Obtené la aprobación en minutos.',
+    title: 'Créditos Prendarios | Formosa FMC - Motos y Autos',
+    description: seoDescription,
     images: [
       {
         url: '/landing/seo/og-image-1.png',
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Créditos para Motos | Formosa FMC',
-    description: 'Con los mejores créditos, la moto de tus sueños está a solo un paso. Financiá en hasta 36 meses (UVA o tasa fija).',
+    description: seoDescription,
     images: [
       {
         url: '/landing/seo/twitter-image-1.png',
@@ -122,7 +122,7 @@ export default function RootLayout({
               '@context': 'https://schema.org',
               '@type': 'FinancialService',
               name: 'Formosa FMC',
-              description: 'Créditos para motos con financiación hasta 36 meses. Tasa fija o UVA. Aprobación en minutos.',
+              description: seoDescription,
               url: siteUrl,
               logo: `${siteUrl}/landing/logofmc.svg`,
               image: `${siteUrl}/landing/seo/og-image-1.png`,
@@ -136,7 +136,7 @@ export default function RootLayout({
               offers: {
                 '@type': 'Offer',
                 name: 'Crédito Prendario para Motos',
-                description: 'Financiación hasta 36 meses con tasa fija o UVA',
+                description: seoDescription,
                 priceCurrency: 'ARS',
                 availability: 'https://schema.org/InStock'
               },

@@ -418,61 +418,67 @@ export async function POST(
       // Continuar aunque falle la asignación de tags
     }
 
-    // Preaprobado / Rechazado: webhook Uchat (etiqueta + flujo) y/o WhatsApp Meta con mensajes oficiales
+    // Preaprobado / Rechazado / Remarketing: webhook Uchat y/o WhatsApp Meta (await: Vercel corta el handler si es void)
     if (isPreaprobadoStageId(normalizedToStageId)) {
       const tagPre = await getTagForStage('PREAPROBADO').catch(() => null)
-      void notifyPipelinePreaprobado(
-        {
-          id: lead.id,
-          telefono: lead.telefono,
-          nombre: lead.nombre,
-          manychatId: lead.manychatId,
-        },
-        { tagApplied: tagPre || 'credito-preaprobado' }
-      ).catch((e) =>
+      try {
+        await notifyPipelinePreaprobado(
+          {
+            id: lead.id,
+            telefono: lead.telefono,
+            nombre: lead.nombre,
+            manychatId: lead.manychatId,
+          },
+          { tagApplied: tagPre || 'credito-preaprobado' }
+        )
+      } catch (e) {
         logger.warn('notifyPipelinePreaprobado falló (no bloquea el movimiento)', {
           leadId,
           error: e instanceof Error ? e.message : String(e),
         })
-      )
+      }
     } else if (isRechazadoStageId(normalizedToStageId)) {
       const tagRej = await getTagForStage('RECHAZADO').catch(() => null)
-      void notifyPipelineRechazado(
-        {
-          id: lead.id,
-          telefono: lead.telefono,
-          nombre: lead.nombre,
-          manychatId: lead.manychatId,
-        },
-        {
-          tagApplied: tagRej || 'credito-rechazado',
-          customRejectionMessage: rejectionMessage || null,
-        }
-      ).catch((e) =>
+      try {
+        await notifyPipelineRechazado(
+          {
+            id: lead.id,
+            telefono: lead.telefono,
+            nombre: lead.nombre,
+            manychatId: lead.manychatId,
+          },
+          {
+            tagApplied: tagRej || 'credito-rechazado',
+            customRejectionMessage: rejectionMessage || null,
+          }
+        )
+      } catch (e) {
         logger.warn('notifyPipelineRechazado falló (no bloquea el movimiento)', {
           leadId,
           error: e instanceof Error ? e.message : String(e),
         })
-      )
+      }
     } else if (isRemarketingStageId(normalizedToStageId)) {
       const tagRemarketing = await getTagForStage('REMARKETING').catch(() => null)
-      void notifyPipelineRemarketing(
-        {
-          id: lead.id,
-          telefono: lead.telefono,
-          nombre: lead.nombre,
-          manychatId: lead.manychatId,
-        },
-        {
-          tagApplied: tagRemarketing || 'remarketing',
-          customMessage: remarketingMessage || null,
-        }
-      ).catch((e) =>
+      try {
+        await notifyPipelineRemarketing(
+          {
+            id: lead.id,
+            telefono: lead.telefono,
+            nombre: lead.nombre,
+            manychatId: lead.manychatId,
+          },
+          {
+            tagApplied: tagRemarketing || 'remarketing',
+            customMessage: remarketingMessage || null,
+          }
+        )
+      } catch (e) {
         logger.warn('notifyPipelineRemarketing falló (no bloquea el movimiento)', {
           leadId,
           error: e instanceof Error ? e.message : String(e),
         })
-      )
+      }
     }
 
     // Ejecutar automatizaciones de la nueva etapa (no crítico si falla)

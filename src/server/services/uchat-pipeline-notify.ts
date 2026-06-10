@@ -66,7 +66,10 @@ export interface PipelineNotifyLead {
 
 function firstName(lead: PipelineNotifyLead): string | undefined {
   const n = (lead.nombre || '').trim().split(/\s+/)[0]
-  return n || undefined
+  if (!n) return undefined
+  // Meta puede rechazar emojis en variables de plantilla (ej. "Walter🎼")
+  const clean = n.replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim()
+  return clean || undefined
 }
 
 function phoneForPayload(lead: PipelineNotifyLead): string | null {

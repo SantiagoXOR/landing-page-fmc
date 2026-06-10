@@ -159,7 +159,11 @@ export class ConversationService {
           messageType: msg.message_type || msg.messageType || 'text',
           sentAt: formattedSentAt, // Asegurar que siempre sea un string ISO válido
           readAt: msg.read_at || msg.readAt || undefined,
-          isFromBot: msg.is_from_bot || msg.isFromBot || false,
+          isFromBot:
+            msg.is_from_bot ||
+            msg.isFromBot ||
+            (msg.metadata && typeof msg.metadata === 'object' && (msg.metadata as { is_from_bot?: boolean }).is_from_bot) ||
+            false,
           manychatFlowId: msg.manychat_flow_id || msg.manychatFlowId || undefined
         }
       })

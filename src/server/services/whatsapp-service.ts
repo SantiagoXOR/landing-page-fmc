@@ -329,6 +329,7 @@ export class WhatsAppService {
       }
       if (data.isFromBot !== undefined) {
         row.is_from_bot = data.isFromBot
+        row.metadata = { is_from_bot: data.isFromBot }
       }
 
       const { data: message, error } = await supabase.client

@@ -133,6 +133,13 @@ const stageMappings = [
     tag_type: 'pipeline',
     description: 'Solicitar referidos al cliente',
     order: 11
+  },
+  {
+    stage: 'REMARKETING',
+    manychat_tag: 'remarketing',
+    tag_type: 'pipeline',
+    description: 'Lead en campaña de remarketing (reengagement WhatsApp)',
+    order: 12
   }
 ]
 

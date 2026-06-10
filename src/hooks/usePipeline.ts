@@ -208,6 +208,7 @@ export function usePipeline(leadId?: string) {
       'ENCUESTA': 'Encuesta Satisfacción',
       'RECHAZADO': 'Rechazado',
       'SOLICITAR_REFERIDO': 'Solicitar Referido',
+      'REMARKETING': 'Remarketing',
       // Legacy support
       'LEAD_NUEVO': 'Cliente Nuevo',
       'CONTACTO_INICIAL': 'Consultando Crédito',
@@ -236,6 +237,7 @@ export function usePipeline(leadId?: string) {
       'ENCUESTA': '#A855F7',
       'RECHAZADO': '#DC2626',
       'SOLICITAR_REFERIDO': '#EC4899',
+      'REMARKETING': '#F97316',
       // Legacy support
       'LEAD_NUEVO': '#3B82F6',
       'CONTACTO_INICIAL': '#10B981',

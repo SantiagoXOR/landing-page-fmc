@@ -193,7 +193,8 @@ function PipelinePage() {
     'solicitando-docs': 'solicitando-docs',
     'listo-analisis': 'listo-analisis',
     'preaprobado': 'preaprobado',
-    'rechazado': 'rechazado'
+    'rechazado': 'rechazado',
+    'remarketing': 'remarketing',
   }
 
   const loadPipelineData = async (showLoading = true) => {

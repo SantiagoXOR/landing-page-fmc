@@ -26,13 +26,14 @@ const pipelineStageToStageId: Record<string, string> = {
   'CERRADO_GANADO': 'cerrado-ganado',
   'CIERRE_PERDIDO': 'cerrado-perdido',
   'RECHAZADO': 'cerrado-perdido',
-  'SEGUIMIENTO': 'cerrado-ganado'
+  'SEGUIMIENTO': 'cerrado-ganado',
+  'REMARKETING': 'remarketing',
 }
 
 // Mapeo inverso: stageId a pipeline_stage
 // NOTA: Solo usar valores del enum actualizado (según migración 002_update_pipeline_stages_manychat.sql)
 // Enum válido: CLIENTE_NUEVO, CONSULTANDO_CREDITO, SOLICITANDO_DOCS, LISTO_ANALISIS, 
-//              PREAPROBADO, APROBADO, EN_SEGUIMIENTO, CERRADO_GANADO, ENCUESTA, RECHAZADO, SOLICITAR_REFERIDO
+//              PREAPROBADO, APROBADO, EN_SEGUIMIENTO, CERRADO_GANADO, ENCUESTA, RECHAZADO, SOLICITAR_REFERIDO, REMARKETING
 const stageIdToPipelineStage: Record<string, string[]> = {
   'cliente-nuevo': ['CLIENTE_NUEVO'], // Removido 'LEAD_NUEVO' que no existe en el enum
   'consultando-credito': ['CONSULTANDO_CREDITO'], // Removido 'CONTACTO_INICIAL' que no existe en el enum
@@ -43,7 +44,8 @@ const stageIdToPipelineStage: Record<string, string[]> = {
   'aprobado': ['APROBADO'],
   'en-seguimiento': ['EN_SEGUIMIENTO'], // Cambiado de 'SEGUIMIENTO' a 'EN_SEGUIMIENTO'
   'cerrado-ganado': ['CERRADO_GANADO'], // Removido 'CIERRE_GANADO' que no existe en el enum
-  'solicitar-referido': ['SOLICITAR_REFERIDO'] // Cambiado de 'SEGUIMIENTO' a 'SOLICITAR_REFERIDO'
+  'solicitar-referido': ['SOLICITAR_REFERIDO'], // Cambiado de 'SEGUIMIENTO' a 'SOLICITAR_REFERIDO'
+  'remarketing': ['REMARKETING'],
 }
 
 // Función helper para mapear lead a PipelineLead (simplificada)

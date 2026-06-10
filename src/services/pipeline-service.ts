@@ -70,7 +70,8 @@ export class PipelineService {
       { name: 'En Seguimiento', order: 8, color: '#84CC16' },
       { name: 'Cerrado Ganado', order: 9, color: '#059669' },
       { name: 'Encuesta Satisfacción', order: 10, color: '#A855F7' },
-      { name: 'Solicitar Referido', order: 11, color: '#EC4899' }
+      { name: 'Solicitar Referido', order: 11, color: '#EC4899' },
+      { name: 'Remarketing', order: 12, color: '#F97316' }
     ]
 
     const response = await fetch(`${this.baseUrl}/pipeline/stages/batch`, {

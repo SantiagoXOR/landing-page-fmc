@@ -146,6 +146,7 @@ Variables relevantes:
 - `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY` — usada si no definís una plantilla solo para Chats.
 - Opcional: `WHATSAPP_TEMPLATE_CHAT_REENGAGEMENT` — nombre de plantilla dedicada al reengagement desde Chats; si está vacía, se usa `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY`.
 - `WHATSAPP_TEMPLATE_PIPELINE_LANG` y `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME` — igual que en [UCHAT-PIPELINE-PREAPROBADO-RECHAZADO.md](./UCHAT-PIPELINE-PREAPROBADO-RECHAZADO.md).
+- Si la plantilla tiene **encabezado de imagen variable** en Meta, además hay que definir `WHATSAPP_TEMPLATE_HEADER_MEDIA_URL` (URL HTTPS pública de la imagen). Si el encabezado es **fijo** en la plantilla, no uses esta variable (solo se envía el cuerpo).
 
 ---
 

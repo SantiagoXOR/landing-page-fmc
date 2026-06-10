@@ -1,6 +1,12 @@
 import { supabase } from '@/lib/db'
 import { ConversationService } from './conversation-service'
-import { WhatsAppBusinessAPI, WhatsAppAPIError, formatWhatsAppNumber, isValidWhatsAppNumber } from '@/lib/integrations/whatsapp-business-api'
+import {
+  WhatsAppBusinessAPI,
+  WhatsAppAPIError,
+  formatWhatsAppNumber,
+  isValidWhatsAppNumber,
+  type SendTemplateMessageParams,
+} from '@/lib/integrations/whatsapp-business-api'
 import { logger } from '@/lib/logger'
 
 export interface WhatsAppMessage {
@@ -226,6 +232,9 @@ export class WhatsAppService {
   /**
    * Plantilla con una variable en el cuerpo: {{1}} (viejo) o {{nombre_snake}} (Meta Spanish ARG, etc.).
    * Si WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME está definido, se envía parameter_name a la API.
+   *
+   * Plantilla con **encabezado de imagen variable** en Meta: incluí el componente `header` en cada envío
+   * (`WHATSAPP_TEMPLATE_HEADER_MEDIA_URL` o `headerImageLink`). Si el header es fijo en la plantilla, no lo uses.
    */
   static async sendTemplateBodySingleVariable(data: {
     to: string
@@ -234,6 +243,8 @@ export class WhatsAppService {
     bodyText: string
     /** Sin env: usa WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME o solo texto ({{1}}) */
     bodyParameterName?: string
+    /** URL HTTPS pública; si no, usa env WHATSAPP_TEMPLATE_HEADER_MEDIA_URL */
+    headerImageLink?: string
   }): Promise<{ success: true; messageId?: string }> {
     if (!this.whatsappClient) {
       throw new Error('WhatsApp Business API not configured')
@@ -252,16 +263,32 @@ export class WhatsAppService {
     if (paramName) {
       param.parameter_name = paramName
     }
+
+    const headerLink = (data.headerImageLink || process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL || '').trim()
+
+    type TemplateComponent = NonNullable<SendTemplateMessageParams['components']>[number]
+    const components: TemplateComponent[] = []
+    if (headerLink) {
+      components.push({
+        type: 'header',
+        parameters: [
+          {
+            type: 'image',
+            image: { link: headerLink },
+          },
+        ],
+      })
+    }
+    components.push({
+      type: 'body',
+      parameters: [param],
+    })
+
     const response = await this.whatsappClient.sendTemplateMessage({
       to: formattedPhone,
       templateName: data.templateName,
       languageCode: data.languageCode || 'es',
-      components: [
-        {
-          type: 'body',
-          parameters: [param],
-        },
-      ],
+      components,
     })
     logger.info('WhatsApp template enviado', {
       template: data.templateName,

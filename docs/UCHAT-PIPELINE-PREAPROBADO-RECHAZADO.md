@@ -19,6 +19,8 @@ Cuando movés una tarjeta a **Preaprobado** o **Rechazado** en el pipeline de ve
 | `WHATSAPP_TEMPLATE_PREAPROBADO` | (Opcional) Plantilla solo para preaprobado (mismo formato `{{1}}`). |
 | `WHATSAPP_TEMPLATE_RECHAZADO` | (Opcional) Plantilla solo para rechazado (`{{1}}`). |
 | `WHATSAPP_TEMPLATE_PIPELINE_LANG` | Código de idioma de la plantilla (ej. `es`, `es_AR`). Por defecto `es`. |
+| `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME` | Nombre de la variable del cuerpo sin `{{}}` (ej. `mensaje_pipeline`) cuando Meta no usa `{{1}}`. |
+| `WHATSAPP_TEMPLATE_HEADER_MEDIA_URL` | (Opcional) URL HTTPS pública de imagen si la plantilla tiene **header de imagen variable**. No definir si el header es fijo en Meta. |
 
 ### Después de 24 horas (Meta)
 
@@ -87,3 +89,21 @@ Si al mover a rechazado el usuario eligió un **mensaje de rechazo** en el CRM, 
 ## Ventana de conversación (Meta)
 
 Con plantillas configuradas, el CRM envía **plantilla** fuera de las 24 h. Sin plantilla, solo funcionará dentro de la ventana de sesión.
+
+## Etapa Remarketing (Kanban)
+
+Al mover una tarjeta a la columna **Remarketing** (`remarketing`):
+
+1. Se aplica el tag `remarketing` al lead.
+2. Se envía WhatsApp por Meta con `notif_pipeline_crm` (o `WHATSAPP_TEMPLATE_REMARKETING`) si el lead está fuera de ventana de 24 h; si hay ventana abierta, texto libre.
+3. Opcional: `UCHAT_INBOUND_WEBHOOK_REMARKETING_URL` para disparar flujo en Uchat.
+
+| Variable | Descripción |
+|----------|-------------|
+| `PIPELINE_REMARKETING_WHATSAPP_MESSAGE` | Texto por defecto en la plantilla (si no se personaliza por API). |
+| `WHATSAPP_TEMPLATE_REMARKETING` | Plantilla Meta solo para remarketing; si vacía, usa `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY`. |
+| `UCHAT_INBOUND_WEBHOOK_REMARKETING_URL` | Webhook Uchat al entrar en Remarketing. |
+
+Mensaje por defecto (personaliza con el nombre del lead): *"Hola {nombre}, seguimos disponibles para ayudarte con tu crédito prendario. ¿Querés que retomemos tu consulta?"*
+
+Migración BD: `scripts/migrations/003_add_remarketing_pipeline_stage.sql` + `004_add_remarketing_stage_tag.sql`.

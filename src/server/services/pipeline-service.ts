@@ -14,6 +14,7 @@ export type PipelineStage =
   | 'ENCUESTA'
   | 'RECHAZADO'
   | 'SOLICITAR_REFERIDO'
+  | 'REMARKETING'
   // Legacy support
   | 'LEAD_NUEVO'
   | 'CONTACTO_INICIAL'
@@ -338,6 +339,7 @@ export class PipelineService {
       'ENCUESTA': 100,
       'RECHAZADO': 0,
       'SOLICITAR_REFERIDO': 50,
+      'REMARKETING': 15,
       // Legacy support
       'LEAD_NUEVO': 10,
       'CONTACTO_INICIAL': 20,

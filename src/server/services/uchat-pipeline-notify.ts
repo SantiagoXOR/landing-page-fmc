@@ -51,6 +51,12 @@ https://www.bancoformosa.com.ar/Prestamos-bPrendariosb-510.note.aspx`
 export const PIPELINE_RECHAZADO_MESSAGE_DEFAULT =
   'Buenas tardes, lamentablemente no podremos asistirlo ya que no percibe sus ingresos a través del Banco Formosa, lo esperamos para futuras operaciones!'
 
+/** Remarketing: reengagement fuera de ventana de 24 h */
+export const PIPELINE_REMARKETING_MESSAGE_DEFAULT =
+  'Hola, seguimos disponibles para ayudarte con tu crédito prendario. ¿Querés que retomemos tu consulta?'
+
+type PipelineNotifyKind = 'preaprobado' | 'rechazado' | 'remarketing'
+
 export interface PipelineNotifyLead {
   id: string
   telefono?: string | null
@@ -85,12 +91,15 @@ function shouldSendMeta(): boolean {
   return skip !== 'true' && skip !== '1'
 }
 
-function resolveTemplateName(kind: 'preaprobado' | 'rechazado'): string {
+function resolveTemplateName(kind: PipelineNotifyKind): string {
   const generic = (process.env.WHATSAPP_TEMPLATE_PIPELINE_NOTIFY || '').trim()
   if (kind === 'preaprobado') {
     return (process.env.WHATSAPP_TEMPLATE_PREAPROBADO || '').trim() || generic
   }
-  return (process.env.WHATSAPP_TEMPLATE_RECHAZADO || '').trim() || generic
+  if (kind === 'rechazado') {
+    return (process.env.WHATSAPP_TEMPLATE_RECHAZADO || '').trim() || generic
+  }
+  return (process.env.WHATSAPP_TEMPLATE_REMARKETING || '').trim() || generic
 }
 
 /**
@@ -101,7 +110,7 @@ async function deliverPipelineWhatsApp(
   leadId: string,
   phone: string,
   message: string,
-  kind: 'preaprobado' | 'rechazado'
+  kind: PipelineNotifyKind
 ): Promise<void> {
   if (!WhatsAppService.isConfigured()) {
     logger.warn(`Pipeline ${kind}: WhatsApp Meta no configurado`, { leadId })
@@ -281,4 +290,77 @@ export function isPreaprobadoStageId(normalizedStageId: string): boolean {
 
 export function isRechazadoStageId(normalizedStageId: string): boolean {
   return ['rechazado', 'cerrado-perdido', 'cerrado_perdido', 'credito-rechazado'].includes(normalizedStageId)
+}
+
+function buildRemarketingMessage(lead: PipelineNotifyLead, customMessage?: string | null): string {
+  const custom = (customMessage || '').trim()
+  if (custom) return custom
+
+  const envMsg = (process.env.PIPELINE_REMARKETING_WHATSAPP_MESSAGE || '').trim()
+  if (envMsg) return envMsg
+
+  const name = firstName(lead)
+  if (name) {
+    return `Hola ${name}, seguimos disponibles para ayudarte con tu crédito prendario. ¿Querés que retomemos tu consulta?`
+  }
+  return PIPELINE_REMARKETING_MESSAGE_DEFAULT
+}
+
+export async function notifyPipelineRemarketing(
+  lead: PipelineNotifyLead,
+  options?: { tagApplied?: string; customMessage?: string | null }
+): Promise<void> {
+  const phone = phoneForPayload(lead)
+  if (!phone) {
+    logger.warn('Pipeline remarketing: lead sin teléfono válido, omitiendo notificación', { leadId: lead.id })
+    return
+  }
+
+  const message = buildRemarketingMessage(lead, options?.customMessage)
+  const url = (process.env.UCHAT_INBOUND_WEBHOOK_REMARKETING_URL || '').trim()
+  const uchatSubscriberId = lead.manychatId?.startsWith('uchat_')
+    ? lead.manychatId.slice('uchat_'.length)
+    : undefined
+
+  const payload = {
+    phone,
+    first_name: firstName(lead),
+    lead_id: lead.id,
+    event: 'pipeline_remarketing',
+    tag_to_apply: options?.tagApplied || 'remarketing',
+    message,
+    ...(uchatSubscriberId && { uchat_subscriber_id: uchatSubscriberId }),
+  }
+
+  if (url) {
+    try {
+      const res = await fetchWithRetry(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+        'pipeline-remarketing-uchat'
+      )
+      if (!res.ok) {
+        logger.warn('Uchat remarketing webhook respondió no OK', { status: res.status, leadId: lead.id })
+      } else {
+        logger.info('Uchat remarketing webhook llamado', { leadId: lead.id })
+      }
+    } catch (e) {
+      logger.error('Error llamando Uchat remarketing webhook', {
+        leadId: lead.id,
+        error: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  if (shouldSendMeta()) {
+    await deliverPipelineWhatsApp(lead.id, phone, message, 'remarketing')
+  }
+}
+
+export function isRemarketingStageId(normalizedStageId: string): boolean {
+  return normalizedStageId === 'remarketing'
 }

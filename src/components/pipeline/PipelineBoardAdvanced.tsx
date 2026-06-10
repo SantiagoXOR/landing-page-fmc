@@ -1011,7 +1011,8 @@ const LeadCard = memo(function LeadCard({
     'propuesta': 'solicitud-en-proceso',
     'listo-analisis': 'solicitud-en-proceso',
     'nuevo': 'lead-nuevo',
-    'cliente-nuevo': 'lead-nuevo'
+    'cliente-nuevo': 'lead-nuevo',
+    'remarketing': 'remarketing',
   }
   const columnTag = lead.stageId ? STAGE_TAG[lead.stageId] : null
   const hasColumnTag = columnTag && parsedTags.some((t: string) => t.toLowerCase().trim() === columnTag.toLowerCase())

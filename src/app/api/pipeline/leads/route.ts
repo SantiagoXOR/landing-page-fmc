@@ -25,7 +25,8 @@ const pipelineStageToStageId: Record<string, string> = {
   'CERRADO_GANADO': 'cerrado-ganado',
   'CIERRE_PERDIDO': 'cerrado-perdido',
   'RECHAZADO': 'cerrado-perdido',
-  'SEGUIMIENTO': 'cerrado-ganado' // SEGUIMIENTO se mapea a cerrado-ganado ya que no hay etapa específica
+  'SEGUIMIENTO': 'cerrado-ganado', // SEGUIMIENTO se mapea a cerrado-ganado ya que no hay etapa específica
+  'REMARKETING': 'remarketing',
 }
 
 // Mapeo inverso: stageId a pipeline_stage (para filtros)
@@ -79,7 +80,8 @@ const tagToStageId: Record<string, string> = {
   'contactado': 'contactado',
   'calificado': 'calificado',
   'propuesta-enviada': 'propuesta',
-  'negociacion': 'negociacion'
+  'negociacion': 'negociacion',
+  'remarketing': 'remarketing',
 }
 
 // Función para obtener probabilidad por etapa

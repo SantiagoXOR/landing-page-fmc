@@ -253,6 +253,24 @@ const defaultStages: PipelineStage[] = [
       leadsThisMonth: 0,
       trend: 'stable'
     }
+  },
+  {
+    id: 'remarketing',
+    name: 'Remarketing',
+    description: 'Reengagement por WhatsApp (plantilla Meta) para leads fuera de ventana de 24 h',
+    color: '#F97316',
+    order: 12,
+    isActive: true,
+    rules: [],
+    automation: [],
+    metrics: {
+      totalLeads: 0,
+      averageTimeInStage: 0,
+      conversionRate: 0,
+      leadsThisWeek: 0,
+      leadsThisMonth: 0,
+      trend: 'stable'
+    }
   }
 ]
 

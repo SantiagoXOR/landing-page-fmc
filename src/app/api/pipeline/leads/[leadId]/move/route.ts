@@ -11,8 +11,10 @@ import { getTagForStage, getPipelineTags } from '@/lib/pipeline-stage-tags'
 import {
   notifyPipelinePreaprobado,
   notifyPipelineRechazado,
+  notifyPipelineRemarketing,
   isPreaprobadoStageId,
   isRechazadoStageId,
+  isRemarketingStageId,
 } from '@/server/services/uchat-pipeline-notify'
 
 // Schema de validación para mover lead
@@ -21,7 +23,8 @@ const MoveLeadSchema = z.object({
   toStageId: z.string().min(1, 'ID de etapa destino es requerido'),
   notes: z.string().optional(),
   reason: z.string().optional(),
-  rejectionMessage: z.string().optional() // Mensaje de rechazo seleccionado para Instagram
+  rejectionMessage: z.string().optional(), // Mensaje de rechazo seleccionado para Instagram
+  remarketingMessage: z.string().optional(), // Texto personalizado para plantilla de remarketing
 })
 
 /**
@@ -84,7 +87,7 @@ export async function POST(
       throw error
     }
 
-    const { fromStageId, toStageId, notes, reason, rejectionMessage } = validatedData
+    const { fromStageId, toStageId, notes, reason, rejectionMessage, remarketingMessage } = validatedData
 
     logger.info('Moving lead', {
       leadId,
@@ -172,7 +175,8 @@ export async function POST(
       'encuesta-pendiente': 'ENCUESTA',
       'rechazado': 'RECHAZADO',
       'cerrado_perdido': 'RECHAZADO',
-      'solicitar-referido': 'SOLICITAR_REFERIDO'
+      'solicitar-referido': 'SOLICITAR_REFERIDO',
+      'remarketing': 'REMARKETING',
     }
 
     const fromStageEnum = stageMapping[normalizedFromStageId] || normalizedFromStageId
@@ -450,6 +454,25 @@ export async function POST(
           error: e instanceof Error ? e.message : String(e),
         })
       )
+    } else if (isRemarketingStageId(normalizedToStageId)) {
+      const tagRemarketing = await getTagForStage('REMARKETING').catch(() => null)
+      void notifyPipelineRemarketing(
+        {
+          id: lead.id,
+          telefono: lead.telefono,
+          nombre: lead.nombre,
+          manychatId: lead.manychatId,
+        },
+        {
+          tagApplied: tagRemarketing || 'remarketing',
+          customMessage: remarketingMessage || null,
+        }
+      ).catch((e) =>
+        logger.warn('notifyPipelineRemarketing falló (no bloquea el movimiento)', {
+          leadId,
+          error: e instanceof Error ? e.message : String(e),
+        })
+      )
     }
 
     // Ejecutar automatizaciones de la nueva etapa (no crítico si falla)
@@ -551,6 +574,7 @@ async function validateStageTransition(
     'encuesta': { order: 10, name: 'Encuesta' },
     'encuesta-pendiente': { order: 10, name: 'Encuesta Pendiente' },
     'solicitar-referido': { order: 11, name: 'Solicitar Referido' },
+    'remarketing': { order: 12, name: 'Remarketing' },
     
     // Etapas legacy (soporte retrocompatibilidad)
     'nuevo': { order: 1, name: 'Nuevo Lead' },
@@ -643,6 +667,7 @@ async function assignStageTag(leadId: string, stageId: string): Promise<void> {
       'encuesta': 'ENCUESTA',
       'encuesta-pendiente': 'ENCUESTA',
       'solicitar-referido': 'SOLICITAR_REFERIDO',
+      'remarketing': 'REMARKETING',
       // Legacy
       'nuevo': 'CLIENTE_NUEVO',
       'contactado': 'CONSULTANDO_CREDITO',

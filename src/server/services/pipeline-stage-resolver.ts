@@ -22,7 +22,8 @@ export const pipelineStageToStageId: Record<string, string> = {
   'CERRADO_GANADO': 'cerrado-ganado',
   'CIERRE_PERDIDO': 'cerrado-perdido',
   'RECHAZADO': 'cerrado-perdido',
-  'SEGUIMIENTO': 'cerrado-ganado'
+  'SEGUIMIENTO': 'cerrado-ganado',
+  'REMARKETING': 'remarketing',
 }
 
 // Mapeo de estados del lead a stageId (fallback si no hay pipeline)
@@ -64,7 +65,8 @@ const tagToStageId: Record<string, string> = {
   'contactado': 'contactado',
   'calificado': 'calificado',
   'propuesta-enviada': 'propuesta',
-  'negociacion': 'negociacion'
+  'negociacion': 'negociacion',
+  'remarketing': 'remarketing',
 }
 
 const initialStages = ['LEAD_NUEVO', 'CLIENTE_NUEVO']

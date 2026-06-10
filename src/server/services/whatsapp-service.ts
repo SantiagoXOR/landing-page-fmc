@@ -357,6 +357,49 @@ export class WhatsAppService {
   }
 
   /**
+   * Guarda en el historial de Chats un outbound enviado fuera de la UI (pipeline, automatizaciones).
+   * No lanza error si falla: el envío por Meta ya ocurrió.
+   */
+  static async persistOutboundToLeadConversation(data: {
+    leadId: string
+    phone: string
+    content: string
+    messageType: 'text' | 'template'
+    platformMsgId?: string
+    isFromBot?: boolean
+  }): Promise<void> {
+    try {
+      const platformId = formatWhatsAppNumber(data.phone)
+      let conversation =
+        (await ConversationService.findConversationByLeadAndPlatform(data.leadId, 'whatsapp')) ||
+        (await ConversationService.findConversationByPlatform('whatsapp', platformId))
+
+      if (!conversation) {
+        conversation = await ConversationService.createConversation({
+          platform: 'whatsapp',
+          platformId,
+          leadId: data.leadId,
+        })
+      }
+
+      await this.createMessage({
+        conversationId: conversation.id,
+        direction: 'outbound',
+        content: data.content,
+        messageType: data.messageType,
+        platformMsgId: data.platformMsgId,
+        isFromBot: data.isFromBot ?? true,
+      })
+      await ConversationService.updateLastActivity(conversation.id)
+    } catch (error) {
+      logger.warn('No se pudo guardar mensaje pipeline en historial del CRM', {
+        leadId: data.leadId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  /**
    * Actualizar estado de un mensaje por platform_msg_id (sent → delivered → read).
    * Persiste en DB para reflejar los estados que envía Meta en el webhook.
    */

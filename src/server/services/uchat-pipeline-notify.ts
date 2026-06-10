@@ -131,22 +131,40 @@ async function deliverPipelineWhatsApp(
       bodyText: message,
     })
 
+  const persistOutbound = async (messageType: 'text' | 'template', platformMsgId?: string) => {
+    await WhatsAppService.persistOutboundToLeadConversation({
+      leadId,
+      phone,
+      content: message,
+      messageType,
+      platformMsgId,
+      isFromBot: true,
+    })
+  }
+
   try {
     if (outsideWindow && templateName) {
-      await sendTemplate()
+      const result = await sendTemplate()
+      await persistOutbound('template', result.messageId)
       logger.info(`WhatsApp ${kind} enviado por plantilla (ventana 24 h cerrada o sin mensaje inbound en CRM)`, {
         leadId,
+        messageId: result.messageId,
       })
       return
     }
 
-    await WhatsAppService.sendMessage({ to: phone, message })
-    logger.info(`WhatsApp ${kind} enviado (mensaje de sesión)`, { leadId })
+    const result = await WhatsAppService.sendMessage({ to: phone, message })
+    await persistOutbound('text', result.messageId)
+    logger.info(`WhatsApp ${kind} enviado (mensaje de sesión)`, { leadId, messageId: result.messageId })
   } catch (err) {
     if (err instanceof WhatsAppAPIError && err.isOutsideMessagingWindow() && templateName) {
       try {
-        await sendTemplate()
-        logger.info(`WhatsApp ${kind} enviado por plantilla (reintento tras error de ventana)`, { leadId })
+        const result = await sendTemplate()
+        await persistOutbound('template', result.messageId)
+        logger.info(`WhatsApp ${kind} enviado por plantilla (reintento tras error de ventana)`, {
+          leadId,
+          messageId: result.messageId,
+        })
         return
       } catch (tplErr) {
         logger.error(`WhatsApp ${kind}: falló plantilla`, {

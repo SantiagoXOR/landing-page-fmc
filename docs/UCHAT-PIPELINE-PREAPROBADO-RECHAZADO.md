@@ -95,8 +95,10 @@ Con plantillas configuradas, el CRM envía **plantilla** fuera de las 24 h. Sin 
 Al mover una tarjeta a la columna **Remarketing** (`remarketing`):
 
 1. Se aplica el tag `remarketing` al lead.
-2. Se envía WhatsApp por Meta con `notif_pipeline_crm` (o `WHATSAPP_TEMPLATE_REMARKETING`) si el lead está fuera de ventana de 24 h; si hay ventana abierta, texto libre.
+2. Se envía **siempre** WhatsApp por Meta con plantilla `notif_pipeline_crm` (o `WHATSAPP_TEMPLATE_REMARKETING`), con el texto de reengagement en `mensaje_pipeline`.
 3. Opcional: `UCHAT_INBOUND_WEBHOOK_REMARKETING_URL` para disparar flujo en Uchat.
+
+Preaprobado y rechazado siguen usando plantilla solo **fuera** de la ventana de 24 h; dentro de ventana, texto libre.
 
 | Variable | Descripción |
 |----------|-------------|

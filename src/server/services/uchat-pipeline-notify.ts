@@ -131,6 +131,7 @@ async function deliverPipelineWhatsApp(
     outsideWindow,
     templateName: templateName || '(vacío)',
     lastInboundAt: lastInbound?.toISOString() ?? null,
+    forceTemplate: kind === 'remarketing',
   })
 
   const sendTemplate = () =>
@@ -152,14 +153,19 @@ async function deliverPipelineWhatsApp(
     })
   }
 
+  // Remarketing: siempre plantilla (reengagement). Preaprobado/rechazado: plantilla solo fuera de ventana 24 h.
+  const useTemplate = !!templateName && (kind === 'remarketing' || outsideWindow)
+
   try {
-    if (outsideWindow && templateName) {
+    if (useTemplate) {
       const result = await sendTemplate()
       await persistOutbound('template', result.messageId)
-      logger.info(`WhatsApp ${kind} enviado por plantilla (ventana 24 h cerrada o sin mensaje inbound en CRM)`, {
-        leadId,
-        messageId: result.messageId,
-      })
+      logger.info(
+        kind === 'remarketing'
+          ? `WhatsApp ${kind} enviado por plantilla (remarketing siempre usa plantilla)`
+          : `WhatsApp ${kind} enviado por plantilla (ventana 24 h cerrada o sin mensaje inbound en CRM)`,
+        { leadId, messageId: result.messageId }
+      )
       return
     }
 

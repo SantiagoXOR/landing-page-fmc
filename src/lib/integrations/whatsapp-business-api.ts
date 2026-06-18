@@ -60,6 +60,10 @@ export interface WhatsAppError {
     code: number;
     error_subcode?: number;
     fbtrace_id: string;
+    error_data?: {
+      messaging_product?: string;
+      details?: string;
+    };
   };
 }
 
@@ -98,7 +102,7 @@ export class WhatsAppBusinessAPI {
     return new WhatsAppBusinessAPI({
       phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID!,
       accessToken: process.env.WHATSAPP_ACCESS_TOKEN!,
-      apiVersion: process.env.WHATSAPP_API_VERSION || 'v18.0',
+      apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
     });
   }
 
@@ -153,18 +157,22 @@ export class WhatsAppBusinessAPI {
    * Enviar mensaje de template (plantilla aprobada)
    */
   async sendTemplateMessage(params: SendTemplateMessageParams): Promise<WhatsAppResponse> {
+    const template: Record<string, unknown> = {
+      name: params.templateName,
+      language: {
+        code: params.languageCode || 'es_AR',
+      },
+    };
+    if (params.components && params.components.length > 0) {
+      template.components = params.components;
+    }
+
     const body = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: this.normalizePhoneNumber(params.to),
       type: 'template',
-      template: {
-        name: params.templateName,
-        language: {
-          code: params.languageCode || 'es',
-        },
-        components: params.components || [],
-      },
+      template,
     };
 
     return this.sendRequest(body, 'sendTemplateMessage');
@@ -320,7 +328,17 @@ export class WhatsAppAPIError extends Error {
    * Verificar si es un error de template no encontrado
    */
   isTemplateNotFoundError(): boolean {
-    return this.errorData.error.code === 132000;
+    return this.errorData.error.code === 132001;
+  }
+
+  /** Meta #132012 — parámetros no coinciden con la plantilla aprobada */
+  isTemplateParamFormatError(): boolean {
+    return this.errorData.error.code === 132012;
+  }
+
+  /** Detalle de Meta (ej. "header: expected IMAGE, received UNKNOWN") */
+  getMetaErrorDetails(): string | undefined {
+    return this.errorData.error.error_data?.details;
   }
 
   /**

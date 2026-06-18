@@ -230,11 +230,8 @@ export class WhatsAppService {
   }
 
   /**
-   * Plantilla con una variable en el cuerpo: {{1}} (viejo) o {{nombre_snake}} (Meta Spanish ARG, etc.).
-   * Si WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME está definido, se envía parameter_name a la API.
-   *
-   * Plantilla con **encabezado de imagen variable** en Meta: incluí el componente `header` en cada envío
-   * (`WHATSAPP_TEMPLATE_HEADER_MEDIA_URL` o `headerImageLink`). Si el header es fijo en la plantilla, no lo uses.
+   * Plantilla con una variable en el cuerpo: {{1}} (posicional) o {{nombre_snake}} (Meta named params).
+   * Ante error #132012 prueba variantes (nominal/posicional, idioma, header opcional).
    */
   static async sendTemplateBodySingleVariable(data: {
     to: string
@@ -243,7 +240,7 @@ export class WhatsAppService {
     bodyText: string
     /** Sin env: usa WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME o solo texto ({{1}}) */
     bodyParameterName?: string
-    /** URL HTTPS pública; si no, usa env WHATSAPP_TEMPLATE_HEADER_MEDIA_URL */
+    /** URL HTTPS pública para plantillas con header de imagen variable */
     headerImageLink?: string
   }): Promise<{ success: true; messageId?: string }> {
     if (!this.whatsappClient) {
@@ -256,61 +253,129 @@ export class WhatsAppService {
     const text = (data.bodyText || '').slice(0, 1024)
     const paramName =
       (data.bodyParameterName || process.env.WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME || '').trim()
-    const param: { type: string; text: string; parameter_name?: string } = {
-      type: 'text',
-      text,
-    }
-    if (paramName) {
-      param.parameter_name = paramName
-    }
-
-    // Solo header explícito por llamada. NO usar env global: si la plantilla tiene header
-    // FIJO en Meta y enviamos header variable → Meta devuelve #132012.
-    const headerLink = (data.headerImageLink || '').trim()
-
-    type TemplateComponent = NonNullable<SendTemplateMessageParams['components']>[number]
-    const components: TemplateComponent[] = []
-    if (headerLink) {
-      components.push({
-        type: 'header',
-        parameters: [
-          {
-            type: 'image',
-            image: { link: headerLink },
-          },
-        ],
-      })
-    }
-    components.push({
-      type: 'body',
-      parameters: [param],
-    })
-
+    const explicitHeader = (data.headerImageLink || '').trim()
+    const envHeader = (process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL || '').trim()
     const lang =
       (data.languageCode || process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es_AR').trim()
 
-    logger.info('WhatsApp template payload', {
-      template: data.templateName,
-      languageCode: lang,
-      bodyParamName: paramName || '(posicional {{1}})',
-      hasHeaderImage: !!headerLink,
-      bodyLength: text.length,
-    })
+    type TemplateComponent = NonNullable<SendTemplateMessageParams['components']>[number]
 
-    const response = await this.whatsappClient.sendTemplateMessage({
-      to: formattedPhone,
-      templateName: data.templateName,
-      languageCode: lang,
-      components,
-    })
-    logger.info('WhatsApp template enviado', {
-      template: data.templateName,
-      to: formattedPhone.substring(0, 6) + '***',
-    })
-    return {
-      success: true,
-      messageId: response.messages?.[0]?.id,
+    const buildComponents = (opts: {
+      useNamed: boolean
+      headerLink?: string
+    }): TemplateComponent[] => {
+      const components: TemplateComponent[] = []
+      const headerLink = (opts.headerLink || '').trim()
+      if (headerLink) {
+        components.push({
+          type: 'header',
+          parameters: [{ type: 'image', image: { link: headerLink } }],
+        })
+      }
+      const param: { type: string; text: string; parameter_name?: string } = {
+        type: 'text',
+        text,
+      }
+      if (opts.useNamed && paramName) {
+        param.parameter_name = paramName
+      }
+      components.push({ type: 'body', parameters: [param] })
+      return components
     }
+
+    type Attempt = { label: string; languageCode: string; components: TemplateComponent[] }
+    const attempts: Attempt[] = []
+    const langs = lang === 'es_AR' ? ['es_AR', 'es'] : [lang, 'es_AR']
+
+    for (const languageCode of langs) {
+      if (paramName) {
+        attempts.push({
+          label: `named/${languageCode}/no-header`,
+          languageCode,
+          components: buildComponents({ useNamed: true }),
+        })
+      }
+      attempts.push({
+        label: `positional/${languageCode}/no-header`,
+        languageCode,
+        components: buildComponents({ useNamed: false }),
+      })
+    }
+
+    if (explicitHeader || envHeader) {
+      const headerLink = explicitHeader || envHeader
+      for (const languageCode of langs) {
+        if (paramName) {
+          attempts.push({
+            label: `named/${languageCode}/header`,
+            languageCode,
+            components: buildComponents({ useNamed: true, headerLink }),
+          })
+        }
+        attempts.push({
+          label: `positional/${languageCode}/header`,
+          languageCode,
+          components: buildComponents({ useNamed: false, headerLink }),
+        })
+      }
+    }
+
+    let lastError: unknown
+    for (let i = 0; i < attempts.length; i++) {
+      const attempt = attempts[i]
+      const hasHeader = attempt.components.some((c) => c.type === 'header')
+      logger.info('WhatsApp template payload', {
+        template: data.templateName,
+        attempt: attempt.label,
+        languageCode: attempt.languageCode,
+        bodyParamName: attempt.label.startsWith('named') ? paramName : '(posicional {{1}})',
+        hasHeaderImage: hasHeader,
+        bodyLength: text.length,
+      })
+
+      try {
+        const response = await this.whatsappClient.sendTemplateMessage({
+          to: formattedPhone,
+          templateName: data.templateName,
+          languageCode: attempt.languageCode,
+          components: attempt.components,
+        })
+        logger.info('WhatsApp template enviado', {
+          template: data.templateName,
+          attempt: attempt.label,
+          to: formattedPhone.substring(0, 6) + '***',
+        })
+        return {
+          success: true,
+          messageId: response.messages?.[0]?.id,
+        }
+      } catch (err) {
+        lastError = err
+        if (
+          err instanceof WhatsAppAPIError &&
+          err.isTemplateParamFormatError() &&
+          i < attempts.length - 1
+        ) {
+          logger.warn('WhatsApp template #132012, probando otra variante', {
+            template: data.templateName,
+            failedAttempt: attempt.label,
+            metaDetails: err.getMetaErrorDetails(),
+          })
+          continue
+        }
+        if (err instanceof WhatsAppAPIError) {
+          logger.error('WhatsApp template falló', {
+            template: data.templateName,
+            attempt: attempt.label,
+            metaDetails: err.getMetaErrorDetails(),
+            code: err.errorData.error.code,
+          })
+        }
+        throw err
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError))
   }
 
   /**

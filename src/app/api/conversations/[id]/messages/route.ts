@@ -305,7 +305,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           { status: 503 }
         )
       }
-      const lang = (process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es').trim()
+      const lang = (process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es_AR').trim()
       const bodyText = messageStr.trim().slice(0, TEMPLATE_BODY_MAX)
 
       let tplResult: { success: true; messageId?: string }

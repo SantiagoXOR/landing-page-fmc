@@ -125,7 +125,7 @@ async function deliverPipelineWhatsApp(
   }
 
   const templateName = resolveTemplateName(kind)
-  const lang = (process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es').trim()
+  const lang = (process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es_AR').trim()
 
   const lastInbound = await ConversationService.getLastInboundWhatsAppMessageAt(leadId)
   const outsideWindow = isOutsideCustomerCareWindow(lastInbound)

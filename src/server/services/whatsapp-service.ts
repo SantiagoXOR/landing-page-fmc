@@ -264,7 +264,9 @@ export class WhatsAppService {
       param.parameter_name = paramName
     }
 
-    const headerLink = (data.headerImageLink || process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL || '').trim()
+    // Solo header explícito por llamada. NO usar env global: si la plantilla tiene header
+    // FIJO en Meta y enviamos header variable → Meta devuelve #132012.
+    const headerLink = (data.headerImageLink || '').trim()
 
     type TemplateComponent = NonNullable<SendTemplateMessageParams['components']>[number]
     const components: TemplateComponent[] = []
@@ -284,10 +286,21 @@ export class WhatsAppService {
       parameters: [param],
     })
 
+    const lang =
+      (data.languageCode || process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es_AR').trim()
+
+    logger.info('WhatsApp template payload', {
+      template: data.templateName,
+      languageCode: lang,
+      bodyParamName: paramName || '(posicional {{1}})',
+      hasHeaderImage: !!headerLink,
+      bodyLength: text.length,
+    })
+
     const response = await this.whatsappClient.sendTemplateMessage({
       to: formattedPhone,
       templateName: data.templateName,
-      languageCode: data.languageCode || 'es',
+      languageCode: lang,
       components,
     })
     logger.info('WhatsApp template enviado', {

@@ -478,6 +478,25 @@ async function handleMetaWebhook(body: any) {
           const statuses = value.statuses || []
           for (const status of statuses) {
             const msgStatus = status.status
+
+            if (msgStatus === 'failed') {
+              const errMsg =
+                status.errors?.[0]?.message ||
+                status.errors?.[0]?.title ||
+                'Entrega fallida (Meta)'
+              console.error('[WhatsApp Webhook] Message delivery failed:', {
+                id: status.id,
+                recipient: status.recipient_id,
+                errors: status.errors,
+              })
+              try {
+                await WhatsAppService.markMessageDeliveryFailed(status.id, errMsg)
+              } catch (error) {
+                console.error('[WhatsApp Webhook] Error recording failed delivery:', error)
+              }
+              continue
+            }
+
             if (msgStatus !== 'sent' && msgStatus !== 'delivered' && msgStatus !== 'read') continue
 
             console.log('[WhatsApp Webhook] Message status update:', {

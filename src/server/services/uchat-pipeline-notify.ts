@@ -47,6 +47,24 @@ export const PIPELINE_PREAPROBADO_MESSAGE_DEFAULT = `Felicitaciones, usted tiene
 
 https://www.bancoformosa.com.ar/Prestamos-bPrendariosb-510.note.aspx`
 
+/** Cuerpo para plantilla Meta (sin URL ni saltos de línea; el botón CONCESIONARIAS ya está en notif_pipeline_crm) */
+export const PIPELINE_PREAPROBADO_TEMPLATE_BODY_DEFAULT =
+  'Felicitaciones, usted tiene un crédito prendario pre-aprobado con el Banco Formosa. Para continuar la gestión, tocá el botón CONCESIONARIAS o respondé este mensaje.'
+
+function buildPreaprobadoTemplateBody(): string {
+  const custom = (process.env.PIPELINE_PREAPROBADO_TEMPLATE_BODY || '').trim()
+  if (custom) return custom
+  return PIPELINE_PREAPROBADO_TEMPLATE_BODY_DEFAULT
+}
+
+/** Texto que va en {{mensaje_pipeline}} según canal (sesión vs plantilla) */
+function resolvePipelineMessageBody(message: string, kind: PipelineNotifyKind, useTemplate: boolean): string {
+  if (useTemplate && kind === 'preaprobado') {
+    return buildPreaprobadoTemplateBody()
+  }
+  return message
+}
+
 /** Mensaje rechazo por ingresos no por Banco Formosa — referencia imagen */
 export const PIPELINE_RECHAZADO_MESSAGE_DEFAULT =
   'Buenas tardes, lamentablemente no podremos asistirlo ya que no percibe sus ingresos a través del Banco Formosa, lo esperamos para futuras operaciones!'
@@ -138,30 +156,37 @@ async function deliverPipelineWhatsApp(
     forceTemplate: kind === 'remarketing',
   })
 
+  // Remarketing: siempre plantilla (reengagement). Preaprobado/rechazado: plantilla solo fuera de ventana 24 h.
+  const useTemplate = !!templateName && (kind === 'remarketing' || outsideWindow)
+  const outboundText = resolvePipelineMessageBody(message, kind, useTemplate)
+
   const sendTemplate = () =>
     WhatsAppService.sendTemplateBodySingleVariable({
       to: phone,
       templateName,
       languageCode: lang,
-      bodyText: message,
+      bodyText: outboundText,
     })
 
   const persistOutbound = async (messageType: 'text' | 'template', platformMsgId?: string) => {
     await WhatsAppService.persistOutboundToLeadConversation({
       leadId,
       phone,
-      content: message,
+      content: messageType === 'template' ? outboundText : message,
       messageType,
       platformMsgId,
       isFromBot: true,
     })
   }
 
-  // Remarketing: siempre plantilla (reengagement). Preaprobado/rechazado: plantilla solo fuera de ventana 24 h.
-  const useTemplate = !!templateName && (kind === 'remarketing' || outsideWindow)
-
   try {
     if (useTemplate) {
+      if (kind === 'preaprobado' && outboundText !== message) {
+        logger.info('Pipeline preaprobado: usando texto corto para plantilla Meta', {
+          leadId,
+          templateBodyLength: outboundText.length,
+        })
+      }
       const result = await sendTemplate()
       await persistOutbound('template', result.messageId)
       logger.info(

@@ -422,7 +422,7 @@ export class WhatsAppService {
         media_url: data.mediaUrl,
         platform_msg_id: data.platformMsgId,
         sent_at: new Date().toISOString(),
-        delivered_at: data.direction === 'outbound' ? new Date().toISOString() : null,
+        delivered_at: null,
       }
       if (data.isFromBot !== undefined) {
         row.is_from_bot = data.isFromBot

@@ -14,6 +14,7 @@ Cuando movés una tarjeta a **Preaprobado** o **Rechazado** en el pipeline de ve
 | `UCHAT_INBOUND_WEBHOOK_RECHAZADO_URL` | URL del Inbound Webhook al mover a **Rechazado** (incl. columnas perdido/rechazado). |
 | `PIPELINE_NOTIFY_SKIP_META` | Si es `true`, **no** envía WhatsApp desde el CRM; solo webhook Uchat (el flujo debe enviar el mensaje usando el campo `message` del JSON). |
 | `PIPELINE_PREAPROBADO_WHATSAPP_MESSAGE` | (Opcional) Sobrescribe el texto de preaprobado. |
+| `PIPELINE_PREAPROBADO_TEMPLATE_BODY` | (Opcional) Texto corto solo para plantilla `mensaje_pipeline` (sin URL; el botón CONCESIONARIAS ya está en Meta). |
 | `PIPELINE_RECHAZADO_WHATSAPP_MESSAGE` | (Opcional) Sobrescribe el texto de rechazo por defecto. |
 | **`WHATSAPP_TEMPLATE_PIPELINE_NOTIFY`** | Nombre de plantilla **aprobada en Meta** (una sola variable en el cuerpo: `{{1}}`). Se usa para preaprobado y rechazado si no definís las específicas. **Necesaria para enviar pasadas las 24 h.** |
 | `WHATSAPP_TEMPLATE_PREAPROBADO` | (Opcional) Plantilla solo para preaprobado (mismo formato `{{1}}`). |

@@ -230,6 +230,17 @@ export class WhatsAppService {
   }
 
   /**
+   * Meta no permite \\n, \\t ni más de 4 espacios seguidos en variables de plantilla (#132018).
+   */
+  static sanitizeTemplateBodyParam(text: string): string {
+    return text
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/ {5,}/g, '    ')
+      .trim()
+      .slice(0, 1024)
+  }
+
+  /**
    * URL HTTPS pública para header de imagen variable en plantillas Meta (notif_pipeline_crm, etc.).
    * Orden: argumento → WHATSAPP_TEMPLATE_HEADER_MEDIA_URL → og-image del sitio FMC.
    */
@@ -266,7 +277,7 @@ export class WhatsAppService {
       throw new Error(`Invalid WhatsApp number: ${data.to}`)
     }
     const formattedPhone = formatWhatsAppNumber(data.to)
-    const text = (data.bodyText || '').slice(0, 1024)
+    const text = WhatsAppService.sanitizeTemplateBodyParam(data.bodyText || '')
     const paramName =
       (data.bodyParameterName || process.env.WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME || '').trim()
     const headerUrl = data.skipHeader ? '' : this.resolveTemplateHeaderUrl(data.headerImageLink)

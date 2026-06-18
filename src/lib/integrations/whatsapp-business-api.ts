@@ -336,9 +336,15 @@ export class WhatsAppAPIError extends Error {
     return this.errorData.error.code === 132012;
   }
 
+  /** Meta #132018 — saltos de línea / espacios inválidos en variable de plantilla */
+  isTemplateParamContentError(): boolean {
+    return this.errorData.error.code === 132018;
+  }
+
   /** Errores de plantilla donde conviene probar otra variante de payload */
   isTemplatePayloadRetryable(): boolean {
     if (this.isTemplateParamFormatError()) return true;
+    if (this.isTemplateParamContentError()) return true;
     if (this.errorData.error.code !== 100) return false;
     const details = (this.getMetaErrorDetails() || '').toLowerCase();
     return (

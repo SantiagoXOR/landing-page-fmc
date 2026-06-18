@@ -38,6 +38,7 @@ El CRM:
 1. Ir a **WhatsApp → Plantillas de mensajes**.
 2. Crear plantilla categoría **UTILITY** (o la que aplique), idioma **español**.
 3. **Cuerpo:** en muchas cuentas (ej. Spanish ARG) Meta ya **no** permite `{{1}}` en encabezado/cuerpo. Usá una variable con **nombre en minúsculas y guiones bajos**, solo en el **cuerpo**, por ejemplo: `{{mensaje_pipeline}}` (dejá el **encabezado vacío**). En el CRM configurá `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME=mensaje_pipeline` (sin `{{}}`).
+4. **Sin saltos de línea** en el texto que va en `mensaje_pipeline`: Meta rechaza `#132018` si hay `\n`, `\t` o más de 4 espacios seguidos. El CRM sanitiza automáticamente al enviar plantilla; en `PIPELINE_PREAPROBADO_WHATSAPP_MESSAGE` evitá párrafos en blanco si editás el mensaje.
 5. Plantillas antiguas con solo `{{1}}` en el cuerpo: no hace falta `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME`.
 6. Enviar a revisión y esperar **APROBADA**.
 7. Copiar el **nombre** exacto de la plantilla (ej. `notif_pipeline_crm`) en `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY` o en las variables por tipo.

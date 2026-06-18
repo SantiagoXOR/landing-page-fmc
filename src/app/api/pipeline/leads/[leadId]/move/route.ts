@@ -459,6 +459,7 @@ export async function POST(
         })
       }
     } else if (isRemarketingStageId(normalizedToStageId)) {
+      logger.info('Pipeline move: disparando notify remarketing', { leadId, toStageId: normalizedToStageId })
       const tagRemarketing = await getTagForStage('REMARKETING').catch(() => null)
       try {
         await notifyPipelineRemarketing(

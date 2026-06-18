@@ -310,7 +310,8 @@ export class PipelineService {
         transition_type: transitionType,
         duration_in_stage_days: durationDays,
         notes: notes,
-        changed_by: userId,
+        // Usuarios del CRM viven en "User"; changed_by FK apunta a auth.users — omitir si no hay match
+        changed_by: null,
         changed_at: new Date().toISOString()
       }
 

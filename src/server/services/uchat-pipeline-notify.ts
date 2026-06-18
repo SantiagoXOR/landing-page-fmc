@@ -126,6 +126,13 @@ async function deliverPipelineWhatsApp(
   const lastInbound = await ConversationService.getLastInboundWhatsAppMessageAt(leadId)
   const outsideWindow = isOutsideCustomerCareWindow(lastInbound)
 
+  logger.info(`Pipeline ${kind}: preparando envío WhatsApp`, {
+    leadId,
+    outsideWindow,
+    templateName: templateName || '(vacío)',
+    lastInboundAt: lastInbound?.toISOString() ?? null,
+  })
+
   const sendTemplate = () =>
     WhatsAppService.sendTemplateBodySingleVariable({
       to: phone,
@@ -331,9 +338,20 @@ export async function notifyPipelineRemarketing(
   lead: PipelineNotifyLead,
   options?: { tagApplied?: string; customMessage?: string | null }
 ): Promise<void> {
+  const sendMeta = shouldSendMeta()
+  logger.info('Pipeline remarketing: iniciando notificación', {
+    leadId: lead.id,
+    telefonoPresente: !!(lead.telefono || '').trim(),
+    sendMeta,
+    skipMetaEnv: process.env.PIPELINE_NOTIFY_SKIP_META || '(no definido)',
+  })
+
   const phone = phoneForPayload(lead)
   if (!phone) {
-    logger.warn('Pipeline remarketing: lead sin teléfono válido, omitiendo notificación', { leadId: lead.id })
+    logger.warn('Pipeline remarketing: lead sin teléfono válido, omitiendo notificación', {
+      leadId: lead.id,
+      telefonoRaw: (lead.telefono || '').slice(0, 20),
+    })
     return
   }
 
@@ -377,8 +395,12 @@ export async function notifyPipelineRemarketing(
     }
   }
 
-  if (shouldSendMeta()) {
+  if (sendMeta) {
     await deliverPipelineWhatsApp(lead.id, phone, message, 'remarketing')
+  } else {
+    logger.warn('Pipeline remarketing: WhatsApp omitido (PIPELINE_NOTIFY_SKIP_META=true)', {
+      leadId: lead.id,
+    })
   }
 }
 

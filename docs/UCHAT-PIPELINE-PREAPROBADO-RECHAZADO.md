@@ -20,7 +20,7 @@ Cuando movés una tarjeta a **Preaprobado** o **Rechazado** en el pipeline de ve
 | `WHATSAPP_TEMPLATE_RECHAZADO` | (Opcional) Plantilla solo para rechazado (`{{1}}`). |
 | `WHATSAPP_TEMPLATE_PIPELINE_LANG` | Código de idioma de la plantilla (ej. `es`, `es_AR`). Por defecto `es`. |
 | `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME` | Nombre de la variable del cuerpo sin `{{}}` (ej. `mensaje_pipeline`) cuando Meta no usa `{{1}}`. |
-| `WHATSAPP_TEMPLATE_HEADER_MEDIA_URL` | (Opcional) URL HTTPS pública de imagen si la plantilla tiene **header de imagen variable**. No definir si el header es fijo en Meta. |
+| `WHATSAPP_TEMPLATE_HEADER_MEDIA_URL` | URL HTTPS pública de imagen para plantillas con **header de imagen variable** (ej. `notif_pipeline_crm`). Si no se define, el CRM usa `https://www.formosafmc.com.ar/landing/seo/og-image-1.png`. |
 
 ### Después de 24 horas (Meta)
 

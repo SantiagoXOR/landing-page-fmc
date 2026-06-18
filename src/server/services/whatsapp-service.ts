@@ -230,8 +230,22 @@ export class WhatsAppService {
   }
 
   /**
+   * URL HTTPS pública para header de imagen variable en plantillas Meta (notif_pipeline_crm, etc.).
+   * Orden: argumento → WHATSAPP_TEMPLATE_HEADER_MEDIA_URL → og-image del sitio FMC.
+   */
+  private static resolveTemplateHeaderUrl(explicit?: string): string {
+    const direct = (explicit || process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL || '').trim()
+    if (direct) return direct
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.formosafmc.com.ar').replace(
+      /\/$/,
+      ''
+    )
+    return `${site}/landing/seo/og-image-1.png`
+  }
+
+  /**
    * Plantilla con una variable en el cuerpo: {{1}} (posicional) o {{nombre_snake}} (Meta named params).
-   * Ante error #132012 prueba variantes (nominal/posicional, idioma, header opcional).
+   * notif_pipeline_crm exige header IMAGE variable + parameter_name (ej. mensaje_pipeline).
    */
   static async sendTemplateBodySingleVariable(data: {
     to: string
@@ -240,8 +254,10 @@ export class WhatsAppService {
     bodyText: string
     /** Sin env: usa WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME o solo texto ({{1}}) */
     bodyParameterName?: string
-    /** URL HTTPS pública para plantillas con header de imagen variable */
+    /** URL HTTPS pública para header de imagen variable */
     headerImageLink?: string
+    /** true = no enviar componente header (plantillas con header fijo en Meta) */
+    skipHeader?: boolean
   }): Promise<{ success: true; messageId?: string }> {
     if (!this.whatsappClient) {
       throw new Error('WhatsApp Business API not configured')
@@ -253,8 +269,7 @@ export class WhatsAppService {
     const text = (data.bodyText || '').slice(0, 1024)
     const paramName =
       (data.bodyParameterName || process.env.WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME || '').trim()
-    const explicitHeader = (data.headerImageLink || '').trim()
-    const envHeader = (process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL || '').trim()
+    const headerUrl = data.skipHeader ? '' : this.resolveTemplateHeaderUrl(data.headerImageLink)
     const lang =
       (data.languageCode || process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es_AR').trim()
 
@@ -262,14 +277,13 @@ export class WhatsAppService {
 
     const buildComponents = (opts: {
       useNamed: boolean
-      headerLink?: string
+      withHeader: boolean
     }): TemplateComponent[] => {
       const components: TemplateComponent[] = []
-      const headerLink = (opts.headerLink || '').trim()
-      if (headerLink) {
+      if (opts.withHeader && headerUrl) {
         components.push({
           type: 'header',
-          parameters: [{ type: 'image', image: { link: headerLink } }],
+          parameters: [{ type: 'image', image: { link: headerUrl } }],
         })
       }
       const param: { type: string; text: string; parameter_name?: string } = {
@@ -286,37 +300,29 @@ export class WhatsAppService {
     type Attempt = { label: string; languageCode: string; components: TemplateComponent[] }
     const attempts: Attempt[] = []
     const langs = lang === 'es_AR' ? ['es_AR', 'es'] : [lang, 'es_AR']
+    const headerVariants = headerUrl ? [true, false] : [false]
 
     for (const languageCode of langs) {
-      if (paramName) {
-        attempts.push({
-          label: `named/${languageCode}/no-header`,
-          languageCode,
-          components: buildComponents({ useNamed: true }),
-        })
-      }
-      attempts.push({
-        label: `positional/${languageCode}/no-header`,
-        languageCode,
-        components: buildComponents({ useNamed: false }),
-      })
-    }
-
-    if (explicitHeader || envHeader) {
-      const headerLink = explicitHeader || envHeader
-      for (const languageCode of langs) {
+      for (const withHeader of headerVariants) {
         if (paramName) {
           attempts.push({
-            label: `named/${languageCode}/header`,
+            label: `named/${languageCode}/${withHeader ? 'header' : 'no-header'}`,
             languageCode,
-            components: buildComponents({ useNamed: true, headerLink }),
+            components: buildComponents({ useNamed: true, withHeader }),
+          })
+        } else if (!withHeader) {
+          attempts.push({
+            label: `positional/${languageCode}/no-header`,
+            languageCode,
+            components: buildComponents({ useNamed: false, withHeader: false }),
+          })
+        } else {
+          attempts.push({
+            label: `positional/${languageCode}/header`,
+            languageCode,
+            components: buildComponents({ useNamed: false, withHeader: true }),
           })
         }
-        attempts.push({
-          label: `positional/${languageCode}/header`,
-          languageCode,
-          components: buildComponents({ useNamed: false, headerLink }),
-        })
       }
     }
 
@@ -330,6 +336,7 @@ export class WhatsAppService {
         languageCode: attempt.languageCode,
         bodyParamName: attempt.label.startsWith('named') ? paramName : '(posicional {{1}})',
         hasHeaderImage: hasHeader,
+        headerUrl: hasHeader ? headerUrl.substring(0, 48) + '…' : undefined,
         bodyLength: text.length,
       })
 
@@ -353,13 +360,14 @@ export class WhatsAppService {
         lastError = err
         if (
           err instanceof WhatsAppAPIError &&
-          err.isTemplateParamFormatError() &&
+          err.isTemplatePayloadRetryable() &&
           i < attempts.length - 1
         ) {
-          logger.warn('WhatsApp template #132012, probando otra variante', {
+          logger.warn('WhatsApp template: probando otra variante', {
             template: data.templateName,
             failedAttempt: attempt.label,
             metaDetails: err.getMetaErrorDetails(),
+            code: err.errorData.error.code,
           })
           continue
         }

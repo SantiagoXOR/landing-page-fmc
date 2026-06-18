@@ -336,6 +336,18 @@ export class WhatsAppAPIError extends Error {
     return this.errorData.error.code === 132012;
   }
 
+  /** Errores de plantilla donde conviene probar otra variante de payload */
+  isTemplatePayloadRetryable(): boolean {
+    if (this.isTemplateParamFormatError()) return true;
+    if (this.errorData.error.code !== 100) return false;
+    const details = (this.getMetaErrorDetails() || '').toLowerCase();
+    return (
+      details.includes('parameter name') ||
+      details.includes('format mismatch') ||
+      details.includes('expected image')
+    );
+  }
+
   /** Detalle de Meta (ej. "header: expected IMAGE, received UNKNOWN") */
   getMetaErrorDetails(): string | undefined {
     return this.errorData.error.error_data?.details;

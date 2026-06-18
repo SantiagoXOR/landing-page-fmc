@@ -64,11 +64,15 @@ export interface PipelineNotifyLead {
   manychatId?: string | null
 }
 
+function stripEmojiFromName(name: string): string {
+  // Sin \p{...} (falla en target ES5 de Vercel). Conserva letras latinas con acentos.
+  return name.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/g, '').trim()
+}
+
 function firstName(lead: PipelineNotifyLead): string | undefined {
   const n = (lead.nombre || '').trim().split(/\s+/)[0]
   if (!n) return undefined
-  // Meta puede rechazar emojis en variables de plantilla (ej. "Walter🎼")
-  const clean = n.replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '').trim()
+  const clean = stripEmojiFromName(n)
   return clean || undefined
 }
 

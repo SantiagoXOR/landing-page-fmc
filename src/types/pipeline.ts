@@ -163,6 +163,8 @@ export interface DragDropResult {
   destinationStageId: string
   sourceIndex: number
   destinationIndex: number
+  remarketingTemplateId?: string
+  remarketingMessage?: string
 }
 
 export interface StageTransition {

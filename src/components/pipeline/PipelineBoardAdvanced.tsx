@@ -41,6 +41,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useLongPress } from '@/hooks/useLongPress'
 import { REJECTION_MESSAGES, REJECTION_MESSAGE_OPTIONS } from '@/lib/rejection-messages'
+import { isRemarketingStageId } from '@/lib/remarketing-templates'
+import { RemarketingTemplateModal } from '@/components/pipeline/RemarketingTemplateModal'
 import { formatDate } from '@/lib/utils'
 
 interface PipelineBoardAdvancedProps {
@@ -72,6 +74,8 @@ export function PipelineBoardAdvanced({
   const [filters, setFilters] = useState<PipelineFilters>({})
   const [visibleCountByStage, setVisibleCountByStage] = useState<Record<string, number>>({})
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [pendingRemarketingDrag, setPendingRemarketingDrag] = useState<DragDropResult | null>(null)
+  const [remarketingDragLoading, setRemarketingDragLoading] = useState(false)
 
   /** Chunk size para carga progresiva al hacer scroll en cada columna */
   const CHUNK_SIZE = 40
@@ -122,6 +126,42 @@ export function PipelineBoardAdvanced({
       document.removeEventListener('mouseup', handleGlobalMouseUp)
     }
   }, [])
+
+  // Interceptar drag a Remarketing para elegir plantilla WhatsApp
+  const wrappedOnLeadMove = useCallback(
+    async (result: DragDropResult) => {
+      if (isRemarketingStageId(result.destinationStageId)) {
+        setPendingRemarketingDrag(result)
+        return false
+      }
+      return onLeadMove(result)
+    },
+    [onLeadMove]
+  )
+
+  const completeRemarketingDrag = useCallback(
+    async (templateId: string) => {
+      if (!pendingRemarketingDrag) return
+      setRemarketingDragLoading(true)
+      try {
+        const success = await onLeadMove({
+          ...pendingRemarketingDrag,
+          remarketingTemplateId: templateId,
+        })
+        if (success) {
+          onLeadMoved?.(pendingRemarketingDrag.leadId, pendingRemarketingDrag.destinationStageId)
+        }
+      } finally {
+        setPendingRemarketingDrag(null)
+        setRemarketingDragLoading(false)
+      }
+    },
+    [pendingRemarketingDrag, onLeadMove, onLeadMoved]
+  )
+
+  const pendingRemarketingLead = pendingRemarketingDrag
+    ? leads.find((l) => l.id === pendingRemarketingDrag.leadId)
+    : undefined
 
   // Log para debugging
   console.log('PipelineBoardAdvanced render:', {
@@ -182,7 +222,7 @@ export function PipelineBoardAdvanced({
   } = usePipelineDragDrop({
     stages,
     leads,
-    onLeadMove,
+    onLeadMove: wrappedOnLeadMove,
     onStageTransition: (transition: StageTransition) => {
       console.log('Stage transition:', transition)
       // Aquí se podría enviar a analytics o logging
@@ -633,6 +673,14 @@ export function PipelineBoardAdvanced({
           </div>
         </div>
       )}
+
+      <RemarketingTemplateModal
+        open={!!pendingRemarketingDrag}
+        leadName={pendingRemarketingLead?.nombre}
+        onConfirm={completeRemarketingDrag}
+        onCancel={() => setPendingRemarketingDrag(null)}
+        isLoading={remarketingDragLoading}
+      />
     </div>
   )
 }
@@ -1026,6 +1074,7 @@ const LeadCard = memo(function LeadCard({
   const [loadingTags, setLoadingTags] = useState(false)
   const [copiedField, setCopiedField] = useState<'cuil' | 'telefono' | null>(null)
   const [showRejectionModal, setShowRejectionModal] = useState(false)
+  const [showRemarketingModal, setShowRemarketingModal] = useState(false)
   const [pendingStageId, setPendingStageId] = useState<string | null>(null)
   const [selectedRejectionMessage, setSelectedRejectionMessage] = useState<string | null>(null)
   const [leadOrigin, setLeadOrigin] = useState<string | null>(null)
@@ -1358,14 +1407,17 @@ const LeadCard = memo(function LeadCard({
   // solo activará el drag si hay movimiento de más de 8px, lo que permite que el long press se complete
 
   // Función para mover el lead a una etapa
-  const handleMoveToStage = async (toStageId: string, rejectionMessage?: string) => {
+  const handleMoveToStage = async (
+    toStageId: string,
+    options?: { rejectionMessage?: string; remarketingTemplateId?: string }
+  ) => {
     if (isMoving) {
       console.log('handleMoveToStage: Ya hay un movimiento en proceso', { isMoving })
       return
     }
     
     try {
-      console.log('handleMoveToStage: Iniciando movimiento', { leadId: lead.id, leadName: lead.nombre, fromStageId: lead.stageId, toStageId, rejectionMessage })
+      console.log('handleMoveToStage: Iniciando movimiento', { leadId: lead.id, leadName: lead.nombre, fromStageId: lead.stageId, toStageId, options })
       setIsMoving(true)
       
       // Llamar directamente a la API en lugar de usar onLeadMove (que es para drag & drop)
@@ -1379,7 +1431,8 @@ const LeadCard = memo(function LeadCard({
         body: JSON.stringify({
           fromStageId,
           toStageId,
-          rejectionMessage: rejectionMessage || undefined,
+          rejectionMessage: options?.rejectionMessage || undefined,
+          remarketingTemplateId: options?.remarketingTemplateId || undefined,
         }),
       })
 
@@ -1393,6 +1446,7 @@ const LeadCard = memo(function LeadCard({
       
       setShowDropdown(false)
       setShowRejectionModal(false)
+      setShowRemarketingModal(false)
       setPendingStageId(null)
       setSelectedRejectionMessage(null)
       const stageName = stages.find(s => s.id === toStageId)?.name || toStageId
@@ -1424,6 +1478,10 @@ const LeadCard = memo(function LeadCard({
       // Mostrar modal de selección de mensaje
       setPendingStageId(stageId)
       setShowRejectionModal(true)
+      setShowDropdown(false)
+    } else if (isRemarketingStageId(stageId)) {
+      setPendingStageId(stageId)
+      setShowRemarketingModal(true)
       setShowDropdown(false)
     } else {
       // Mover directamente sin modal
@@ -2154,7 +2212,7 @@ const LeadCard = memo(function LeadCard({
                       const selectedOption = REJECTION_MESSAGE_OPTIONS.find(opt => opt.id === selectedRejectionMessage)
                       const rejectionMsg = selectedOption?.message
                       if (pendingStageId && rejectionMsg) {
-                        handleMoveToStage(pendingStageId, rejectionMsg)
+                        handleMoveToStage(pendingStageId, { rejectionMessage: rejectionMsg })
                       }
                     }}
                     className="w-full"
@@ -2182,6 +2240,21 @@ const LeadCard = memo(function LeadCard({
         </div>,
         document.body
       )}
+
+      <RemarketingTemplateModal
+        open={showRemarketingModal}
+        leadName={lead.nombre}
+        isLoading={isMoving}
+        onConfirm={(templateId) => {
+          if (pendingStageId) {
+            handleMoveToStage(pendingStageId, { remarketingTemplateId: templateId })
+          }
+        }}
+        onCancel={() => {
+          setShowRemarketingModal(false)
+          setPendingStageId(null)
+        }}
+      />
     </>
   )
 })

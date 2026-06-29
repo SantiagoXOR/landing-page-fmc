@@ -16,6 +16,10 @@ import {
   isRechazadoStageId,
   isRemarketingStageId,
 } from '@/server/services/uchat-pipeline-notify'
+import {
+  getRemarketingTemplateProfile,
+  DEFAULT_REMARKETING_TEMPLATE_ID,
+} from '@/lib/remarketing-templates'
 
 // Schema de validación para mover lead
 const MoveLeadSchema = z.object({
@@ -25,6 +29,7 @@ const MoveLeadSchema = z.object({
   reason: z.string().optional(),
   rejectionMessage: z.string().optional(), // Mensaje de rechazo seleccionado para Instagram
   remarketingMessage: z.string().optional(), // Texto personalizado para plantilla de remarketing
+  remarketingTemplateId: z.string().optional(), // Perfil de plantilla (ver src/lib/remarketing-templates.ts)
 })
 
 /**
@@ -87,7 +92,7 @@ export async function POST(
       throw error
     }
 
-    const { fromStageId, toStageId, notes, reason, rejectionMessage, remarketingMessage } = validatedData
+    const { fromStageId, toStageId, notes, reason, rejectionMessage, remarketingMessage, remarketingTemplateId } = validatedData
 
     logger.info('Moving lead', {
       leadId,
@@ -461,6 +466,8 @@ export async function POST(
     } else if (isRemarketingStageId(normalizedToStageId)) {
       logger.info('Pipeline move: disparando notify remarketing', { leadId, toStageId: normalizedToStageId })
       const tagRemarketing = await getTagForStage('REMARKETING').catch(() => null)
+      const resolvedTemplateId =
+        getRemarketingTemplateProfile(remarketingTemplateId)?.id || DEFAULT_REMARKETING_TEMPLATE_ID
       try {
         await notifyPipelineRemarketing(
           {
@@ -472,6 +479,7 @@ export async function POST(
           {
             tagApplied: tagRemarketing || 'remarketing',
             customMessage: remarketingMessage || null,
+            templateId: resolvedTemplateId,
           }
         )
       } catch (e) {

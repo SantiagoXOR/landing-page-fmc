@@ -15,6 +15,13 @@ import { logger } from '@/lib/logger'
 import { WhatsAppService } from '@/server/services/whatsapp-service'
 import { ConversationService } from '@/server/services/conversation-service'
 import { isOutsideCustomerCareWindow } from '@/lib/whatsapp-customer-care-window'
+import {
+  DEFAULT_REMARKETING_TEMPLATE_ID,
+  getRemarketingTemplateProfile,
+  resolveRemarketingBodyParameterName,
+  resolveRemarketingMetaTemplateName,
+  buildRemarketingTemplateBodyValue,
+} from '@/lib/remarketing-templates'
 
 const RETRIES = 3
 const DELAY_MS = 800
@@ -369,15 +376,102 @@ function buildRemarketingMessage(lead: PipelineNotifyLead, customMessage?: strin
   return PIPELINE_REMARKETING_MESSAGE_DEFAULT
 }
 
+async function deliverRemarketingWhatsApp(
+  leadId: string,
+  phone: string,
+  lead: PipelineNotifyLead,
+  fullMessage: string,
+  templateId?: string | null
+): Promise<void> {
+  if (!WhatsAppService.isConfigured()) {
+    logger.warn('Pipeline remarketing: WhatsApp Meta no configurado', { leadId })
+    return
+  }
+
+  const profile =
+    getRemarketingTemplateProfile(templateId) ||
+    getRemarketingTemplateProfile(DEFAULT_REMARKETING_TEMPLATE_ID)
+  if (!profile) {
+    logger.warn('Pipeline remarketing: perfil de plantilla no encontrado', {
+      leadId,
+      templateId,
+    })
+    return
+  }
+
+  const templateName = resolveRemarketingMetaTemplateName(profile)
+  if (!templateName) {
+    logger.warn('Pipeline remarketing: sin nombre de plantilla Meta configurado', {
+      leadId,
+      profileId: profile.id,
+    })
+    return
+  }
+
+  const lang = (process.env.WHATSAPP_TEMPLATE_PIPELINE_LANG || 'es_AR').trim()
+  const contactName = firstName(lead) || 'Cliente'
+  const bodyText = buildRemarketingTemplateBodyValue(profile, contactName, fullMessage)
+  const bodyParameterName = resolveRemarketingBodyParameterName(profile)
+
+  logger.info('Pipeline remarketing: enviando plantilla', {
+    leadId,
+    profileId: profile.id,
+    templateName,
+    bodyMode: profile.bodyMode,
+    bodyParameterName: bodyParameterName || '(posicional {{1}})',
+    skipHeader: !!profile.skipHeader,
+    bodyLength: bodyText.length,
+  })
+
+  try {
+    const result = await WhatsAppService.sendTemplateBodySingleVariable({
+      to: phone,
+      templateName,
+      languageCode: lang,
+      bodyText,
+      bodyParameterName,
+      skipHeader: profile.skipHeader,
+      headerImageLink: profile.headerImageUrl,
+    })
+    await WhatsAppService.persistOutboundToLeadConversation({
+      leadId,
+      phone,
+      content: fullMessage,
+      messageType: 'template',
+      platformMsgId: result.messageId,
+      isFromBot: true,
+    })
+    logger.info('WhatsApp remarketing enviado por plantilla', {
+      leadId,
+      profileId: profile.id,
+      templateName,
+      messageId: result.messageId,
+    })
+  } catch (err) {
+    logger.error('Error enviando WhatsApp remarketing', {
+      leadId,
+      profileId: profile.id,
+      templateName,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+}
+
 export async function notifyPipelineRemarketing(
   lead: PipelineNotifyLead,
-  options?: { tagApplied?: string; customMessage?: string | null }
+  options?: {
+    tagApplied?: string
+    customMessage?: string | null
+    templateId?: string | null
+  }
 ): Promise<void> {
   const sendMeta = shouldSendMeta()
   logger.info('Pipeline remarketing: iniciando notificación', {
     leadId: lead.id,
     telefonoPresente: !!(lead.telefono || '').trim(),
     sendMeta,
+    templateId: options?.templateId || DEFAULT_REMARKETING_TEMPLATE_ID,
     skipMetaEnv: process.env.PIPELINE_NOTIFY_SKIP_META || '(no definido)',
   })
 
@@ -403,6 +497,7 @@ export async function notifyPipelineRemarketing(
     event: 'pipeline_remarketing',
     tag_to_apply: options?.tagApplied || 'remarketing',
     message,
+    remarketing_template_id: options?.templateId || DEFAULT_REMARKETING_TEMPLATE_ID,
     ...(uchatSubscriberId && { uchat_subscriber_id: uchatSubscriberId }),
   }
 
@@ -431,7 +526,13 @@ export async function notifyPipelineRemarketing(
   }
 
   if (sendMeta) {
-    await deliverPipelineWhatsApp(lead.id, phone, message, 'remarketing')
+    await deliverRemarketingWhatsApp(
+      lead.id,
+      phone,
+      lead,
+      message,
+      options?.templateId
+    )
   } else {
     logger.warn('Pipeline remarketing: WhatsApp omitido (PIPELINE_NOTIFY_SKIP_META=true)', {
       leadId: lead.id,

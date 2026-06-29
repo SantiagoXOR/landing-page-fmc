@@ -108,7 +108,9 @@ export class PipelineService {
       body: JSON.stringify({
         fromStageId: result.sourceStageId,
         toStageId: result.destinationStageId,
-        notes: ''
+        notes: '',
+        remarketingTemplateId: result.remarketingTemplateId,
+        remarketingMessage: result.remarketingMessage,
       })
     })
 

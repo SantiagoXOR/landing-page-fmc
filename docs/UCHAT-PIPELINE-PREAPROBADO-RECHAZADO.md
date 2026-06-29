@@ -97,17 +97,40 @@ Con plantillas configuradas, el CRM envía **plantilla** fuera de las 24 h. Sin 
 Al mover una tarjeta a la columna **Remarketing** (`remarketing`):
 
 1. Se aplica el tag `remarketing` al lead.
-2. Se envía **siempre** WhatsApp por Meta con plantilla `notif_pipeline_crm` (o `WHATSAPP_TEMPLATE_REMARKETING`), con el texto de reengagement en `mensaje_pipeline`.
-3. Opcional: `UCHAT_INBOUND_WEBHOOK_REMARKETING_URL` para disparar flujo en Uchat.
+2. El CRM muestra un **modal para elegir plantilla WhatsApp** (arrastre o menú de etapas).
+3. Se envía **siempre** WhatsApp por Meta con la plantilla elegida.
 
 Preaprobado y rechazado siguen usando plantilla solo **fuera** de la ventana de 24 h; dentro de ventana, texto libre.
 
+### Plantillas disponibles
+
+Definidas en `src/lib/remarketing-templates.ts` (agregar nuevas entradas al crear plantillas en Meta):
+
+| ID (UI/API) | Uso | Variable que envía el CRM |
+|---|---|---|
+| `seguimiento_credito` | Plantilla actual (`notif_pipeline_crm`) | Texto completo en `mensaje_pipeline` / `{{1}}` |
+| `credito_autos_referidos` | Campaña 4 ruedas / referidos | Solo el **nombre** en `nombre_contacto` (copy fijo en Meta) |
+
+Al mover desde el pipeline, enviar en el body del POST:
+
+```json
+{
+  "fromStageId": "...",
+  "toStageId": "remarketing",
+  "remarketingTemplateId": "credito_autos_referidos"
+}
+```
+
 | Variable | Descripción |
 |----------|-------------|
-| `PIPELINE_REMARKETING_WHATSAPP_MESSAGE` | Texto por defecto en la plantilla (si no se personaliza por API). |
-| `WHATSAPP_TEMPLATE_REMARKETING` | Plantilla Meta solo para remarketing; si vacía, usa `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY`. |
+| `PIPELINE_REMARKETING_WHATSAPP_MESSAGE` | Texto por defecto para plantilla `seguimiento_credito` (modo mensaje completo). |
+| `WHATSAPP_TEMPLATE_REMARKETING` | Nombre Meta para `seguimiento_credito`; si vacía, usa `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY`. |
+| `WHATSAPP_TEMPLATE_REMARKETING_AUTOS` | Nombre Meta para `credito_autos_referidos` (default: `credito_autos_referidos`). |
+| `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME` | Variable del cuerpo para seguimiento (ej. `mensaje_pipeline`). |
 | `UCHAT_INBOUND_WEBHOOK_REMARKETING_URL` | Webhook Uchat al entrar en Remarketing. |
 
-Mensaje por defecto (personaliza con el nombre del lead): *"Hola {nombre}, seguimos disponibles para ayudarte con tu crédito prendario. ¿Querés que retomemos tu consulta?"*
+Mensaje por defecto seguimiento: *"Hola {nombre}, seguimos disponibles para ayudarte con tu crédito prendario. ¿Querés que retomemos tu consulta?"*
+
+**Nueva plantilla autos en Meta:** categoría Marketing, header imagen fija, cuerpo con `{{nombre_contacto}}` al inicio y copy fijo, botón a formosafmc.com.ar. Luego configurar `WHATSAPP_TEMPLATE_REMARKETING_AUTOS=credito_autos_referidos` (o el nombre exacto aprobado).
 
 Migración BD: `scripts/migrations/003_add_remarketing_pipeline_stage.sql` + `004_add_remarketing_stage_tag.sql`.

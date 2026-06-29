@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brief — Plantillas WhatsApp · Formosa Moto Crédito</title>
+  <style>
+    :root {
+      --wa-green: #25d366;
+      --wa-dark: #075e54;
+      --wa-light: #dcf8c6;
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --text: #111b21;
+      --muted: #667781;
+      --border: #e9edef;
+      --accent: #128c7e;
+      --warn-bg: #fff8e6;
+      --warn-border: #f0c040;
+      --ok-bg: #e8f8ef;
+      --ok-border: #25d366;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--wa-dark) 0%, var(--accent) 100%);
+      color: #fff;
+      padding: 3rem 1.5rem 2.5rem;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero p {
+      opacity: 0.9;
+      max-width: 640px;
+      margin: 0 auto;
+      font-size: 1.05rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 999px;
+      padding: 0.25rem 0.85rem;
+      font-size: 0.8rem;
+      margin-bottom: 1rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    section {
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      color: var(--wa-dark);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--wa-light);
+    }
+
+    h3 {
+      font-size: 1rem;
+      color: var(--accent);
+      margin: 1.25rem 0 0.5rem;
+    }
+
+    p { margin-bottom: 0.75rem; color: #3b4a54; }
+
+    ul, ol { margin: 0.5rem 0 0.75rem 1.25rem; color: #3b4a54; }
+    li { margin-bottom: 0.35rem; }
+
+    .analogy {
+      background: var(--ok-bg);
+      border: 1px solid var(--ok-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-top: 0.75rem;
+      font-size: 0.95rem;
+    }
+
+    .warn {
+      background: var(--warn-bg);
+      border-left: 4px solid var(--warn-border);
+      padding: 0.85rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin: 0.75rem 0;
+      font-size: 0.95rem;
+    }
+
+    /* Mockup WhatsApp */
+    .phone-mock {
+      max-width: 340px;
+      margin: 1.5rem auto;
+      background: #e5ddd5;
+      border-radius: 20px;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .bubble {
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .bubble-header {
+      background: linear-gradient(135deg, #1a5276, #2980b9);
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.75rem;
+      text-align: center;
+      padding: 1rem;
+      position: relative;
+    }
+
+    .bubble-header span {
+      background: rgba(255,255,255,0.15);
+      padding: 0.35rem 0.6rem;
+      border-radius: 4px;
+    }
+
+    .label-tag {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: var(--wa-green);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .bubble-body {
+      padding: 0.75rem 0.85rem 0.5rem;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .bubble-footer-text {
+      padding: 0 0.85rem 0.5rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .bubble-btn {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 0.65rem;
+      color: #027eb5;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .bubble-time {
+      text-align: right;
+      padding: 0 0.85rem 0.5rem;
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+
+    .block-labels {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      font-size: 0.82rem;
+    }
+
+    .block-labels div {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 0.75rem 0;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f7f8fa;
+      font-weight: 600;
+      color: var(--wa-dark);
+    }
+
+    tr:nth-child(even) td { background: #fafbfc; }
+
+    .yes { color: #128c7e; font-weight: 700; }
+    .no { color: #e74c3c; font-weight: 700; }
+    .maybe { color: #e67e22; font-weight: 700; }
+
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .spec-card {
+      background: #f7f8fa;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .spec-card strong {
+      display: block;
+      color: var(--wa-dark);
+      margin-bottom: 0.35rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .spec-card span {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+    }
+
+    .checklist li {
+      padding: 0.45rem 0 0.45rem 1.75rem;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .checklist li:last-child { border-bottom: none; }
+
+    .checklist li::before {
+      content: "☐";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 1.1rem;
+    }
+
+    .example-box {
+      background: #f7f8fa;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+    }
+
+    .example-box.good { border-left: 4px solid var(--wa-green); }
+    .example-box.bad { border-left: 4px solid #e74c3c; }
+
+    .example-box em {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-style: normal;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    @media print {
+      body { background: #fff; }
+      section { box-shadow: none; break-inside: avoid; }
+      .hero { background: var(--wa-dark); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="hero">
+    <div class="badge">Brief diseño &amp; marketing</div>
+    <h1>Plantillas de WhatsApp Business</h1>
+    <p>Guía visual para diseñadores y equipos de marketing — Formosa Moto Crédito / Banco Formosa</p>
+  </header>
+
+  <main class="container">
+
+    <!-- INTRO -->
+    <section>
+      <h2>¿Qué es una plantilla?</h2>
+      <p>Una plantilla es un <strong>mensaje preaprobado por Meta (WhatsApp)</strong>, como un mailing o un email transaccional. Una vez aprobada, podés usarla muchas veces cambiando solo algunas partes: nombre del cliente, texto del mensaje y, a veces, la imagen.</p>
+      <div class="analogy">
+        <strong>Analogía:</strong> es como un template de Klaviyo o Mailchimp — el diseño y la estructura los aprueba la plataforma; vos cambiás el contenido variable en cada envío.
+      </div>
+    </section>
+
+    <!-- CUANDO -->
+    <section>
+      <h2>¿Cuándo hay que usarla?</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Situación</th>
+            <th>¿Qué podés enviar?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>El cliente escribió en las <strong>últimas 24 h</strong></td>
+            <td>Mensaje normal de chat (texto libre)</td>
+          </tr>
+          <tr>
+            <td>Pasaron <strong>más de 24 h</strong> sin respuesta del cliente</td>
+            <td>Solo plantilla aprobada</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Por eso los mensajes de <strong>seguimiento, preaprobado, rechazo y remarketing</strong> suelen ir por plantilla.</p>
+    </section>
+
+    <!-- ESTRUCTURA -->
+    <section>
+      <h2>Anatomía del mensaje</h2>
+      <p>Cada plantilla se compone de bloques. Solo el cuerpo de texto es obligatorio; el resto es opcional.</p>
+
+      <div class="phone-mock">
+        <div class="bubble">
+          <div class="bubble-header">
+            <span class="label-tag">Encabezado</span>
+            <span>BANNER PROMOCIONAL<br>1200 × 628 px · JPG o PNG</span>
+          </div>
+          <div class="bubble-body">
+            <strong>Hola Santiago,</strong><br><br>
+            Actualización sobre su solicitud:<br>
+            seguimos disponibles para ayudarte con tu crédito prendario. ¿Querés que retomemos tu consulta?<br><br>
+            — Equipo Formosa Moto Crédito
+          </div>
+          <div class="bubble-footer-text">— Pie de mensaje (opcional, 60 caracteres máx.) —</div>
+          <div class="bubble-btn">🔗 CONCESIONARIAS</div>
+          <div class="bubble-time">1:11 p.m.</div>
+        </div>
+      </div>
+
+      <div class="block-labels">
+        <div><span class="dot" style="background:#2980b9"></span> <strong>Encabezado</strong> — imagen, video o texto (banner visual)</div>
+        <div><span class="dot" style="background:#25d366"></span> <strong>Cuerpo</strong> — mensaje principal + personalización</div>
+        <div><span class="dot" style="background:#95a5a6"></span> <strong>Pie</strong> — texto legal o aclaración (opcional)</div>
+        <div><span class="dot" style="background:#027eb5"></span> <strong>Botón</strong> — CTA: link, respuesta rápida o llamada</div>
+      </div>
+    </section>
+
+    <!-- IMAGEN -->
+    <section>
+      <h2>1. Encabezado — Banner (imagen)</h2>
+      <p>Es la pieza visual principal, equivalente al hero de un email o la imagen de un post patrocinado.</p>
+
+      <div class="spec-grid">
+        <div class="spec-card"><strong>Formatos</strong><span>JPG / PNG</span></div>
+        <div class="spec-card"><strong>Tamaño máximo</strong><span>5 MB</span></div>
+        <div class="spec-card"><strong>Proporción</strong><span>1.91 : 1 (horizontal)</span></div>
+        <div class="spec-card"><strong>Medidas ideales</strong><span>1200 × 628 px</span></div>
+        <div class="spec-card"><strong>Alternativa</strong><span>800 × 418 px</span></div>
+      </div>
+
+      <h3>Tips de diseño</h3>
+      <ul>
+        <li>Diseñá como <strong>banner horizontal</strong>, no como cuadrado de Instagram.</li>
+        <li>Dejá margen en los bordes — WhatsApp puede recortar un poco.</li>
+        <li>Texto grande y legible: en el celular se ve chico.</li>
+        <li>Poco texto sobre la imagen; el mensaje principal va en el cuerpo.</li>
+        <li>Exportá optimizado (idealmente &lt; 500 KB para carga rápida).</li>
+      </ul>
+
+      <div class="warn">
+        <strong>Importante:</strong> la imagen debe estar en un link público (HTTPS). No sirve subir el archivo local del diseñador directamente al envío — se sube a un servidor web o se configura en Meta al crear la plantilla.
+      </div>
+    </section>
+
+    <!-- COPY -->
+    <section>
+      <h2>2. Cuerpo — Texto del mensaje</h2>
+
+      <div class="spec-grid">
+        <div class="spec-card"><strong>Largo máximo</strong><span>1.024 caracteres</span></div>
+        <div class="spec-card"><strong>Equivale a</strong><span>~150–180 palabras</span></div>
+        <div class="spec-card"><strong>Personalización</strong><span>Nombre, mensaje custom</span></div>
+      </div>
+
+      <h3>Reglas de copywriting</h3>
+      <ul>
+        <li>Escribir en <strong>una sola línea continua</strong> en la parte variable (sin Enter / saltos de línea).</li>
+        <li><strong>No incluir links</strong> en el texto si ya hay botón — el link va en el botón.</li>
+        <li>Un solo objetivo claro por mensaje.</li>
+        <li>Tono directo y conversacional (es WhatsApp, no un email formal).</li>
+      </ul>
+
+      <div class="example-box good">
+        <em>✓ Ejemplo correcto</em>
+        Hola Santiago, seguimos disponibles para ayudarte con tu crédito prendario. ¿Querés que retomemos tu consulta? — Equipo Formosa Moto Crédito
+      </div>
+
+      <div class="example-box bad">
+        <em>✗ Ejemplo que puede fallar</em>
+        Hola Santiago,<br><br>Seguimos disponibles...<br><br>https://www.bancoformosa.com.ar/...
+      </div>
+    </section>
+
+    <!-- FOOTER Y BOTONES -->
+    <section>
+      <h2>3. Pie de mensaje (opcional)</h2>
+      <p>Texto pequeño debajo del cuerpo. Máximo <strong>60 caracteres</strong>. No se personaliza en cada envío.</p>
+      <p>Ejemplo: <em>"Respondé STOP para dejar de recibir mensajes."</em></p>
+
+      <h2 style="margin-top:1.5rem">4. Botones (CTA)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Para qué sirve</th>
+            <th>Límite texto</th>
+            <th>Cantidad máx.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Visitar sitio web</strong></td>
+            <td>Mandar tráfico a landing (ej. CONCESIONARIAS)</td>
+            <td>25 caracteres</td>
+            <td>2 botones</td>
+          </tr>
+          <tr>
+            <td><strong>Respuesta rápida</strong></td>
+            <td>Que el usuario toque y responda algo predefinido</td>
+            <td>25 caracteres</td>
+            <td>10 botones</td>
+          </tr>
+          <tr>
+            <td><strong>Llamar</strong></td>
+            <td>Disparar una llamada telefónica</td>
+            <td>25 caracteres</td>
+            <td>1 botón</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="warn">
+        El texto y la URL del botón se definen <strong>al crear la plantilla en Meta</strong>. No se cambian en cada envío (salvo plantillas avanzadas con URL dinámica).
+      </div>
+    </section>
+
+    <!-- QUE CAMBIA -->
+    <section>
+      <h2>¿Qué se puede cambiar sin tocar Meta?</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Elemento</th>
+            <th>¿Cambia en cada envío?</th>
+            <th>¿Requiere re-aprobación en Meta?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Nombre del cliente ("Hola Santiago")</td>
+            <td class="yes">Sí</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <td>Texto del mensaje (preaprobado, remarketing…)</td>
+            <td class="yes">Sí</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <td>Imagen del banner</td>
+            <td class="maybe">A veces</td>
+            <td class="no">No (si la plantilla permite imagen variable)</td>
+          </tr>
+          <tr>
+            <td>Botón CONCESIONARIAS (texto + link)</td>
+            <td class="no">No</td>
+            <td class="yes">Sí</td>
+          </tr>
+          <tr>
+            <td>Pie legal / footer</td>
+            <td class="no">No</td>
+            <td class="yes">Sí</td>
+          </tr>
+          <tr>
+            <td>Estructura (con/sin imagen, con/sin botón)</td>
+            <td class="no">No</td>
+            <td class="yes">Sí</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Cualquier cambio de estructura, botón o diseño base tarda <strong>24–48 h</strong> en re-aprobarse por Meta.</p>
+    </section>
+
+    <!-- CATEGORIAS -->
+    <section>
+      <h2>Categorías de plantilla (Meta)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Categoría</th>
+            <th>Cuándo usarla</th>
+            <th>Ejemplo nuestro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Utilidad</strong></td>
+            <td>Actualizaciones de trámite, seguimiento, confirmaciones</td>
+            <td>"Seguimos disponibles para ayudarte con tu crédito"</td>
+          </tr>
+          <tr>
+            <td><strong>Marketing</strong></td>
+            <td>Promos, ofertas, remarketing</td>
+            <td>Campañas promocionales estacionales</td>
+          </tr>
+          <tr>
+            <td><strong>Autenticación</strong></td>
+            <td>Códigos de verificación (OTP)</td>
+            <td>No aplica a nuestro caso</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CHECKLIST -->
+    <section>
+      <h2>Checklist para entregar al diseñador</h2>
+
+      <h3>Diseño — Banner</h3>
+      <ul class="checklist">
+        <li>Proporción horizontal 1.91:1 (1200 × 628 px o 800 × 418 px)</li>
+        <li>Formato JPG o PNG, peso &lt; 5 MB (ideal &lt; 500 KB)</li>
+        <li>Logo + mensaje clave visible en pantalla de celular</li>
+        <li>Poco texto sobre la imagen; contenido importante centrado</li>
+        <li>Márgenes seguros en los 4 lados (evitar recorte)</li>
+      </ul>
+
+      <h3>Copy — Cuerpo del mensaje</h3>
+      <ul class="checklist">
+        <li>Menos de 1.024 caracteres</li>
+        <li>Una sola línea continua (sin saltos de línea en la variable)</li>
+        <li>Saludo personalizado con nombre del cliente</li>
+        <li>Un solo objetivo / CTA claro</li>
+        <li>Sin links sueltos en el texto (usar botón)</li>
+        <li>Firma de marca al final</li>
+      </ul>
+
+      <h3>Botón CTA</h3>
+      <ul class="checklist">
+        <li>Texto del botón ≤ 25 caracteres (ej. "CONCESIONARIAS")</li>
+        <li>URL final definida y probada en mobile</li>
+        <li>Coherencia entre mensaje y destino del botón</li>
+      </ul>
+    </section>
+
+    <!-- ENTREGABLES -->
+    <section>
+      <h2>Entregables para Meta Business Manager</h2>
+      <ol>
+        <li><strong>Banner</strong> — archivo JPG/PNG 1200×628 px + link HTTPS donde estará alojado.</li>
+        <li><strong>Texto fijo del cuerpo</strong> — con marcador de variable, ej: <code>Hola {{nombre_cliente}}, {{mensaje_pipeline}}</code> o el formato que Meta indique en la cuenta.</li>
+        <li><strong>Texto de ejemplo</strong> — para que Meta apruebe (con datos ficticios).</li>
+        <li><strong>Botón</strong> — label + URL destino.</li>
+        <li><strong>Pie</strong> (opcional) — aviso legal o de baja.</li>
+        <li><strong>Categoría</strong> — Utilidad o Marketing según el objetivo.</li>
+        <li><strong>Idioma</strong> — Español (Argentina) / es_AR.</li>
+      </ol>
+    </section>
+
+  </main>
+
+  <footer>
+    Formosa Moto Crédito · Brief interno — Plantillas WhatsApp Business API<br>
+    Documento generado para equipos de diseño y marketing · CRM Phorencial
+  </footer>
+
+</body>
+</html>

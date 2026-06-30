@@ -343,6 +343,7 @@ export class WhatsAppAPIError extends Error {
 
   /** Errores de plantilla donde conviene probar otra variante de payload */
   isTemplatePayloadRetryable(): boolean {
+    if (this.isTemplateNotFoundError()) return false;
     if (this.isTemplateParamFormatError()) return true;
     if (this.isTemplateParamContentError()) return true;
     if (this.errorData.error.code !== 100) return false;

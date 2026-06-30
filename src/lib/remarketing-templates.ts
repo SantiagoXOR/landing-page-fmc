@@ -19,10 +19,12 @@ export interface RemarketingTemplateProfile {
   bodyMode: RemarketingBodyMode
   /** Variable del cuerpo en Meta (ej. mensaje_pipeline, nombre_contacto) */
   bodyParameterName?: string
-  /** true = imagen fija en Meta, no enviar header por API */
+  /** true = plantilla sin header de imagen en Meta */
   skipHeader?: boolean
-  /** URL opcional de header variable (solo si skipHeader es false) */
+  /** URL fija de header (prioridad sobre env) */
   headerImageUrl?: string
+  /** Env vars con URL HTTPS del banner (header variable en Meta) */
+  headerImageUrlEnvKeys?: string[]
 }
 
 export const DEFAULT_REMARKETING_TEMPLATE_ID = 'seguimiento_credito'
@@ -50,7 +52,8 @@ export const REMARKETING_TEMPLATE_PROFILES: RemarketingTemplateProfile[] = [
     metaTemplateNameEnvKeys: ['WHATSAPP_TEMPLATE_REMARKETING_AUTOS'],
     bodyMode: 'name_only',
     bodyParameterName: 'nombre_contacto',
-    skipHeader: true,
+    skipHeader: false,
+    headerImageUrlEnvKeys: ['WHATSAPP_TEMPLATE_REMARKETING_AUTOS_HEADER_URL'],
   },
 ]
 
@@ -118,4 +121,23 @@ export function buildRemarketingTemplateBodyValue(
 export function formatRemarketingPreview(preview: string, firstName?: string | null): string {
   const name = (firstName || '').trim() || 'Cliente'
   return preview.replace(/\{nombre\}/g, name)
+}
+
+/** URL pública del banner para plantillas con header IMAGE variable en Meta */
+export function resolveRemarketingHeaderUrl(profile: RemarketingTemplateProfile): string {
+  if (profile.skipHeader) return ''
+
+  const direct = (profile.headerImageUrl || '').trim()
+  if (direct) return direct
+
+  for (const key of profile.headerImageUrlEnvKeys || []) {
+    const value = (process.env[key] || '').trim()
+    if (value) return value
+  }
+
+  const generic = (process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL || '').trim()
+  if (generic) return generic
+
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.formosafmc.com.ar').replace(/\/$/, '')
+  return `${site}/landing/seo/og-image-1.png`
 }

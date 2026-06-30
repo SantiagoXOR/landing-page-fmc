@@ -4,6 +4,7 @@ import {
   getRemarketingTemplateProfile,
   resolveRemarketingMetaTemplateName,
   resolveRemarketingBodyParameterName,
+  resolveRemarketingHeaderUrl,
   isRemarketingStageId,
   DEFAULT_REMARKETING_TEMPLATE_ID,
 } from '@/lib/remarketing-templates'
@@ -56,5 +57,15 @@ describe('remarketing-templates', () => {
     process.env.WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME = 'mensaje_pipeline'
     const profile = getRemarketingTemplateProfile('seguimiento_credito')!
     expect(resolveRemarketingBodyParameterName(profile)).toBe('mensaje_pipeline')
+  })
+
+  it('autos resuelve URL de header desde env', () => {
+    process.env.WHATSAPP_TEMPLATE_REMARKETING_AUTOS_HEADER_URL =
+      'https://www.formosafmc.com.ar/banners/autos-referidos.jpg'
+    const profile = getRemarketingTemplateProfile('credito_autos_referidos')!
+    expect(resolveRemarketingHeaderUrl(profile)).toBe(
+      'https://www.formosafmc.com.ar/banners/autos-referidos.jpg'
+    )
+    expect(profile.skipHeader).toBe(false)
   })
 })

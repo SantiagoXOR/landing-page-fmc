@@ -21,6 +21,7 @@ import {
   resolveRemarketingBodyParameterName,
   resolveRemarketingMetaTemplateName,
   buildRemarketingTemplateBodyValue,
+  resolveRemarketingHeaderUrl,
 } from '@/lib/remarketing-templates'
 
 const RETRIES = 3
@@ -412,6 +413,8 @@ async function deliverRemarketingWhatsApp(
   const contactName = firstName(lead) || 'Cliente'
   const bodyText = buildRemarketingTemplateBodyValue(profile, contactName, fullMessage)
   const bodyParameterName = resolveRemarketingBodyParameterName(profile)
+  const headerImageLink = resolveRemarketingHeaderUrl(profile)
+  const skipHeader = profile.skipHeader || !headerImageLink
 
   logger.info('Pipeline remarketing: enviando plantilla', {
     leadId,
@@ -419,7 +422,8 @@ async function deliverRemarketingWhatsApp(
     templateName,
     bodyMode: profile.bodyMode,
     bodyParameterName: bodyParameterName || '(posicional {{1}})',
-    skipHeader: !!profile.skipHeader,
+    skipHeader,
+    hasHeaderImage: !skipHeader,
     bodyLength: bodyText.length,
   })
 
@@ -430,8 +434,8 @@ async function deliverRemarketingWhatsApp(
       languageCode: lang,
       bodyText,
       bodyParameterName,
-      skipHeader: profile.skipHeader,
-      headerImageLink: profile.headerImageUrl,
+      skipHeader,
+      headerImageLink: skipHeader ? undefined : headerImageLink,
     })
     await WhatsAppService.persistOutboundToLeadConversation({
       leadId,

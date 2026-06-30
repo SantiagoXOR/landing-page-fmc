@@ -55,6 +55,44 @@ const validateFormosaPhone = (phone: string): boolean => {
   return false
 }
 
+/** Formosa o móvil argentino (549XXXXXXXXXX) — para alta manual en CRM */
+export const validateLeadPhone = (phone: string): boolean => {
+  if (!phone) return false
+  if (validateFormosaPhone(phone)) return true
+
+  const clean = phone.replace(/\D/g, '')
+  if (/^549\d{10}$/.test(clean)) return true
+  if (/^54\d{10,12}$/.test(clean)) return true
+  if (/^9\d{10}$/.test(clean)) return true
+  if (/^\d{10,11}$/.test(clean)) return true
+  return false
+}
+
+const LEAD_NULLISH_OPTIONAL_KEYS = [
+  'email',
+  'dni',
+  'cuil',
+  'zona',
+  'producto',
+  'origen',
+  'utmSource',
+  'agencia',
+  'banco',
+  'trabajo_actual',
+  'notas',
+] as const
+
+function preprocessLeadCreateBody(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw
+  const obj = { ...(raw as Record<string, unknown>) }
+  for (const key of LEAD_NULLISH_OPTIONAL_KEYS) {
+    if (obj[key] === null || obj[key] === '') obj[key] = undefined
+  }
+  if (obj.ingresos === null) obj.ingresos = undefined
+  if (obj.monto === null) obj.monto = undefined
+  return obj
+}
+
 const validateArgentinianEmail = (email: string): boolean => {
   if (!email) return true // Opcional
 
@@ -71,7 +109,9 @@ const validateArgentinianEmail = (email: string): boolean => {
   return true // Aceptamos todos los emails válidos
 }
 
-export const LeadCreateSchema = z.object({
+export const LeadCreateSchema = z.preprocess(
+  preprocessLeadCreateBody,
+  z.object({
   nombre: z.string()
     .min(2, 'Nombre debe tener al menos 2 caracteres')
     .max(100, 'Nombre no puede exceder 100 caracteres')
@@ -82,8 +122,9 @@ export const LeadCreateSchema = z.object({
   telefono: z.string()
     .min(10, 'Teléfono debe tener al menos 10 dígitos')
     .max(20, 'Teléfono no puede exceder 20 caracteres')
-    .refine(validateFormosaPhone, {
-      message: 'Teléfono debe ser válido para Formosa. Formatos aceptados: +54 3704XXXXXXX, 0 3704XXXXXXX, 3704XXXXXXX'
+    .refine(validateLeadPhone, {
+      message:
+        'Teléfono inválido. Formatos: +54 3704XXXXXXX (Formosa) o móvil +54 9 XX XXXX XXXX (ej. +54 9 354 7527070)',
     })
     .transform(val => val.replace(/\D/g, '')), // Limpiar formato
 
@@ -161,7 +202,8 @@ export const LeadCreateSchema = z.object({
     .max(1000, 'Notas no pueden exceder 1000 caracteres')
     .optional()
     .or(z.literal('').transform(() => undefined)),
-})
+  })
+)
 
 export const LeadUpdateSchema = z.object({
   nombre: z.string()

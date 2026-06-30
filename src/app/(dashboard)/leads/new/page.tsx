@@ -91,50 +91,61 @@ export default function NewLeadPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const success = await submitForm(async (data) => {
-      // Preparar datos para envío
-      const leadData = {
-        ...data,
-        telefono: data.telefono.replace(/[^\d]/g, ''), // Solo números
-        ingresos: data.ingresos ? parseInt(data.ingresos) : null,
-        monto: data.monto ? parseInt(data.monto) : null,
-        // Limpiar campos vacíos
-        email: data.email.trim() || null,
-        dni: data.dni.trim() || null,
-        zona: data.zona.trim() || null,
-        producto: data.producto.trim() || null,
-        origen: data.origen.trim() || null,
-        utmSource: data.utmSource.trim() || null,
-        agencia: data.agencia.trim() || null,
-        notas: data.notas.trim() || null
-      }
+    try {
+      const success = await submitForm(async (data) => {
+        const optionalText = (value: string) => {
+          const trimmed = value.trim()
+          return trimmed === '' ? undefined : trimmed
+        }
 
-      console.log('Sending lead data:', leadData)
+        const leadData = {
+          nombre: data.nombre.trim(),
+          telefono: data.telefono.replace(/[^\d]/g, ''),
+          estado: data.estado,
+          ...(optionalText(data.email) && { email: optionalText(data.email) }),
+          ...(optionalText(data.dni) && { dni: optionalText(data.dni) }),
+          ...(optionalText(data.zona) && { zona: optionalText(data.zona) }),
+          ...(optionalText(data.producto) && { producto: optionalText(data.producto) }),
+          ...(optionalText(data.origen) && { origen: optionalText(data.origen) }),
+          ...(optionalText(data.utmSource) && { utmSource: optionalText(data.utmSource) }),
+          ...(optionalText(data.agencia) && { agencia: optionalText(data.agencia) }),
+          ...(optionalText(data.notas) && { notas: optionalText(data.notas) }),
+          ...(data.ingresos ? { ingresos: parseInt(data.ingresos, 10) } : {}),
+          ...(data.monto ? { monto: parseInt(data.monto, 10) } : {}),
+        }
 
-      const response = await fetch('/api/leads', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(leadData)
+        console.log('Sending lead data:', leadData)
+
+        const response = await fetch('/api/leads', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(leadData)
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error('Error response:', errorData)
+          const detailMsg = Array.isArray(errorData.details)
+            ? errorData.details
+                .map((d: { field: string; message: string }) => `${d.field}: ${d.message}`)
+                .join(' · ')
+            : ''
+          throw new Error(detailMsg || errorData.message || errorData.error || 'Error al crear el lead')
+        }
+
+        const newLead = await response.json()
+
+        toast.success('Lead creado exitosamente')
+        router.push(`/leads/${newLead.id}`)
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        throw new Error(errorData.error || 'Error al crear el lead')
+      if (!success) {
+        toast.error('Revisá los campos marcados antes de guardar.')
       }
-
-      const newLead = await response.json()
-
-      toast.success('Lead creado exitosamente')
-
-      // Redirigir al lead creado
-      router.push(`/leads/${newLead.id}`)
-    })
-
-    if (!success) {
-      toast.error('Error al crear el lead. Revisa los campos marcados.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al crear el lead')
     }
   }
 
@@ -173,9 +184,9 @@ export default function NewLeadPage() {
               <OptimizedInput
                 label="Teléfono"
                 type="tel"
-                placeholder="+54 3704 123456"
+                placeholder="+54 9 354 7527070"
                 required
-                hint="Formato: +54 3704 123456 (Formosa)"
+                hint="Formosa: +54 3704 123456 · Móvil AR: +54 9 XX XXXX XXXX"
                 showValidation={touched.telefono}
                 {...getFieldProps('telefono')}
               />

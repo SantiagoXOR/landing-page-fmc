@@ -109,9 +109,7 @@ const validateArgentinianEmail = (email: string): boolean => {
   return true // Aceptamos todos los emails válidos
 }
 
-export const LeadCreateSchema = z.preprocess(
-  preprocessLeadCreateBody,
-  z.object({
+export const LeadCreateBodySchema = z.object({
   nombre: z.string()
     .min(2, 'Nombre debe tener al menos 2 caracteres')
     .max(100, 'Nombre no puede exceder 100 caracteres')
@@ -202,7 +200,13 @@ export const LeadCreateSchema = z.preprocess(
     .max(1000, 'Notas no pueden exceder 1000 caracteres')
     .optional()
     .or(z.literal('').transform(() => undefined)),
-  })
+})
+
+export const LeadCreateSchema = z.preprocess(preprocessLeadCreateBody, LeadCreateBodySchema)
+
+export const LeadCreatePartialSchema = z.preprocess(
+  preprocessLeadCreateBody,
+  LeadCreateBodySchema.partial()
 )
 
 export const LeadUpdateSchema = z.object({

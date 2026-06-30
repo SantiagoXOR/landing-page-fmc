@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { createTRPCRouter, protectedProcedure, adminProcedure } from '@/server/trpc'
 import { supabaseLeadService } from '@/server/services/supabase-lead-service'
-import { LeadCreateSchema, LeadQuerySchema } from '@/lib/validators'
+import { LeadCreateSchema, LeadCreatePartialSchema, LeadQuerySchema } from '@/lib/validators'
 import { checkPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { captureBusinessMetric } from '@/lib/monitoring-temp'
@@ -148,7 +148,7 @@ export const leadsRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        data: LeadCreateSchema.partial(),
+        data: LeadCreatePartialSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {

@@ -29,6 +29,9 @@ export interface RemarketingTemplateProfile {
 
 export const DEFAULT_REMARKETING_TEMPLATE_ID = 'seguimiento_credito'
 
+/** Ruta pública del banner autos referidos (servido desde /public) */
+export const REMARKETING_AUTOS_HEADER_PATH = '/landing/whatsapp/credito_autos_referidos.jpeg'
+
 export const REMARKETING_TEMPLATE_PROFILES: RemarketingTemplateProfile[] = [
   {
     id: DEFAULT_REMARKETING_TEMPLATE_ID,
@@ -135,9 +138,14 @@ export function resolveRemarketingHeaderUrl(profile: RemarketingTemplateProfile)
     if (value) return value
   }
 
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.formosafmc.com.ar').replace(/\/$/, '')
+
+  if (profile.id === 'credito_autos_referidos') {
+    return `${site}${REMARKETING_AUTOS_HEADER_PATH}`
+  }
+
   const generic = (process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL || '').trim()
   if (generic) return generic
 
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.formosafmc.com.ar').replace(/\/$/, '')
   return `${site}/landing/seo/og-image-1.png`
 }

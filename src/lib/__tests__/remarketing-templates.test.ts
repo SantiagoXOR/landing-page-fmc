@@ -68,4 +68,13 @@ describe('remarketing-templates', () => {
     )
     expect(profile.skipHeader).toBe(false)
   })
+
+  it('autos usa banner por defecto en public/landing/whatsapp', () => {
+    delete process.env.WHATSAPP_TEMPLATE_REMARKETING_AUTOS_HEADER_URL
+    delete process.env.WHATSAPP_TEMPLATE_HEADER_MEDIA_URL
+    const profile = getRemarketingTemplateProfile('credito_autos_referidos')!
+    expect(resolveRemarketingHeaderUrl(profile)).toBe(
+      'https://www.formosafmc.com.ar/landing/whatsapp/credito_autos_referidos.jpeg'
+    )
+  })
 })

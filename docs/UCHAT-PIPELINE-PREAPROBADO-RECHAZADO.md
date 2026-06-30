@@ -126,7 +126,7 @@ Al mover desde el pipeline, enviar en el body del POST:
 | `PIPELINE_REMARKETING_WHATSAPP_MESSAGE` | Texto por defecto para plantilla `seguimiento_credito` (modo mensaje completo). |
 | `WHATSAPP_TEMPLATE_REMARKETING` | Nombre Meta para `seguimiento_credito`; si vacía, usa `WHATSAPP_TEMPLATE_PIPELINE_NOTIFY`. |
 | `WHATSAPP_TEMPLATE_REMARKETING_AUTOS` | Nombre Meta para `credito_autos_referidos` (default: `credito_autos_referidos`). |
-| `WHATSAPP_TEMPLATE_REMARKETING_AUTOS_HEADER_URL` | **Obligatorio** para autos: URL HTTPS pública del banner (header IMAGE variable en Meta). |
+| `WHATSAPP_TEMPLATE_REMARKETING_AUTOS_HEADER_URL` | (Opcional) Sobrescribe el banner. Por defecto: `https://www.formosafmc.com.ar/landing/whatsapp/credito_autos_referidos.jpeg` |
 | `WHATSAPP_TEMPLATE_BODY_PARAMETER_NAME` | Variable del cuerpo para seguimiento (ej. `mensaje_pipeline`). |
 | `UCHAT_INBOUND_WEBHOOK_REMARKETING_URL` | Webhook Uchat al entrar en Remarketing. |
 

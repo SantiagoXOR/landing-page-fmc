@@ -186,7 +186,7 @@ async function postHandler(
     }
 
     // Verificar permisos granulares
-    const hasCreatePermission = await checkUserPermission(session.user.id, 'leads', 'create')
+    const hasCreatePermission = await checkUserPermission(session.user.id, 'leads', 'write')
     
     if (!hasCreatePermission) {
       logger.warn('Permission denied for lead creation', {

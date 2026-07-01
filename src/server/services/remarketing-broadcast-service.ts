@@ -9,14 +9,20 @@ import {
   getRemarketingTemplateProfile,
 } from '@/lib/remarketing-templates'
 import {
+  getBroadcastStageLabel,
+  resolvePipelineStagesForStageId,
+} from '@/lib/pipeline-stage-map'
+import {
   sendRemarketingWhatsAppToLead,
   type PipelineNotifyLead,
 } from '@/server/services/uchat-pipeline-notify'
 
 export const REMARKETING_BROADCAST_STAGE_ID = 'remarketing'
-export const REMARKETING_PIPELINE_STAGE = 'REMARKETING'
 export const BROADCAST_BATCH_SIZE = 5
 export const BROADCAST_SEND_DELAY_MS = 800
+const LEAD_PIPELINE_PAGE = 500
+const LEAD_FETCH_CHUNK = 100
+const ITEM_INSERT_CHUNK = 100
 
 export type BroadcastJobStatus =
   | 'pending'
@@ -70,75 +76,126 @@ function assertSupabase() {
   return supabaseClient
 }
 
-async function fetchRemarketingLeads(): Promise<PipelineNotifyLead[]> {
+async function fetchLeadIdsInStages(pipelineStages: string[]): Promise<string[]> {
   const db = assertSupabase()
+  const allIds: string[] = []
+  let offset = 0
 
-  const { data: pipelines, error: pipelineError } = await db
-    .from('lead_pipeline')
-    .select('lead_id')
-    .eq('current_stage', REMARKETING_PIPELINE_STAGE)
+  while (true) {
+    const { data, error } = await db
+      .from('lead_pipeline')
+      .select('lead_id')
+      .in('current_stage', pipelineStages)
+      .range(offset, offset + LEAD_PIPELINE_PAGE - 1)
 
-  if (pipelineError) {
-    throw new Error(`Error al listar leads en Remarketing: ${pipelineError.message}`)
+    if (error) {
+      throw new Error(`Error al listar leads: ${error.message}`)
+    }
+
+    const batch = (data || []).map((p) => p.lead_id as string).filter(Boolean)
+    if (batch.length === 0) break
+
+    allIds.push(...batch)
+    if (batch.length < LEAD_PIPELINE_PAGE) break
+    offset += LEAD_PIPELINE_PAGE
   }
 
-  const leadIds = (pipelines || [])
-    .map((p) => p.lead_id as string)
-    .filter(Boolean)
-
-  if (leadIds.length === 0) {
-    return []
-  }
-
-  const { data: leads, error: leadsError } = await db
-    .from('Lead')
-    .select('id, nombre, telefono, manychatId')
-    .in('id', leadIds)
-
-  if (leadsError) {
-    throw new Error(`Error al cargar contactos: ${leadsError.message}`)
-  }
-
-  return (leads || []).map((l) => ({
-    id: l.id as string,
-    nombre: l.nombre as string | null,
-    telefono: l.telefono as string | null,
-    manychatId: l.manychatId as string | null,
-  }))
+  return allIds
 }
 
+async function fetchLeadsByIds(leadIds: string[]): Promise<PipelineNotifyLead[]> {
+  if (leadIds.length === 0) return []
+
+  const db = assertSupabase()
+  const leads: PipelineNotifyLead[] = []
+
+  for (let i = 0; i < leadIds.length; i += LEAD_FETCH_CHUNK) {
+    const chunk = leadIds.slice(i, i + LEAD_FETCH_CHUNK)
+    const { data, error } = await db
+      .from('Lead')
+      .select('id, nombre, telefono, manychatId')
+      .in('id', chunk)
+
+    if (error) {
+      throw new Error(`Error al cargar contactos: ${error.message}`)
+    }
+
+    for (const l of data || []) {
+      leads.push({
+        id: l.id as string,
+        nombre: l.nombre as string | null,
+        telefono: l.telefono as string | null,
+        manychatId: l.manychatId as string | null,
+      })
+    }
+  }
+
+  return leads
+}
+
+async function fetchLeadsByStageId(stageId: string): Promise<PipelineNotifyLead[]> {
+  const pipelineStages = resolvePipelineStagesForStageId(stageId)
+  if (pipelineStages.length === 0) {
+    throw new Error(`Etapa desconocida: ${stageId}`)
+  }
+
+  const leadIds = await fetchLeadIdsInStages(pipelineStages)
+  return fetchLeadsByIds(leadIds)
+}
+
+export async function countBroadcastTargets(stageId: string = REMARKETING_BROADCAST_STAGE_ID): Promise<number> {
+  const pipelineStages = resolvePipelineStagesForStageId(stageId)
+  if (pipelineStages.length === 0) return 0
+
+  const db = assertSupabase()
+  const { count, error } = await db
+    .from('lead_pipeline')
+    .select('*', { count: 'exact', head: true })
+    .in('current_stage', pipelineStages)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return count || 0
+}
+
+/** @deprecated use countBroadcastTargets */
 export async function countRemarketingBroadcastTargets(): Promise<number> {
-  const leads = await fetchRemarketingLeads()
-  return leads.length
+  return countBroadcastTargets(REMARKETING_BROADCAST_STAGE_ID)
 }
 
 export async function createRemarketingBroadcastJob(options: {
   createdBy: string
   templateId: string
+  stageId?: string
   customMessage?: string | null
   leadIds?: string[]
 }): Promise<{ job: BroadcastJobRow; skippedNoPhone: number }> {
   const db = assertSupabase()
+  const stageId = (options.stageId || REMARKETING_BROADCAST_STAGE_ID).trim()
   const templateId = (options.templateId || DEFAULT_REMARKETING_TEMPLATE_ID).trim()
   if (!getRemarketingTemplateProfile(templateId)) {
     throw new Error(`Plantilla desconocida: ${templateId}`)
   }
 
-  let leads = await fetchRemarketingLeads()
+  let leads = await fetchLeadsByStageId(stageId)
   if (options.leadIds?.length) {
     const allowed = new Set(options.leadIds)
     leads = leads.filter((l) => allowed.has(l.id))
   }
 
   if (leads.length === 0) {
-    throw new Error('No hay leads en etapa Remarketing para enviar')
+    throw new Error(
+      `No hay leads en etapa ${getBroadcastStageLabel(stageId)} para enviar`
+    )
   }
 
   const { data: job, error: jobError } = await db
     .from('whatsapp_broadcast_jobs')
     .insert({
       created_by: options.createdBy,
-      stage_id: REMARKETING_BROADCAST_STAGE_ID,
+      stage_id: stageId,
       template_id: templateId,
       custom_message: options.customMessage?.trim() || null,
       status: 'pending',
@@ -159,10 +216,13 @@ export async function createRemarketingBroadcastJob(options: {
     status: 'pending' as BroadcastItemStatus,
   }))
 
-  const { error: itemsError } = await db.from('whatsapp_broadcast_items').insert(items)
-  if (itemsError) {
-    await db.from('whatsapp_broadcast_jobs').delete().eq('id', job.id)
-    throw new Error(`Error al encolar contactos: ${itemsError.message}`)
+  for (let i = 0; i < items.length; i += ITEM_INSERT_CHUNK) {
+    const chunk = items.slice(i, i + ITEM_INSERT_CHUNK)
+    const { error: itemsError } = await db.from('whatsapp_broadcast_items').insert(chunk)
+    if (itemsError) {
+      await db.from('whatsapp_broadcast_jobs').delete().eq('id', job.id)
+      throw new Error(`Error al encolar contactos: ${itemsError.message}`)
+    }
   }
 
   logger.info('Remarketing broadcast job created', {

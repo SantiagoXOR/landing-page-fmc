@@ -43,6 +43,7 @@ import { useLongPress } from '@/hooks/useLongPress'
 import { REJECTION_MESSAGES, REJECTION_MESSAGE_OPTIONS } from '@/lib/rejection-messages'
 import { isRemarketingStageId } from '@/lib/remarketing-templates'
 import { RemarketingTemplateModal } from '@/components/pipeline/RemarketingTemplateModal'
+import { BulkStageMoveDialog } from '@/components/pipeline/BulkStageMoveDialog'
 import { formatDate } from '@/lib/utils'
 
 interface PipelineBoardAdvancedProps {
@@ -53,6 +54,7 @@ interface PipelineBoardAdvancedProps {
   onStageClick?: (stage: PipelineStage) => void
   onAddLead?: (stageId: string) => void
   onLeadMoved?: (leadId: string, newStageId: string) => void
+  onBulkMoveComplete?: () => void
   isLoading?: boolean
   className?: string
 }
@@ -65,6 +67,7 @@ export function PipelineBoardAdvanced({
   onStageClick,
   onAddLead,
   onLeadMoved,
+  onBulkMoveComplete,
   isLoading = false,
   className = ''
 }: PipelineBoardAdvancedProps) {
@@ -76,6 +79,10 @@ export function PipelineBoardAdvanced({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [pendingRemarketingDrag, setPendingRemarketingDrag] = useState<DragDropResult | null>(null)
   const [remarketingDragLoading, setRemarketingDragLoading] = useState(false)
+  const [bulkMove, setBulkMove] = useState<{
+    fromStage: PipelineStage
+    toStage: PipelineStage
+  } | null>(null)
 
   /** Chunk size para carga progresiva al hacer scroll en cada columna */
   const CHUNK_SIZE = 40
@@ -458,6 +465,10 @@ export function PipelineBoardAdvanced({
 
   const filteredLeads = filteredLeadsByStage()
   
+  const bulkMoveTotalCount = bulkMove
+    ? (filteredLeads[bulkMove.fromStage.id]?.length ?? getStageStats(bulkMove.fromStage.id).count ?? 0)
+    : 0
+  
   // Verificar si hay leads en total
   const totalLeads = Object.values(filteredLeads).reduce((sum, stageLeads) => sum + stageLeads.length, 0)
   const hasAnyLeads = totalLeads > 0
@@ -640,6 +651,9 @@ export function PipelineBoardAdvanced({
                         stages={stages}
                         onLeadMove={handleLeadMoveToStage}
                         onLeadMoved={onLeadMoved}
+                        onBulkMoveAll={(fromStage, toStage) =>
+                          setBulkMove({ fromStage, toStage })
+                        }
                         scrollContainerRef={scrollContainerRef}
                       />
                     </div>
@@ -681,6 +695,18 @@ export function PipelineBoardAdvanced({
         onCancel={() => setPendingRemarketingDrag(null)}
         isLoading={remarketingDragLoading}
       />
+
+      <BulkStageMoveDialog
+        open={!!bulkMove}
+        fromStage={bulkMove?.fromStage ?? null}
+        toStage={bulkMove?.toStage ?? null}
+        totalCount={bulkMoveTotalCount}
+        onClose={() => setBulkMove(null)}
+        onComplete={() => {
+          toast.success('Movimiento masivo completado')
+          onBulkMoveComplete?.()
+        }}
+      />
     </div>
   )
 }
@@ -705,6 +731,7 @@ interface PipelineStageColumnProps {
   stages: PipelineStage[]
   onLeadMove?: (leadId: string, toStageId: string) => Promise<void>
   onLeadMoved?: (leadId: string, newStageId: string) => void
+  onBulkMoveAll?: (fromStage: PipelineStage, toStage: PipelineStage) => void
   scrollContainerRef: React.RefObject<HTMLDivElement>
 }
 
@@ -727,6 +754,7 @@ function PipelineStageColumn({
   stages,
   onLeadMove,
   onLeadMoved,
+  onBulkMoveAll,
   scrollContainerRef
 }: PipelineStageColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -946,9 +974,44 @@ function PipelineStageColumn({
                   <Plus className="h-4 w-4" />
                 </Button>
               )}
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+              {onBulkMoveAll && stats.count > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      Mover todos ({stats.count})
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {stages
+                      .filter((s) => s.id !== stage.id)
+                      .sort((a, b) => a.order - b.order)
+                      .map((dest) => (
+                        <DropdownMenuItem
+                          key={dest.id}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onBulkMoveAll(stage, dest)
+                          }}
+                        >
+                          → {dest.name}
+                        </DropdownMenuItem>
+                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {!onBulkMoveAll && (
+                <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
           

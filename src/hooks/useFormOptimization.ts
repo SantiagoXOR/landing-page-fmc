@@ -137,7 +137,7 @@ export function useFormOptimization<T extends Record<string, any>>(
         
         return {
           ...prev,
-          errors: { ...prev.errors, ...fullErrors },
+          errors: fullErrors,
           isValid
         }
       })

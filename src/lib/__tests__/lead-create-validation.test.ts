@@ -29,6 +29,18 @@ describe('LeadCreateSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('acepta móvil local de 10 dígitos (3547531646)', () => {
+    const result = LeadCreateSchema.safeParse({
+      nombre: 'Lucas Martinez',
+      telefono: '3547531646',
+      estado: 'NUEVO',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.telefono).toBe('3547531646')
+    }
+  })
+
   it('rechaza DNI con dígito verificador inválido', () => {
     const result = LeadCreateSchema.safeParse({
       nombre: 'Santiago Martinez',
@@ -45,5 +57,6 @@ describe('validateLeadPhone', () => {
     expect(validateLeadPhone('37041234567')).toBe(true)
     expect(validateLeadPhone('5493547527070')).toBe(true)
     expect(validateLeadPhone('+54 9 354 7527070')).toBe(true)
+    expect(validateLeadPhone('3547531646')).toBe(true)
   })
 })

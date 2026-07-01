@@ -7,7 +7,8 @@ import { z } from 'zod'
 import { automationService } from '@/services/automation-service'
 import { pipelineService } from '@/server/services/pipeline-service'
 import { supabase } from '@/lib/db'
-import { getTagForStage, getPipelineTags } from '@/lib/pipeline-stage-tags'
+import { getTagForStage } from '@/lib/pipeline-stage-tags'
+import { assignStageTagForLead } from '@/server/services/pipeline-stage-tag-assignment'
 import {
   notifyPipelinePreaprobado,
   notifyPipelineRechazado,
@@ -30,6 +31,7 @@ const MoveLeadSchema = z.object({
   rejectionMessage: z.string().optional(), // Mensaje de rechazo seleccionado para Instagram
   remarketingMessage: z.string().optional(), // Texto personalizado para plantilla de remarketing
   remarketingTemplateId: z.string().optional(), // Perfil de plantilla (ver src/lib/remarketing-templates.ts)
+  skipNotifications: z.boolean().optional().default(false),
 })
 
 /**
@@ -92,7 +94,7 @@ export async function POST(
       throw error
     }
 
-    const { fromStageId, toStageId, notes, reason, rejectionMessage, remarketingMessage, remarketingTemplateId } = validatedData
+    const { fromStageId, toStageId, notes, reason, rejectionMessage, remarketingMessage, remarketingTemplateId, skipNotifications } = validatedData
 
     logger.info('Moving lead', {
       leadId,
@@ -413,7 +415,7 @@ export async function POST(
 
     // Asignar tags según la nueva etapa (solo en CRM, sin sincronización externa)
     try {
-      await assignStageTag(leadId, normalizedToStageId)
+      await assignStageTagForLead(leadId, normalizedToStageId)
     } catch (tagError: any) {
       logger.warn('Failed to assign stage tag', {
         error: tagError.message,
@@ -424,6 +426,7 @@ export async function POST(
     }
 
     // Preaprobado / Rechazado / Remarketing: webhook Uchat y/o WhatsApp Meta (await: Vercel corta el handler si es void)
+    if (!skipNotifications) {
     if (isPreaprobadoStageId(normalizedToStageId)) {
       const tagPre = await getTagForStage('PREAPROBADO').catch(() => null)
       try {
@@ -488,6 +491,7 @@ export async function POST(
           error: e instanceof Error ? e.message : String(e),
         })
       }
+    }
     }
 
     // Ejecutar automatizaciones de la nueva etapa (no crítico si falla)
@@ -650,120 +654,6 @@ async function validateStageTransition(
     isValid: errors.length === 0,
     errors,
     warnings
-  }
-}
-
-// Función para asignar tags según la etapa
-async function assignStageTag(leadId: string, stageId: string): Promise<void> {
-  try {
-    // Obtener lead actual
-    const lead = await supabase.findLeadById(leadId)
-    if (!lead) {
-      logger.warn('Lead not found for tag assignment', { leadId })
-      return
-    }
-
-    // Mapear stageId a enum de etapa para consultar la tabla
-    const stageMapping: Record<string, string> = {
-      'cliente-nuevo': 'CLIENTE_NUEVO',
-      'consultando-credito': 'CONSULTANDO_CREDITO',
-      'solicitando-docs': 'SOLICITANDO_DOCS',
-      'solicitando-documentacion': 'SOLICITANDO_DOCS',
-      'listo-analisis': 'LISTO_ANALISIS',
-      'preaprobado': 'PREAPROBADO',
-      'aprobado': 'APROBADO',
-      'en-seguimiento': 'EN_SEGUIMIENTO',
-      'cerrado-ganado': 'CERRADO_GANADO',
-      'cerrado_ganado': 'CERRADO_GANADO',
-      'venta-cerrada': 'CERRADO_GANADO',
-      'rechazado': 'RECHAZADO',
-      'cerrado-perdido': 'RECHAZADO',
-      'cerrado_perdido': 'RECHAZADO',
-      'encuesta': 'ENCUESTA',
-      'encuesta-pendiente': 'ENCUESTA',
-      'solicitar-referido': 'SOLICITAR_REFERIDO',
-      'remarketing': 'REMARKETING',
-      // Legacy
-      'nuevo': 'CLIENTE_NUEVO',
-      'contactado': 'CONSULTANDO_CREDITO',
-      'calificado': 'LISTO_ANALISIS',
-      'propuesta': 'PREAPROBADO',
-      'negociacion': 'APROBADO'
-    }
-
-    const stageEnum = stageMapping[stageId] || stageId
-
-    // Obtener el tag para esta etapa desde la base de datos (pipeline_stage_tags)
-    const tagToAdd = await getTagForStage(stageEnum)
-    if (!tagToAdd) {
-      logger.warn('No tag mapping found for stage', { 
-        leadId, 
-        stageId, 
-        stageEnum
-      })
-      return
-    }
-    
-    // Log detallado para debugging de tags incorrectos
-    logger.info('Tag assignment for stage', {
-      leadId,
-      stageId,
-      stageEnum,
-      tag: tagToAdd,
-      expectedTag: stageEnum === 'PREAPROBADO' ? 'credito-preaprobado' : 
-                    stageEnum === 'APROBADO' ? 'credito-aprobado' : 'unknown',
-      tagMatches: (stageEnum === 'PREAPROBADO' && tagToAdd === 'credito-preaprobado') ||
-                  (stageEnum === 'APROBADO' && tagToAdd === 'credito-aprobado')
-    })
-
-    // Obtener todos los tags de pipeline para filtrar
-    const pipelineTagNames = await getPipelineTags()
-
-    // Obtener tags actuales del lead
-    let currentTags: string[] = []
-    if (lead.tags) {
-      try {
-        currentTags = typeof lead.tags === 'string' 
-          ? JSON.parse(lead.tags) 
-          : lead.tags
-      } catch {
-        currentTags = Array.isArray(lead.tags) ? lead.tags : []
-      }
-    }
-
-    // En "Listo para Análisis" el lead debe tener SOLO el tag solicitud-en-proceso
-    let filteredTags: string[]
-    if (stageEnum === 'LISTO_ANALISIS') {
-      filteredTags = [tagToAdd]
-    } else {
-      // Remover todos los tags de pipeline (excepto el nuevo que vamos a agregar)
-      filteredTags = currentTags.filter(tag => !pipelineTagNames.includes(tag))
-      if (!filteredTags.includes(tagToAdd)) {
-        filteredTags.push(tagToAdd)
-      }
-    }
-
-    // Actualizar lead con nuevos tags
-    await supabase.updateLead(leadId, {
-      tags: JSON.stringify(filteredTags)
-    })
-
-    logger.info('Stage tag assigned', {
-      leadId,
-      stageId,
-      stageEnum,
-      tag: tagToAdd,
-      previousTags: currentTags,
-      newTags: filteredTags
-    })
-
-  } catch (error) {
-    logger.error('Error assigning stage tag', {
-      leadId,
-      stageId,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    })
-    // No lanzar error, es opcional
   }
 }
 

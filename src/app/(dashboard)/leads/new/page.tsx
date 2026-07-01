@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { useFormOptimization } from '@/hooks/useFormOptimization'
 import { OptimizedInput, OptimizedTextarea, OptimizedSelect, FormStatus } from '@/components/ui/optimized-form-field'
 import { SelectItem } from '@/components/ui/select'
-import { FORMOSA_ZONES } from '@/lib/validators'
+import { FORMOSA_ZONES, validateLeadPhone } from '@/lib/validators'
 import { z } from 'zod'
 import { LoadingButton } from '@/components/ui/loading-states'
 import { toast } from 'sonner'
@@ -32,8 +32,15 @@ interface LeadFormData {
 
 // Schema específico para el formulario (todos los campos como strings)
 const LeadFormSchema = z.object({
-  nombre: z.string().min(2, 'Nombre debe tener al menos 2 caracteres'),
-  telefono: z.string().min(10, 'Teléfono debe tener al menos 10 dígitos'),
+  nombre: z.string()
+    .min(2, 'Nombre debe tener al menos 2 caracteres')
+    .refine(val => val.trim().split(/\s+/).length >= 2, 'Debe incluir nombre y apellido'),
+  telefono: z.string()
+    .refine(val => val.replace(/\D/g, '').length >= 10, 'Teléfono debe tener al menos 10 dígitos')
+    .refine(validateLeadPhone, {
+      message:
+        'Teléfono inválido. Formatos: +54 3704XXXXXXX (Formosa) o móvil +54 9 XX XXXX XXXX (ej. +54 9 354 7527070)',
+    }),
   email: z.string().email('Email inválido').or(z.literal('')),
   dni: z.string().max(8, 'DNI no puede exceder 8 dígitos').or(z.literal('')),
   ingresos: z.string().or(z.literal('')),

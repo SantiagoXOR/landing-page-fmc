@@ -713,6 +713,7 @@ function PipelinePage() {
             leads={leads}
             onLeadMove={handleLeadMove}
             onLeadMoved={handleLeadMoved}
+            onBulkMoveComplete={() => loadPipelineData(false)}
             onLeadClick={handleLeadClick}
             onStageClick={handleStageClick}
             onAddLead={handleAddLead}

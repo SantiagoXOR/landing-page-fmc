@@ -118,8 +118,8 @@ export const LeadCreateBodySchema = z.object({
     .refine(val => val.split(' ').length >= 2, 'Debe incluir nombre y apellido'),
 
   telefono: z.string()
-    .min(10, 'Teléfono debe tener al menos 10 dígitos')
     .max(20, 'Teléfono no puede exceder 20 caracteres')
+    .refine(val => val.replace(/\D/g, '').length >= 10, 'Teléfono debe tener al menos 10 dígitos')
     .refine(validateLeadPhone, {
       message:
         'Teléfono inválido. Formatos: +54 3704XXXXXXX (Formosa) o móvil +54 9 XX XXXX XXXX (ej. +54 9 354 7527070)',

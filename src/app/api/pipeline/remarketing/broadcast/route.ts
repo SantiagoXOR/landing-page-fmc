@@ -5,16 +5,19 @@ import { checkUserPermission } from '@/lib/rbac'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 import {
-  countRemarketingBroadcastTargets,
+  countBroadcastTargets,
   createRemarketingBroadcastJob,
   listRemarketingBroadcastJobs,
+  REMARKETING_BROADCAST_STAGE_ID,
 } from '@/server/services/remarketing-broadcast-service'
 import { DEFAULT_REMARKETING_TEMPLATE_ID } from '@/lib/remarketing-templates'
+import { BROADCAST_STAGE_OPTIONS } from '@/lib/pipeline-stage-map'
 
 export const dynamic = 'force-dynamic'
 
 const CreateBroadcastSchema = z.object({
   templateId: z.string().min(1).optional().default(DEFAULT_REMARKETING_TEMPLATE_ID),
+  stageId: z.string().min(1).optional().default(REMARKETING_BROADCAST_STAGE_ID),
   customMessage: z.string().max(1024).optional().nullable(),
   leadIds: z.array(z.string().uuid()).optional(),
 })
@@ -46,9 +49,20 @@ export async function GET(request: NextRequest) {
     if (forbidden) return forbidden
 
     const { searchParams } = new URL(request.url)
+    if (searchParams.get('preview') === 'stages') {
+      const stages = await Promise.all(
+        BROADCAST_STAGE_OPTIONS.map(async (stage) => ({
+          ...stage,
+          count: await countBroadcastTargets(stage.id),
+        }))
+      )
+      return NextResponse.json({ stages })
+    }
+
     if (searchParams.get('preview') === 'targets') {
-      const count = await countRemarketingBroadcastTargets()
-      return NextResponse.json({ stageId: 'remarketing', count })
+      const stageId = searchParams.get('stageId') || REMARKETING_BROADCAST_STAGE_ID
+      const count = await countBroadcastTargets(stageId)
+      return NextResponse.json({ stageId, count })
     }
 
     const jobs = await listRemarketingBroadcastJobs(20)
@@ -93,6 +107,7 @@ export async function POST(request: NextRequest) {
     const { job } = await createRemarketingBroadcastJob({
       createdBy: session.user.id,
       templateId: parsed.data.templateId,
+      stageId: parsed.data.stageId,
       customMessage: parsed.data.customMessage,
       leadIds: parsed.data.leadIds,
     })

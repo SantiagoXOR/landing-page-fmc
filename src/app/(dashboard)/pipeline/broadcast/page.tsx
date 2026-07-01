@@ -23,6 +23,14 @@ import {
   getRemarketingTemplatesForUi,
   formatRemarketingPreview,
 } from '@/lib/remarketing-templates'
+import { BROADCAST_STAGE_OPTIONS } from '@/lib/pipeline-stage-map'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface BroadcastJob {
   id: string
@@ -68,7 +76,8 @@ function itemIcon(status: string) {
 export default function RemarketingBroadcastPage() {
   const templates = getRemarketingTemplatesForUi()
   const [selectedTemplateId, setSelectedTemplateId] = useState(DEFAULT_REMARKETING_TEMPLATE_ID)
-  const [targetCount, setTargetCount] = useState<number | null>(null)
+  const [selectedStageId, setSelectedStageId] = useState('preaprobado')
+  const [stageCounts, setStageCounts] = useState<Record<string, number>>({})
   const [loadingPreview, setLoadingPreview] = useState(true)
   const [recentJobs, setRecentJobs] = useState<BroadcastJob[]>([])
   const [activeJob, setActiveJob] = useState<BroadcastJob | null>(null)
@@ -77,16 +86,23 @@ export default function RemarketingBroadcastPage() {
   const cancelRef = useRef(false)
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
+  const selectedStageLabel =
+    BROADCAST_STAGE_OPTIONS.find((s) => s.id === selectedStageId)?.label || selectedStageId
+  const targetCount = stageCounts[selectedStageId] ?? null
 
-  const loadPreview = useCallback(async () => {
+  const loadStageCounts = useCallback(async () => {
     setLoadingPreview(true)
     try {
-      const res = await fetch('/api/pipeline/remarketing/broadcast?preview=targets')
-      if (!res.ok) throw new Error('No se pudo cargar el conteo')
+      const res = await fetch('/api/pipeline/remarketing/broadcast?preview=stages')
+      if (!res.ok) throw new Error('No se pudo cargar etapas')
       const data = await res.json()
-      setTargetCount(data.count ?? 0)
+      const counts: Record<string, number> = {}
+      for (const stage of data.stages || []) {
+        counts[stage.id] = stage.count ?? 0
+      }
+      setStageCounts(counts)
     } catch {
-      setTargetCount(null)
+      setStageCounts({})
     } finally {
       setLoadingPreview(false)
     }
@@ -105,9 +121,9 @@ export default function RemarketingBroadcastPage() {
   }, [])
 
   useEffect(() => {
-    loadPreview()
+    loadStageCounts()
     loadRecentJobs()
-  }, [loadPreview, loadRecentJobs])
+  }, [loadStageCounts, loadRecentJobs])
 
   const refreshJobDetail = async (jobId: string) => {
     const res = await fetch(`/api/pipeline/remarketing/broadcast/${jobId}`)
@@ -161,7 +177,7 @@ export default function RemarketingBroadcastPage() {
 
   const handleStart = async () => {
     if (!targetCount || targetCount === 0) {
-      toast.error('No hay contactos en etapa Remarketing')
+      toast.error(`No hay contactos en etapa ${selectedStageLabel}`)
       return
     }
 
@@ -170,7 +186,10 @@ export default function RemarketingBroadcastPage() {
       const res = await fetch('/api/pipeline/remarketing/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: selectedTemplateId }),
+        body: JSON.stringify({
+          templateId: selectedTemplateId,
+          stageId: selectedStageId,
+        }),
       })
       if (!res.ok) {
         const err = await res.json()
@@ -228,22 +247,45 @@ export default function RemarketingBroadcastPage() {
                 Nueva campaña
               </CardTitle>
               <CardDescription>
-                Envía la plantilla WhatsApp a todos los contactos en la columna{' '}
-                <strong>Remarketing</strong> del pipeline. Los envíos van en cola (~5 por lote, 800 ms
-                entre mensajes).
+                Enviá una plantilla WhatsApp a <strong>todos los contactos de una etapa</strong> del
+                pipeline. No hace falta moverlos uno por uno a Remarketing. Cola: ~5 por lote, 800 ms
+                entre mensajes.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Etapa del pipeline</p>
+                <Select
+                  value={selectedStageId}
+                  onValueChange={setSelectedStageId}
+                  disabled={isRunning}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elegir etapa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BROADCAST_STAGE_OPTIONS.map((stage) => (
+                      <SelectItem key={stage.id} value={stage.id}>
+                        {stage.label}
+                        {stageCounts[stage.id] != null ? ` (${stageCounts[stage.id]})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="rounded-md border bg-muted/40 p-4">
                 {loadingPreview ? (
                   <LoadingSpinner size="sm" />
                 ) : (
                   <p className="text-lg font-semibold">
-                    {targetCount ?? '—'} contacto{targetCount === 1 ? '' : 's'} en Remarketing
+                    {targetCount ?? '—'} contacto{targetCount === 1 ? '' : 's'} en{' '}
+                    {selectedStageLabel}
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Solo se incluyen leads con etapa pipeline REMARKETING.
+                  Se envía a todos los leads de esa columna en Ventas. Meta limita ~250 usuarios
+                  únicos/día al inicio; campañas grandes pueden requerir varios días o tier superior.
                 </p>
               </div>
 

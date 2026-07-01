@@ -135,3 +135,30 @@ Mensaje por defecto seguimiento: *"Hola {nombre}, seguimos disponibles para ayud
 **Nueva plantilla autos en Meta:** categoría Marketing, header imagen fija, cuerpo con `{{nombre_contacto}}` al inicio y copy fijo, botón a formosafmc.com.ar. Luego configurar `WHATSAPP_TEMPLATE_REMARKETING_AUTOS=credito_autos_referidos` (o el nombre exacto aprobado).
 
 Migración BD: `scripts/migrations/003_add_remarketing_pipeline_stage.sql` + `004_add_remarketing_stage_tag.sql`.
+
+## Broadcast masivo (Remarketing)
+
+Pantalla: **`/pipeline/broadcast`** (menú CRM → Broadcast WhatsApp).
+
+1. Lista todos los leads en etapa pipeline **REMARKETING**.
+2. Elegís plantilla (`seguimiento_credito` o `credito_autos_referidos`).
+3. Crea un job en Supabase (`whatsapp_broadcast_jobs` + `whatsapp_broadcast_items`).
+4. Procesa en lotes de 5 con pausa de 800 ms (respeta límites Meta).
+5. Logs por contacto: `sent` / `failed` / `skipped` (sin teléfono válido).
+
+**Migración requerida:** `scripts/migrations/006_whatsapp_broadcast.sql`
+
+**API:**
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/pipeline/remarketing/broadcast?preview=targets` | Cantidad en Remarketing |
+| POST | `/api/pipeline/remarketing/broadcast` | Crear job `{ templateId }` |
+| POST | `/api/pipeline/remarketing/broadcast/[jobId]/process` | Procesar siguiente lote |
+| GET | `/api/pipeline/remarketing/broadcast/[jobId]` | Estado + logs |
+| DELETE | `/api/pipeline/remarketing/broadcast/[jobId]` | Cancelar campaña |
+
+Permiso: `pipeline:write` (ADMIN, MANAGER, VENDEDOR).
+
+No dispara webhook Uchat (solo Meta + historial en Chats). Para incluir Uchat en bulk, evaluar integración futura.
+

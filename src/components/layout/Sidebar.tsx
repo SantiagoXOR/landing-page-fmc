@@ -91,6 +91,11 @@ const createNavigation = (leadsCount: number, chatsCount: number): NavigationIte
     icon: TrendingUp
   },
   {
+    name: "Broadcast WhatsApp",
+    href: "/pipeline/broadcast",
+    icon: Radio
+  },
+  {
     name: "Documentos",
     href: "/documents",
     icon: FileText,
